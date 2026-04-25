@@ -2,14 +2,14 @@
 
 <div align="center">
 
-![TimeLens Logo](docs/assets/logo.png)
+![TimeLens Logo](docs/assets/icon.png)
 
 **轻量级桌面屏幕时间追踪器 & 浮动小组件管理器**
 
 [![CI](https://github.com/PythonSmall-Q/TimeLens/actions/workflows/ci.yml/badge.svg)](https://github.com/PythonSmall-Q/TimeLens/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/PythonSmall-Q/TimeLens)](https://github.com/PythonSmall-Q/TimeLens/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/平台-Windows%20%7C%20macOS-lightgrey)](https://github.com/PythonSmall-Q/TimeLens/releases)
+[![Platform](https://img.shields.io/badge/平台-Windows-lightgrey)](https://github.com/PythonSmall-Q/TimeLens/releases)
 
 [English](README.md) · [简体中文](#)
 
@@ -28,15 +28,6 @@
 
 ---
 
-## 📸 截图
-
-> *（将截图放入 `docs/assets/` 并更新下方路径。）*
-
-| 仪表盘 | 小组件中心 | 浮动时钟 |
-|-------|----------|---------|
-| ![](docs/assets/dashboard.png) | ![](docs/assets/widgets.png) | ![](docs/assets/clock.png) |
-
----
 
 ## 🛠 技术栈
 
