@@ -240,44 +240,78 @@ pub fn get_recent_executables(limit: Option<u32>, db: State<DbState>) -> Result<
 pub fn get_running_executables() -> Result<Vec<ExecutableOption>, String> {
     #[cfg(target_os = "windows")]
     {
-        use std::collections::BTreeSet;
-        use std::process::Command;
+        use std::collections::BTreeMap;
+        use windows::Win32::Foundation::CloseHandle;
+        use windows::Win32::System::ProcessStatus::{EnumProcesses, GetModuleFileNameExW};
+        use windows::Win32::System::Threading::{
+            OpenProcess, PROCESS_QUERY_INFORMATION, PROCESS_VM_READ,
+        };
 
-        let output = Command::new("tasklist")
-            .args(["/fo", "csv", "/nh"])
-            .output()
-            .map_err(|e| e.to_string())?;
+        let pids: Vec<u32> = unsafe {
+            // Retry with a larger buffer until EnumProcesses fills less than the whole buffer,
+            // which guarantees we received all process IDs.
+            let mut buf = vec![0u32; 1024];
+            loop {
+                let buf_bytes = (buf.len() * std::mem::size_of::<u32>()) as u32;
+                let mut bytes_returned = 0u32;
+                if EnumProcesses(buf.as_mut_ptr(), buf_bytes, &mut bytes_returned).is_err() {
+                    return Ok(vec![]);
+                }
+                let used = bytes_returned as usize / std::mem::size_of::<u32>();
+                if used < buf.len() {
+                    buf.truncate(used);
+                    break buf;
+                }
+                // Buffer was too small — double it and retry.
+                buf.resize(buf.len() * 2, 0);
+            }
+        };
 
-        if !output.status.success() {
-            return Ok(vec![]);
-        }
+        let mut map: BTreeMap<String, ExecutableOption> = BTreeMap::new();
 
-        let text = String::from_utf8_lossy(&output.stdout);
-        let mut set = BTreeSet::new();
-        for line in text.lines() {
-            let line = line.trim();
-            if line.is_empty() {
+        for pid in pids {
+            if pid == 0 {
                 continue;
             }
-            let first = line
-                .trim_matches('"')
-                .split("\",\"")
-                .next()
-                .unwrap_or("")
-                .trim();
-            if first.is_empty() {
-                continue;
+
+            unsafe {
+                let handle = match OpenProcess(
+                    PROCESS_QUERY_INFORMATION | PROCESS_VM_READ,
+                    false,
+                    pid,
+                ) {
+                    Ok(h) if !h.is_invalid() => h,
+                    _ => continue,
+                };
+
+                let mut path_buf = [0u16; 260];
+                let path_len = GetModuleFileNameExW(handle, None, &mut path_buf);
+                let _ = CloseHandle(handle);
+
+                if path_len == 0 {
+                    continue;
+                }
+
+                let exe_path =
+                    String::from_utf16_lossy(&path_buf[..path_len as usize]).to_string();
+                if exe_path.is_empty() {
+                    continue;
+                }
+
+                map.entry(exe_path.clone()).or_insert_with(|| {
+                    let stem = std::path::Path::new(&exe_path)
+                        .file_stem()
+                        .map(|s| s.to_string_lossy().to_string())
+                        .unwrap_or_else(|| exe_path.clone());
+                    ExecutableOption {
+                        app_name: stem,
+                        exe_path,
+                    }
+                });
             }
-            set.insert(first.to_string());
         }
 
-        return Ok(set
-            .into_iter()
-            .map(|exe| ExecutableOption {
-                app_name: exe.clone(),
-                exe_path: exe,
-            })
-            .collect());
+        Ok(map.into_values().collect())
     }
 
     #[cfg(not(target_os = "windows"))]
