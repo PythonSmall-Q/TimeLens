@@ -64,6 +64,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - **Startup race condition** — `DbState` is now registered with Tauri's state manager *before* widget windows are restored, preventing early IPC calls from failing with a missing-state error
 - Two Rust compile errors introduced by `exe_path` tracking: missing tuple element in `monitor/mod.rs` and missing `start_on_launch` field in `WidgetConfig` initializer
+- **macOS build compatibility** — removed unsupported `WebviewWindowBuilder::transparent(true)` call in `widget_cmd.rs`, fixing `error[E0599]` when building `aarch64-apple-darwin`
 
 ### Changed
 
@@ -72,6 +73,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - New `ignored_apps` table created on first run
 - All stat queries now filter out rows whose `exe_path` is in the ignored-apps list
 - Version bumped to **0.3.0** in `package.json`, `Cargo.toml`, and `tauri.conf.json`
+- Added crate feature mapping `macos-private-api = ["tauri/macos-private-api"]` in `src-tauri/Cargo.toml` to avoid misconfiguring `tauri-build` features in release builds
 
 ---
 
