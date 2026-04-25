@@ -247,6 +247,7 @@ pub fn get_running_executables() -> Result<Vec<ExecutableOption>, String> {
             OpenProcess, PROCESS_QUERY_INFORMATION, PROCESS_VM_READ,
         };
 
+        const MAX_PIDS: usize = 16384;
         let pids: Vec<u32> = unsafe {
             // Retry with a larger buffer until EnumProcesses fills less than the whole buffer,
             // which guarantees we received all process IDs.
@@ -254,7 +255,8 @@ pub fn get_running_executables() -> Result<Vec<ExecutableOption>, String> {
             loop {
                 let buf_bytes = (buf.len() * std::mem::size_of::<u32>()) as u32;
                 let mut bytes_returned = 0u32;
-                if EnumProcesses(buf.as_mut_ptr(), buf_bytes, &mut bytes_returned).is_err() {
+                if let Err(e) = EnumProcesses(buf.as_mut_ptr(), buf_bytes, &mut bytes_returned) {
+                    log::warn!("EnumProcesses failed: {e}");
                     return Ok(vec![]);
                 }
                 let used = bytes_returned as usize / std::mem::size_of::<u32>();
@@ -262,8 +264,13 @@ pub fn get_running_executables() -> Result<Vec<ExecutableOption>, String> {
                     buf.truncate(used);
                     break buf;
                 }
-                // Buffer was too small — double it and retry.
-                buf.resize(buf.len() * 2, 0);
+                // Buffer was too small — double it and retry, up to the hard cap.
+                let next = (buf.len() * 2).min(MAX_PIDS);
+                if next <= buf.len() {
+                    buf.truncate(used);
+                    break buf;
+                }
+                buf.resize(next, 0);
             }
         };
 
