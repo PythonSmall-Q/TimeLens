@@ -9,6 +9,7 @@ use crate::models::ActiveWindowInfo;
 #[derive(Debug, Clone)]
 struct Segment {
     app_name: String,
+    exe_path: String,
     window_title: String,
     start: Instant,
     first_seen_at: String,
@@ -19,6 +20,7 @@ struct Segment {
 pub struct MonitorStatus {
     pub active: bool,
     pub current_app: String,
+    pub current_exe_path: String,
     pub current_title: String,
 }
 
@@ -72,7 +74,7 @@ fn friendly_windows_app_name(process_stem: &str, window_title: &str) -> String {
 }
 
 #[cfg(target_os = "windows")]
-fn get_foreground_window_info() -> Option<(String, String)> {
+fn get_foreground_window_info() -> Option<(String, String, String)> {
     use windows::Win32::Foundation::HWND;
     use windows::Win32::UI::WindowsAndMessaging::{
         GetForegroundWindow, GetWindowTextW, GetWindowThreadProcessId,
@@ -101,36 +103,38 @@ fn get_foreground_window_info() -> Option<(String, String)> {
         let mut pid: u32 = 0;
         GetWindowThreadProcessId(hwnd, Some(&mut pid));
         if pid == 0 {
-            return Some(("Unknown".into(), title));
+            return Some(("Unknown".into(), title, String::new()));
         }
 
         let handle = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, false, pid)
             .unwrap_or_default();
         if handle.is_invalid() {
-            return Some(("Unknown".into(), title));
+            return Some(("Unknown".into(), title, String::new()));
         }
 
         let mut path_buf = [0u16; 260];
         let path_len = GetModuleFileNameExW(handle, None, &mut path_buf);
         let _ = windows::Win32::Foundation::CloseHandle(handle);
 
-        let app_name = if path_len > 0 {
-            let path = String::from_utf16_lossy(&path_buf[..path_len as usize]);
-            let stem = std::path::Path::new(&path)
+        if path_len == 0 {
+            return Some(("Unknown".into(), title, String::new()));
+        }
+
+        let exe_path = String::from_utf16_lossy(&path_buf[..path_len as usize]);
+        let app_name = {
+            let stem = std::path::Path::new(&exe_path)
                 .file_stem()
                 .map(|s| s.to_string_lossy().to_string())
                 .unwrap_or_else(|| "Unknown".into());
             friendly_windows_app_name(&stem, &title)
-        } else {
-            "Unknown".into()
         };
 
-        Some((app_name, title))
+        Some((app_name, title, exe_path))
     }
 }
 
 #[cfg(target_os = "macos")]
-fn get_foreground_window_info() -> Option<(String, String)> {
+fn get_foreground_window_info() -> Option<(String, String, String)> {
     use std::process::Command;
 
     let script = r#"
@@ -157,11 +161,11 @@ fn get_foreground_window_info() -> Option<(String, String)> {
     if app_name.is_empty() {
         return None;
     }
-    Some((app_name, window_title))
+    Some((app_name.clone(), window_title, app_name))
 }
 
 #[cfg(not(any(target_os = "windows", target_os = "macos")))]
-fn get_foreground_window_info() -> Option<(String, String)> {
+fn get_foreground_window_info() -> Option<(String, String, String)> {
     // Linux / other platforms: not supported in MVP
     None
 }
@@ -203,11 +207,12 @@ pub fn start_monitor_task(
                 None => {
                     // Nothing to track
                 }
-                Some((app_name, window_title)) => {
+                Some((app_name, window_title, exe_path)) => {
                     // Update status for frontend queries
                     {
                         let mut s = status.lock().unwrap();
                         s.current_app = app_name.clone();
+                        s.current_exe_path = exe_path.clone();
                         s.current_title = window_title.clone();
                     }
 
@@ -216,6 +221,7 @@ pub fn start_monitor_task(
                         "active-window-changed",
                         ActiveWindowInfo {
                             app_name: app_name.clone(),
+                            exe_path: exe_path.clone(),
                             window_title: window_title.clone(),
                             timestamp: now_ts.clone(),
                         },
@@ -226,6 +232,7 @@ pub fn start_monitor_task(
                             // Start a new segment
                             current = Some(Segment {
                                 app_name,
+                                exe_path,
                                 window_title,
                                 start: Instant::now(),
                                 first_seen_at: now_ts,
@@ -249,6 +256,7 @@ pub fn start_monitor_task(
                                             &conn,
                                             &today_c,
                                             &seg_clone.app_name,
+                                            &seg_clone.exe_path,
                                             &seg_clone.window_title,
                                             seconds,
                                             &seg_clone.first_seen_at,
@@ -260,6 +268,7 @@ pub fn start_monitor_task(
                             // Start fresh segment
                             current = Some(Segment {
                                 app_name,
+                                exe_path,
                                 window_title,
                                 start: Instant::now(),
                                 first_seen_at: now_ts,

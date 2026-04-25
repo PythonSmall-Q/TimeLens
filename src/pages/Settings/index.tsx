@@ -5,7 +5,7 @@ import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { Moon, Sun, Activity, Database, Info, Rocket, Keyboard, PanelsTopLeft } from "lucide-react";
 import clsx from "clsx";
 import * as api from "@/services/tauriApi";
-import type { ShortcutSettings } from "@/types";
+import type { ExecutableOption, ShortcutSettings } from "@/types";
 
 function Section({
   icon: Icon,
@@ -44,6 +44,9 @@ export default function Settings() {
   const [silentStartup, setSilentStartup] = useState(true);
   const [autoOpenWidgets, setAutoOpenWidgets] = useState(true);
   const [fadeOnBlur, setFadeOnBlur] = useState(true);
+  const [executableOptions, setExecutableOptions] = useState<ExecutableOption[]>([]);
+  const [ignoredApps, setIgnoredAppsState] = useState<string[]>([]);
+  const [excludeQuery, setExcludeQuery] = useState("");
   const [shortcuts, setShortcutState] = useState<ShortcutSettings>({
     open_widget_center: "Alt+W",
     toggle_widget_visibility: "Alt+Shift+W",
@@ -61,6 +64,10 @@ export default function Settings() {
     debounceMs,
     setDebounce,
     setAutoOpenWidgets: setStoreAutoOpenWidgets,
+    weekStartDay,
+    setWeekStartDay,
+    excludeTimelens,
+    setExcludeTimelens,
   } = useSettingsStore();
 
   useEffect(() => {
@@ -73,12 +80,52 @@ export default function Settings() {
       })
       .catch(() => {});
 
+    Promise.all([api.getRecentExecutables(300), api.getRunningExecutables()])
+      .then(([recent, running]) => {
+        const map = new Map<string, ExecutableOption>();
+        for (const row of [...running, ...recent]) {
+          if (!row.exe_path) continue;
+          map.set(row.exe_path, row);
+        }
+        const options = Array.from(map.values());
+        setExecutableOptions(options);
+
+        // Auto-seed TimeLens exclusion on first run
+        api.getIgnoredApps().then((ignored) => {
+          setIgnoredAppsState(ignored);
+          if (ignored.length === 0 && excludeTimelens) {
+            const tlExes = options
+              .filter((x) => x.exe_path.toLowerCase().includes("timelens"))
+              .map((x) => x.exe_path);
+            if (tlExes.length > 0) {
+              setIgnoredAppsState(tlExes);
+              api.setIgnoredApps(tlExes).catch(() => {});
+            }
+          }
+        }).catch(() => {});
+      })
+      .catch(() => {});
+
     const fade = localStorage.getItem("timelens-widget-fade-on-blur");
     setFadeOnBlur(fade !== "0");
   }, []);
 
   const setShortcut = (key: keyof ShortcutSettings, value: string) => {
     setShortcutState((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const filteredExecutables = executableOptions.filter((x) => {
+    const q = excludeQuery.trim().toLowerCase();
+    if (!q) return true;
+    return x.app_name.toLowerCase().includes(q) || x.exe_path.toLowerCase().includes(q);
+  });
+
+  const toggleIgnoredApp = (exePath: string) => {
+    setIgnoredAppsState((prev) =>
+      prev.includes(exePath)
+        ? prev.filter((p) => p !== exePath)
+        : [...prev, exePath]
+    );
   };
 
   return (
@@ -172,9 +219,64 @@ export default function Settings() {
             </span>
           </div>
         </Row>
-      </Section>
+        <Row label={t("tracking.weekStartDay")}>
+          <div className="flex gap-2">
+            {([1, 0] as const).map((d) => (
+              <button
+                key={d}
+                onClick={() => setWeekStartDay(d)}
+                className={clsx(
+                  "px-3 py-1.5 rounded-lg text-xs border transition-colors",
+                  weekStartDay === d
+                    ? "border-accent-blue bg-accent-blue/15 text-accent-blue"
+                    : "border-surface-border text-text-muted hover:text-text-secondary"
+                )}
+              >
+                {d === 1 ? t("tracking.weekStartMonday") : t("tracking.weekStartSunday")}
+              </button>
+            ))}
+          </div>
+        </Row>
+        <Row label={t("tracking.excludeTimelens")}>
+          <button
+            onClick={() => {
+              const next = !excludeTimelens;
+              setExcludeTimelens(next);
+              // Add/remove TimeLens exes from ignored list
+              const tlExes = executableOptions
+                .filter((x) => x.exe_path.toLowerCase().includes("timelens"))
+                .map((x) => x.exe_path);
+              if (next) {
+                const merged = Array.from(new Set([...ignoredApps, ...tlExes]));
+                setIgnoredAppsState(merged);
+                api.setIgnoredApps(merged).catch(() => {});
+              } else {
+                const filtered = ignoredApps.filter(
+                  (p) => !p.toLowerCase().includes("timelens")
+                );
+                setIgnoredAppsState(filtered);
+                api.setIgnoredApps(filtered).catch(() => {});
+              }
+            }}
+            title={t("tracking.excludeTimelens")}
+            className={clsx(
+              "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+              excludeTimelens ? "bg-accent-blue" : "bg-surface-hover"
+            )}
+          >
+            <span
+              className={clsx(
+                "inline-block h-4 w-4 rounded-full bg-white shadow transition-transform",
+                excludeTimelens ? "translate-x-6" : "translate-x-1"
+              )}
+            />
+          </button>
+        </Row>
+        <p className="text-xs text-text-muted text-right">{t("tracking.excludeTimelensHint")}</p>
 
-      {/* Startup */}
+  </Section>
+
+  {/* Startup */}
       <Section icon={Rocket} title={t("startup.title")}>
         <Row label={t("startup.launchAtStartup")}>
           <button
@@ -325,6 +427,53 @@ export default function Settings() {
 
       {/* Data */}
       <Section icon={Database} title={t("data.title")}>
+        <div className="space-y-2">
+          <div className="text-sm text-text-secondary">{t("data.excludeApps")}</div>
+          <input
+            value={excludeQuery}
+            onChange={(e) => setExcludeQuery(e.target.value)}
+            className="ui-field"
+            placeholder={t("data.searchExe")}
+          />
+          <div className="max-h-48 overflow-y-auto rounded-lg border border-surface-border divide-y divide-surface-border">
+            {filteredExecutables.map((row) => {
+              const checked = ignoredApps.includes(row.exe_path);
+              return (
+                <label
+                  key={row.exe_path}
+                  className="flex items-start gap-2 px-3 py-2 text-xs text-text-secondary hover:bg-surface-hover cursor-pointer"
+                >
+                  <input
+                    type="checkbox"
+                    className="ui-checkbox mt-0.5"
+                    checked={checked}
+                    onChange={() => toggleIgnoredApp(row.exe_path)}
+                  />
+                  <span className="min-w-0">
+                    <span className="block text-text-primary truncate">{row.app_name}</span>
+                    <span className="block text-text-muted truncate" title={row.exe_path}>
+                      {row.exe_path}
+                    </span>
+                  </span>
+                </label>
+              );
+            })}
+            {filteredExecutables.length === 0 && (
+              <p className="px-3 py-3 text-xs text-text-muted">{t("data.noExeFound")}</p>
+            )}
+          </div>
+          <div className="flex justify-end">
+            <button
+              onClick={async () => {
+                await api.setIgnoredApps(ignoredApps);
+              }}
+              className="text-xs px-3 py-1.5 rounded-lg border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
+            >
+              {t("data.saveExcludedApps")}
+            </button>
+          </div>
+        </div>
+
         <Row label={t("data.export")}>
           <button
             disabled
@@ -339,7 +488,7 @@ export default function Settings() {
       {/* About */}
       <Section icon={Info} title={t("about.title")}>
         <Row label={t("about.version")}>
-          <span className="text-xs font-mono text-text-secondary">v0.1.0</span>
+          <span className="text-xs font-mono text-text-secondary">v0.3.0</span>
         </Row>
         <Row label="GitHub">
           <a

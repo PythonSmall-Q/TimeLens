@@ -32,7 +32,12 @@ export default function AppList() {
                     className="w-2 h-2 rounded-full flex-shrink-0"
                     style={{ backgroundColor: color }}
                   />
-                  <span className="text-sm text-text-primary truncate">{app.app_name}</span>
+                  <span
+                    className="text-sm text-text-primary truncate"
+                    title={app.exe_path || app.app_name}
+                  >
+                    {app.app_name}
+                  </span>
                 </div>
                 <div className="flex items-center gap-3 flex-shrink-0 ml-2">
                   <span className="text-xs text-text-secondary">{pct}%</span>

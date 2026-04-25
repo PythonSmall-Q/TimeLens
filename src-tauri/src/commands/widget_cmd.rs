@@ -37,6 +37,7 @@ pub async fn create_widget(
         opacity: 0.88,
         always_on_top_mode: "focus".to_string(),
         pinned: false,
+        start_on_launch: true,
     };
 
     build_widget_window(&app, &config)?;

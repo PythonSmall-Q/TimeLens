@@ -6,12 +6,14 @@ import enCommon from "./locales/en/common.json";
 import enDashboard from "./locales/en/dashboard.json";
 import enWidgets from "./locales/en/widgets.json";
 import enSettings from "./locales/en/settings.json";
+import enLimits from "./locales/en/limits.json";
 
 // ZH-CN
 import zhCommon from "./locales/zh-CN/common.json";
 import zhDashboard from "./locales/zh-CN/dashboard.json";
 import zhWidgets from "./locales/zh-CN/widgets.json";
 import zhSettings from "./locales/zh-CN/settings.json";
+import zhLimits from "./locales/zh-CN/limits.json";
 
 /**
  * To add a new language:
@@ -28,6 +30,15 @@ export const SUPPORTED_LANGUAGES = [
   // { code: "ja", label: "Japanese", nativeLabel: "日本語" },
 ];
 
+function resolveInitialLanguage(): string {
+  const saved = localStorage.getItem("timelens-language");
+  if (saved) return saved;
+  const sys = (navigator.language || "en").toLowerCase();
+  const initial = sys.startsWith("zh") ? "zh-CN" : "en";
+  localStorage.setItem("timelens-language", initial);
+  return initial;
+}
+
 i18n
   .use(initReactI18next)
   .init({
@@ -37,18 +48,20 @@ i18n
         dashboard: enDashboard,
         widgets: enWidgets,
         settings: enSettings,
+        limits: enLimits,
       },
       "zh-CN": {
         common: zhCommon,
         dashboard: zhDashboard,
         widgets: zhWidgets,
         settings: zhSettings,
+        limits: zhLimits,
       },
     },
-    lng: localStorage.getItem("timelens-language") || "en",
+    lng: resolveInitialLanguage(),
     fallbackLng: "en",
     defaultNS: "common",
-    ns: ["common", "dashboard", "widgets", "settings"],
+    ns: ["common", "dashboard", "widgets", "settings", "limits"],
     interpolation: {
       escapeValue: false,
     },

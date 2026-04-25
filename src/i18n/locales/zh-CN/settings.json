@@ -14,7 +14,12 @@
     "title": "记录",
     "active": "屏幕时间监控",
     "samplingInterval": "采样间隔",
-    "debounce": "去抖时长"
+    "debounce": "去抖时长",
+    "weekStartDay": "每周第一天",
+    "weekStartMonday": "周一",
+    "weekStartSunday": "周日",
+    "excludeTimelens": "从统计中排除 TimeLens",
+    "excludeTimelensHint": "在屏幕时间记录中隐藏 TimeLens 自身的使用时长"
   },
   "startup": {
     "title": "启动",
@@ -39,6 +44,10 @@
   },
   "data": {
     "title": "数据",
+    "excludeApps": "排除应用",
+    "searchExe": "搜索正在运行/近期记录的 exe",
+    "noExeFound": "未找到可选 exe",
+    "saveExcludedApps": "保存排除应用",
     "export": "导出数据",
     "exportCsv": "导出为 CSV",
     "clearData": "清除所有数据",
@@ -46,7 +55,12 @@
   },
   "about": {
     "title": "关于",
-    "version": "版本"
+    "version": "版本",
+    "checkUpdate": "检查更新",
+    "checking": "检查中…",
+    "upToDate": "已是最新版本",
+    "updateAvailable": "发现新版本：v{{version}}",
+    "viewRelease": "查看发布说明"
   },
   "saved": "设置已保存",
   "addLanguageHint": "如需添加新语言，请参阅 docs/ADD_LANGUAGE.md"

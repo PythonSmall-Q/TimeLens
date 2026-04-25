@@ -23,7 +23,7 @@ const TYPE_LABELS: Record<string, string> = {
 
 function WidgetCard({ config }: { config: WidgetConfig }) {
   const { t } = useTranslation("widgets");
-  const { openWidget, closeWidget, removeWidget } = useWidgetStore();
+  const { openWidget, closeWidget, removeWidget, updateWidgetConfig } = useWidgetStore();
   const Icon = ICONS[config.widget_type as keyof typeof ICONS] ?? Clock;
 
   return (
@@ -52,6 +52,18 @@ function WidgetCard({ config }: { config: WidgetConfig }) {
       </div>
 
       {/* Open / Close */}
+      <label className="flex items-center justify-between text-xs text-text-secondary rounded-lg border border-surface-border px-3 py-2">
+        <span>{t("startOnLaunch")}</span>
+        <input
+          type="checkbox"
+          className="ui-checkbox"
+          checked={!!config.start_on_launch}
+          onChange={(e) =>
+            updateWidgetConfig({ ...config, start_on_launch: e.target.checked })
+          }
+        />
+      </label>
+
       <button
         onClick={() => openWidget(config)}
         className="w-full flex items-center justify-center gap-1.5 text-xs py-2 rounded-xl

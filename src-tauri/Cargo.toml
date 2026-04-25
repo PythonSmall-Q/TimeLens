@@ -1,6 +1,6 @@
 [package]
 name = "timelens"
-version = "0.1.0"
+version = "0.3.0"
 description = "A screen time tracker and desktop widget manager"
 authors = []
 edition = "2021"
@@ -12,6 +12,10 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
+
+[features]
+default = []
+macos-private-api = ["tauri/macos-private-api"]
 
 [dependencies]
 tauri = { version = "2", features = ["tray-icon", "image-png", "image-ico"] }

@@ -16,6 +16,8 @@
   "seconds": "s",
   "today": "Today",
   "yesterday": "Yesterday",
+  "previous": "Previous",
+  "next": "Next",
   "thisWeek": "This Week",
   "noData": "No data yet",
   "tracking": "Tracking",
@@ -27,5 +29,10 @@
   "dark": "Dark",
   "light": "Light",
   "system": "System",
-  "version": "Version"
+  "version": "Version",
+  "updateAvailableTitle": "New Version Available",
+  "updateAvailableBody": "TimeLens v{{version}} is now available. You are on v{{current}}.",
+  "viewOnGitHub": "View on GitHub",
+  "whatsNew": "What\u2019s new",
+  "remindLater": "Remind me later"
 }

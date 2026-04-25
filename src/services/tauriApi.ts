@@ -2,6 +2,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import type {
   AppUsageSummary,
+  AppUsageComparison,
+  ExecutableOption,
   HourlyDistribution,
   DailyUsage,
   TodoItem,
@@ -31,11 +33,42 @@ export const getTodayAppTotals = (): Promise<AppUsageSummary[]> =>
 export const getAppTotalsForDate = (date: string): Promise<AppUsageSummary[]> =>
   invoke("get_app_totals_for_date", { date });
 
+export const getAppTotalsInRange = (
+  startDate: string,
+  endDate: string
+): Promise<AppUsageSummary[]> =>
+  invoke("get_app_totals_in_range", { startDate, endDate });
+
+export const getAppComparisonInRanges = (
+  currentStart: string,
+  currentEnd: string,
+  previousStart: string,
+  previousEnd: string
+): Promise<AppUsageComparison[]> =>
+  invoke("get_app_comparison_in_ranges", {
+    currentStart,
+    currentEnd,
+    previousStart,
+    previousEnd,
+  });
+
 export const getTodayHourly = (): Promise<HourlyDistribution[]> =>
   invoke("get_today_hourly");
 
 export const getRecentDailyTotals = (days: number): Promise<DailyUsage[]> =>
   invoke("get_recent_daily_totals", { days });
+
+export const getRecentExecutables = (limit = 200): Promise<ExecutableOption[]> =>
+  invoke("get_recent_executables", { limit });
+
+export const getRunningExecutables = (): Promise<ExecutableOption[]> =>
+  invoke("get_running_executables");
+
+export const getIgnoredApps = (): Promise<string[]> =>
+  invoke("get_ignored_apps");
+
+export const setIgnoredApps = (exePaths: string[]): Promise<void> =>
+  invoke("set_ignored_apps", { exePaths });
 
 // ── Todos ─────────────────────────────────────────────────────
 export const getTodos = (): Promise<TodoItem[]> => invoke("get_todos");

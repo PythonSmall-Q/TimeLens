@@ -10,23 +10,29 @@ interface SettingsState {
   samplingIntervalMs: number;
   debounceMs: number;
   autoOpenWidgets: boolean;
+  weekStartDay: 0 | 1; // 0 = Sunday, 1 = Monday
+  excludeTimelens: boolean;
   setLanguage: (lang: string) => void;
   setTheme: (theme: "dark" | "light" | "system") => void;
   setMonitoringActive: (active: boolean) => void;
   setSamplingInterval: (ms: number) => void;
   setDebounce: (ms: number) => void;
   setAutoOpenWidgets: (active: boolean) => void;
+  setWeekStartDay: (day: 0 | 1) => void;
+  setExcludeTimelens: (val: boolean) => void;
 }
 
 export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
-      language: "en",
+      language: i18n.language || "en",
       theme: "dark",
       monitoringActive: true,
       samplingIntervalMs: 1000,
       debounceMs: 500,
       autoOpenWidgets: true,
+      weekStartDay: 1,
+      excludeTimelens: true,
 
       setLanguage: (lang) => {
         set({ language: lang });
@@ -53,6 +59,10 @@ export const useSettingsStore = create<SettingsState>()(
           console.error("setAutoOpenWidgets failed", e);
         });
       },
+
+      setWeekStartDay: (weekStartDay) => set({ weekStartDay }),
+
+      setExcludeTimelens: (excludeTimelens) => set({ excludeTimelens }),
     }),
     {
       name: "timelens-settings",

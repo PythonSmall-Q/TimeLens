@@ -81,6 +81,10 @@ pub fn run() {
                 .expect("Failed to open SQLite database");
             let db_state: DbState = Arc::new(Mutex::new(conn));
 
+            // Register shared DB state before opening any extra windows.
+            // Widget/main windows can start invoking commands immediately.
+            app.manage(db_state.clone());
+
             // Restore widget windows that were open last session (if setting enabled)
             {
                 let conn = db_state.lock().unwrap();
@@ -91,13 +95,14 @@ pub fn run() {
                         let app_handle = app.handle().clone();
                         drop(conn); // release lock before async work
                         for cfg in configs {
+                            if !cfg.start_on_launch {
+                                continue;
+                            }
                             let _ = commands::widget_cmd::build_widget_window_sync(&app_handle, &cfg);
                         }
                     }
                 }
             }
-
-            app.manage(db_state);
 
             // Hide main window when launched by autostart with silent-startup enabled.
             let is_autostart = std::env::args().any(|a| a == "--autostart");
@@ -118,6 +123,7 @@ pub fn run() {
             let monitor_status: SharedMonitorStatus = Arc::new(Mutex::new(MonitorStatus {
                 active: true,
                 current_app: String::new(),
+                current_exe_path: String::new(),
                 current_title: String::new(),
             }));
             app.manage(monitor_status.clone());
@@ -160,8 +166,14 @@ pub fn run() {
             // Storage – screen time
             commands::get_today_app_totals,
             commands::get_app_totals_for_date,
+            commands::get_app_totals_in_range,
+            commands::get_app_comparison_in_ranges,
             commands::get_today_hourly,
             commands::get_recent_daily_totals,
+            commands::get_recent_executables,
+            commands::get_running_executables,
+            commands::get_ignored_apps,
+            commands::set_ignored_apps,
             // Storage – todos
             commands::get_todos,
             commands::add_todo,
@@ -331,6 +343,7 @@ fn spawn_widget(app: &AppHandle, widget_type: &str) {
         opacity: 0.88,
         always_on_top_mode: "focus".to_string(),
         pinned: false,
+        start_on_launch: true,
     };
     let _ = commands::widget_cmd::build_widget_window_sync(app, &cfg);
 }

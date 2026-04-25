@@ -11,6 +11,7 @@
   "newTodo": "新建待办",
   "newTimer": "新建计时器",
   "openWidget": "打开",
+  "startOnLaunch": "软件启动时自动打开",
   "closeWidget": "关闭",
   "deleteWidget": "删除小组件",
   "removeWidget": "移除",

@@ -14,7 +14,12 @@
     "title": "Tracking",
     "active": "Screen Time Monitoring",
     "samplingInterval": "Sampling Interval",
-    "debounce": "Debounce Time"
+    "debounce": "Debounce Time",
+    "weekStartDay": "Week starts on",
+    "weekStartMonday": "Monday",
+    "weekStartSunday": "Sunday",
+    "excludeTimelens": "Exclude TimeLens from stats",
+    "excludeTimelensHint": "Hide TimeLens own usage from screen-time records"
   },
   "startup": {
     "title": "Startup",
@@ -39,6 +44,10 @@
   },
   "data": {
     "title": "Data",
+    "excludeApps": "Excluded applications",
+    "searchExe": "Search running/recent executables",
+    "noExeFound": "No executable found",
+    "saveExcludedApps": "Save excluded apps",
     "export": "Export Data",
     "exportCsv": "Export as CSV",
     "clearData": "Clear All Data",
@@ -46,7 +55,12 @@
   },
   "about": {
     "title": "About",
-    "version": "Version"
+    "version": "Version",
+    "checkUpdate": "Check for Updates",
+    "checking": "Checking…",
+    "upToDate": "You are on the latest version",
+    "updateAvailable": "Update available: v{{version}}",
+    "viewRelease": "View Release"
   },
   "saved": "Settings saved",
   "addLanguageHint": "To add a new language, see docs/ADD_LANGUAGE.md"

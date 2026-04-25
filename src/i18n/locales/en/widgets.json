@@ -11,6 +11,7 @@
   "newTodo": "New Todo",
   "newTimer": "New Timer",
   "openWidget": "Open",
+  "startOnLaunch": "Open on app startup",
   "closeWidget": "Close",
   "deleteWidget": "Delete widget",
   "removeWidget": "Remove",

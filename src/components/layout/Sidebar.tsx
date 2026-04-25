@@ -1,7 +1,6 @@
 import { NavLink } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { LayoutDashboard, Layers, Settings, Clock, Activity } from "lucide-react";
-import LanguageSwitcher from "@/components/LanguageSwitcher";
+import { LayoutDashboard, Layers, Settings, Clock, Activity, Bell } from "lucide-react";
 import { useStatsStore } from "@/stores/statsStore";
 import { formatDuration } from "@/utils/format";
 import clsx from "clsx";
@@ -9,6 +8,7 @@ import clsx from "clsx";
 const NAV_ITEMS = [
   { to: "/dashboard", icon: LayoutDashboard, labelKey: "dashboard:title" },
   { to: "/widgets", icon: Layers, labelKey: "widgets:widgetCenter" },
+  { to: "/limits", icon: Bell, labelKey: "limits:title" },
   { to: "/settings", icon: Settings, labelKey: "settings:title" },
 ];
 
@@ -73,11 +73,6 @@ export default function Sidebar() {
           </NavLink>
         ))}
       </nav>
-
-      {/* Language switcher */}
-      <div className="px-4 py-4 border-t border-surface-border">
-        <LanguageSwitcher />
-      </div>
     </aside>
   );
 }

@@ -6,6 +6,7 @@ pub struct AppUsageRecord {
     pub id: Option<i64>,
     pub date: String,
     pub app_name: String,
+    pub exe_path: String,
     pub window_title: String,
     pub active_seconds: i64,
     pub first_seen_at: String,
@@ -15,7 +16,24 @@ pub struct AppUsageRecord {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AppUsageSummary {
     pub app_name: String,
+    pub exe_path: String,
     pub total_seconds: i64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AppUsageComparison {
+    pub app_name: String,
+    pub exe_path: String,
+    pub current_seconds: i64,
+    pub previous_seconds: i64,
+    pub delta_seconds: i64,
+    pub delta_ratio: f64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ExecutableOption {
+    pub app_name: String,
+    pub exe_path: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -52,6 +70,7 @@ pub struct WidgetConfig {
     pub opacity: f64,
     pub always_on_top_mode: String, // "always" | "focus" | "never"
     pub pinned: bool,
+    pub start_on_launch: bool,
 }
 
 impl Default for WidgetConfig {
@@ -66,6 +85,7 @@ impl Default for WidgetConfig {
             opacity: 0.85,
             always_on_top_mode: "focus".to_string(),
             pinned: false,
+            start_on_launch: true,
         }
     }
 }
@@ -74,6 +94,7 @@ impl Default for WidgetConfig {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ActiveWindowInfo {
     pub app_name: String,
+    pub exe_path: String,
     pub window_title: String,
     pub timestamp: String,
 }
