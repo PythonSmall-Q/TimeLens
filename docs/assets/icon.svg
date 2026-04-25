@@ -1,0 +1,135 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Background gradient: deep navy → dark blue-grey -->
+    <radialGradient id="bg" cx="50%" cy="45%" r="55%">
+      <stop offset="0%"   stop-color="#1e2a3a"/>
+      <stop offset="100%" stop-color="#0d1520"/>
+    </radialGradient>
+
+    <!-- Lens outer ring gradient -->
+    <linearGradient id="ringGrad" x1="20%" y1="10%" x2="80%" y2="90%">
+      <stop offset="0%"   stop-color="#7ab3e0"/>
+      <stop offset="50%"  stop-color="#4a7fbf"/>
+      <stop offset="100%" stop-color="#2a5a9a"/>
+    </linearGradient>
+
+    <!-- Lens glass gradient -->
+    <radialGradient id="lensGrad" cx="38%" cy="32%" r="62%">
+      <stop offset="0%"   stop-color="#3a6090" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#0d2040" stop-opacity="0.80"/>
+    </radialGradient>
+
+    <!-- Glare gradient -->
+    <radialGradient id="glare" cx="35%" cy="28%" r="45%">
+      <stop offset="0%"   stop-color="#ffffff" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.00"/>
+    </radialGradient>
+
+    <!-- Hour/minute hand glow -->
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+
+    <!-- Drop shadow for the whole icon -->
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="18" flood-color="#000000" flood-opacity="0.5"/>
+    </filter>
+
+    <!-- Clip circle -->
+    <clipPath id="circleClip">
+      <circle cx="256" cy="256" r="210"/>
+    </clipPath>
+  </defs>
+
+  <!-- ── Outer card / background circle ── -->
+  <circle cx="256" cy="256" r="240" fill="url(#bg)" filter="url(#shadow)"/>
+
+  <!-- ── Subtle tick marks around outer rim ── -->
+  <g stroke="#7ab3e0" stroke-opacity="0.35" stroke-linecap="round">
+    <!-- 12 hour ticks -->
+    <line x1="256" y1="60"  x2="256" y2="82"  stroke-width="5" transform="rotate(0   256 256)"/>
+    <line x1="256" y1="60"  x2="256" y2="72"  stroke-width="3" transform="rotate(30  256 256)"/>
+    <line x1="256" y1="60"  x2="256" y2="72"  stroke-width="3" transform="rotate(60  256 256)"/>
+    <line x1="256" y1="60"  x2="256" y2="82"  stroke-width="5" transform="rotate(90  256 256)"/>
+    <line x1="256" y1="60"  x2="256" y2="72"  stroke-width="3" transform="rotate(120 256 256)"/>
+    <line x1="256" y1="60"  x2="256" y2="72"  stroke-width="3" transform="rotate(150 256 256)"/>
+    <line x1="256" y1="60"  x2="256" y2="82"  stroke-width="5" transform="rotate(180 256 256)"/>
+    <line x1="256" y1="60"  x2="256" y2="72"  stroke-width="3" transform="rotate(210 256 256)"/>
+    <line x1="256" y1="60"  x2="256" y2="72"  stroke-width="3" transform="rotate(240 256 256)"/>
+    <line x1="256" y1="60"  x2="256" y2="82"  stroke-width="5" transform="rotate(270 256 256)"/>
+    <line x1="256" y1="60"  x2="256" y2="72"  stroke-width="3" transform="rotate(300 256 256)"/>
+    <line x1="256" y1="60"  x2="256" y2="72"  stroke-width="3" transform="rotate(330 256 256)"/>
+  </g>
+
+  <!-- ── Lens outer ring ── -->
+  <circle cx="256" cy="256" r="170" fill="none" stroke="url(#ringGrad)" stroke-width="12"/>
+
+  <!-- ── Lens glass fill ── -->
+  <circle cx="256" cy="256" r="163" fill="url(#lensGrad)"/>
+
+  <!-- ── Lens glare highlight ── -->
+  <ellipse cx="210" cy="200" rx="60" ry="38" fill="url(#glare)" transform="rotate(-25 210 200)"/>
+
+  <!-- ── Clock face hour markers ── -->
+  <g fill="#7ab3e0" fill-opacity="0.7">
+    <rect x="252" y="112" width="8" height="22" rx="4" transform="rotate(0   256 256)"/>
+    <rect x="252" y="112" width="6" height="14" rx="3" transform="rotate(30  256 256)" fill-opacity="0.45"/>
+    <rect x="252" y="112" width="6" height="14" rx="3" transform="rotate(60  256 256)" fill-opacity="0.45"/>
+    <rect x="252" y="112" width="8" height="22" rx="4" transform="rotate(90  256 256)"/>
+    <rect x="252" y="112" width="6" height="14" rx="3" transform="rotate(120 256 256)" fill-opacity="0.45"/>
+    <rect x="252" y="112" width="6" height="14" rx="3" transform="rotate(150 256 256)" fill-opacity="0.45"/>
+    <rect x="252" y="112" width="8" height="22" rx="4" transform="rotate(180 256 256)"/>
+    <rect x="252" y="112" width="6" height="14" rx="3" transform="rotate(210 256 256)" fill-opacity="0.45"/>
+    <rect x="252" y="112" width="6" height="14" rx="3" transform="rotate(240 256 256)" fill-opacity="0.45"/>
+    <rect x="252" y="112" width="8" height="22" rx="4" transform="rotate(270 256 256)"/>
+    <rect x="252" y="112" width="6" height="14" rx="3" transform="rotate(300 256 256)" fill-opacity="0.45"/>
+    <rect x="252" y="112" width="6" height="14" rx="3" transform="rotate(330 256 256)" fill-opacity="0.45"/>
+  </g>
+
+  <!-- ── Hour hand (pointing ~10 o'clock = -60°) ── -->
+  <g filter="url(#glow)">
+    <line
+      x1="256" y1="256"
+      x2="256" y2="170"
+      stroke="#d0e4f7" stroke-width="11" stroke-linecap="round"
+      transform="rotate(-60 256 256)"
+    />
+  </g>
+
+  <!-- ── Minute hand (pointing ~2 o'clock = 60°) ── -->
+  <g filter="url(#glow)">
+    <line
+      x1="256" y1="256"
+      x2="256" y2="148"
+      stroke="#7ab3e0" stroke-width="7" stroke-linecap="round"
+      transform="rotate(60 256 256)"
+    />
+  </g>
+
+  <!-- ── Second hand (pointing ~7 o'clock = 210°) ── -->
+  <line
+    x1="256" y1="256"
+    x2="256" y2="152"
+    stroke="#ff6b6b" stroke-width="3.5" stroke-linecap="round"
+    transform="rotate(210 256 256)"
+  />
+  <!-- second hand tail -->
+  <line
+    x1="256" y1="256"
+    x2="256" y2="282"
+    stroke="#ff6b6b" stroke-width="3.5" stroke-linecap="round"
+    transform="rotate(210 256 256)"
+  />
+
+  <!-- ── Center dot ── -->
+  <circle cx="256" cy="256" r="10" fill="#d0e4f7"/>
+  <circle cx="256" cy="256" r="5"  fill="#ff6b6b"/>
+
+  <!-- ── Lens handle (bottom-right) ── -->
+  <line
+    x1="382" y1="382"
+    x2="432" y2="440"
+    stroke="url(#ringGrad)" stroke-width="22" stroke-linecap="round"
+  />
+</svg>

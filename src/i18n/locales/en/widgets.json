@@ -1,0 +1,81 @@
+{
+  "widgetCenter": "Widget Center",
+  "widgetCenterDesc": "Manage and create floating widgets",
+  "myWidgets": "My Widgets",
+  "addWidget": "Add Widget",
+  "noWidgets": "No widgets yet. Add one below!",
+  "clockWidget": "Clock",
+  "todoWidget": "Todo",
+  "timerWidget": "Timer",
+  "newClock": "New Clock",
+  "newTodo": "New Todo",
+  "newTimer": "New Timer",
+  "openWidget": "Open",
+  "closeWidget": "Close",
+  "deleteWidget": "Delete widget",
+  "removeWidget": "Remove",
+  "resetPosition": "Reset Position",
+  "opacity": "Opacity",
+  "alwaysOnTop": "Always on Top",
+  "alwaysOnTopMode": {
+    "always": "Always",
+    "focus": "On Focus",
+    "never": "Never"
+  },
+  "clock": {
+    "title": "Clock",
+    "switchTo12h": "12-hour",
+    "switchTo24h": "24-hour",
+    "showSeconds": "Show seconds",
+    "hideSeconds": "Hide seconds",
+    "digital": "Digital",
+    "analog": "Analog"
+  },
+  "note": {
+    "title": "Note",
+    "titleList": "Notes",
+    "detailTitle": "Content",
+    "placeholder": "Capture ideas, todos, or quick notes...",
+    "add": "Add note",
+    "save": "Save",
+    "delete": "Delete current note",
+    "empty": "No notes yet. Create your first one.",
+    "selectHint": "Select a note to view or edit",
+    "lastEdited": "Last edited",
+    "untitled": "Untitled note"
+  },
+  "status": {
+    "title": "Habit Tracker",
+    "habitTitle": "Today's Habits",
+    "habitPlaceholder": "Habit {{index}}",
+    "completed": "Completed {{done}} / {{total}}",
+    "reset": "Reset Today",
+    "addHabit": "Add Habit",
+    "detailTitle": "Details",
+    "notePlaceholder": "Add notes, trigger cues, or today's context...",
+    "markDone": "Mark as done",
+    "empty": "No habits yet. Add one from the left panel"
+  },
+  "todo": {
+    "title": "Todo",
+    "addPlaceholder": "Add a task…",
+    "emptyState": "All done! 🎉",
+    "clearCompleted": "Clear completed"
+  },
+  "timer": {
+    "title": "Timer",
+    "pomodoro": "Pomodoro",
+    "countdown": "Countdown",
+    "stopwatch": "Stopwatch",
+    "start": "Start",
+    "pause": "Pause",
+    "resume": "Resume",
+    "reset": "Reset",
+    "workTime": "Work",
+    "breakTime": "Break",
+    "customDuration": "Custom",
+    "minutes": "min",
+    "pomodoroComplete": "Pomodoro complete! Take a break.",
+    "breakComplete": "Break over. Back to work!"
+  }
+}

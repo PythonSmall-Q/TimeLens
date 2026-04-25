@@ -1,0 +1,81 @@
+{
+  "widgetCenter": "小组件中心",
+  "widgetCenterDesc": "管理与创建浮动小组件",
+  "myWidgets": "我的小组件",
+  "addWidget": "添加小组件",
+  "noWidgets": "还没有小组件，点击下方添加！",
+  "clockWidget": "时钟",
+  "todoWidget": "待办",
+  "timerWidget": "计时器",
+  "newClock": "新建时钟",
+  "newTodo": "新建待办",
+  "newTimer": "新建计时器",
+  "openWidget": "打开",
+  "closeWidget": "关闭",
+  "deleteWidget": "删除小组件",
+  "removeWidget": "移除",
+  "resetPosition": "重置位置",
+  "opacity": "透明度",
+  "alwaysOnTop": "置顶方式",
+  "alwaysOnTopMode": {
+    "always": "始终置顶",
+    "focus": "焦点时置顶",
+    "never": "不置顶"
+  },
+  "clock": {
+    "title": "时钟",
+    "switchTo12h": "12小时制",
+    "switchTo24h": "24小时制",
+    "showSeconds": "显示秒",
+    "hideSeconds": "隐藏秒",
+    "digital": "数字",
+    "analog": "指针"
+  },
+  "note": {
+    "title": "便签",
+    "titleList": "便签列表",
+    "detailTitle": "内容",
+    "placeholder": "记录想法、待办或临时笔记…",
+    "add": "新增便签",
+    "save": "保存",
+    "delete": "删除当前便签",
+    "empty": "还没有便签，点击右上角的加号新建一条吧",
+    "selectHint": "请选择左侧便签开始查看或编辑",
+    "lastEdited": "最近修改",
+    "untitled": "未命名便签"
+  },
+  "status": {
+    "title": "习惯打卡",
+    "habitTitle": "今日习惯",
+    "habitPlaceholder": "习惯 {{index}}",
+    "completed": "已完成 {{done}} / {{total}}",
+    "reset": "重置今日",
+    "addHabit": "新增习惯",
+    "detailTitle": "详情",
+    "notePlaceholder": "记录这个习惯的说明、触发条件或今日备注…",
+    "markDone": "标记为已完成",
+    "empty": "暂无习惯，请先在左侧新增"
+  },
+  "todo": {
+    "title": "待办",
+    "addPlaceholder": "添加任务…",
+    "emptyState": "全部完成啦！🎉",
+    "clearCompleted": "清除已完成"
+  },
+  "timer": {
+    "title": "计时器",
+    "pomodoro": "番茄钟",
+    "countdown": "倒计时",
+    "stopwatch": "正计时",
+    "start": "开始",
+    "pause": "暂停",
+    "resume": "继续",
+    "reset": "重置",
+    "workTime": "专注",
+    "breakTime": "休息",
+    "customDuration": "自定义",
+    "minutes": "分钟",
+    "pomodoroComplete": "番茄完成！休息一下吧。",
+    "breakComplete": "休息结束，继续加油！"
+  }
+}

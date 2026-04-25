@@ -1,0 +1,53 @@
+{
+  "title": "设置",
+  "subtitle": "自定义 TimeLens 的各项参数",
+  "general": "通用",
+  "appearance": "外观",
+  "language": "语言",
+  "theme": {
+    "label": "主题",
+    "dark": "深色",
+    "light": "浅色",
+    "system": "跟随系统"
+  },
+  "tracking": {
+    "title": "记录",
+    "active": "屏幕时间监控",
+    "samplingInterval": "采样间隔",
+    "debounce": "去抖时长"
+  },
+  "startup": {
+    "title": "启动",
+    "launchAtStartup": "开机自启动",
+    "silentStartup": "静默启动（启动到托盘）",
+    "autoOpenWidgets": "启动时自动打开小组件",
+    "silentHint": "仅在系统自启动拉起时生效"
+  },
+  "widgets": {
+    "title": "小组件",
+    "fadeOnBlur": "失焦时透明化",
+    "fadeHint": "小组件被覆盖时近透明显示，点击后恢复"
+  },
+  "shortcuts": {
+    "title": "快捷键",
+    "openWidgetCenter": "打开小组件中心",
+    "toggleWidgetVisibility": "显示/隐藏小组件",
+    "startRecording": "开始记录",
+    "pauseRecording": "暂停记录",
+    "save": "保存快捷键",
+    "saved": "快捷键已保存"
+  },
+  "data": {
+    "title": "数据",
+    "export": "导出数据",
+    "exportCsv": "导出为 CSV",
+    "clearData": "清除所有数据",
+    "comingSoon": "即将推出"
+  },
+  "about": {
+    "title": "关于",
+    "version": "版本"
+  },
+  "saved": "设置已保存",
+  "addLanguageHint": "如需添加新语言，请参阅 docs/ADD_LANGUAGE.md"
+}

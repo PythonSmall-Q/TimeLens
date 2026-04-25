@@ -1,0 +1,21 @@
+{
+  "title": "Screen Time",
+  "todayTotal": "Today's Total",
+  "currentApp": "Current App",
+  "mostUsed": "Most Used",
+  "topApps": "Top Apps",
+  "allApps": "All Apps",
+  "hourlyDistribution": "Hourly Distribution",
+  "weeklyTrend": "7-Day Trend",
+  "screenTime": "Screen time",
+  "noActivity": "No activity recorded today",
+  "activeFor": "Active for {{duration}}",
+  "rank": "Rank",
+  "appName": "App",
+  "duration": "Duration",
+  "percentage": "Percentage",
+  "hour": "{{hour}}:00",
+  "dateLabel": "{{date}}",
+  "selectDate": "Select Date",
+  "totalTime": "Total: {{time}}"
+}

@@ -1,0 +1,21 @@
+{
+  "title": "屏幕时间",
+  "todayTotal": "今日总计",
+  "currentApp": "正在使用",
+  "mostUsed": "最常使用",
+  "topApps": "应用排行",
+  "allApps": "全部应用",
+  "hourlyDistribution": "按小时分布",
+  "weeklyTrend": "近7天趋势",
+  "screenTime": "屏幕时间",
+  "noActivity": "今日暂无记录",
+  "activeFor": "已活跃 {{duration}}",
+  "rank": "排名",
+  "appName": "应用",
+  "duration": "时长",
+  "percentage": "占比",
+  "hour": "{{hour}}时",
+  "dateLabel": "{{date}}",
+  "selectDate": "选择日期",
+  "totalTime": "共 {{time}}"
+}

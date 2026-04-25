@@ -1,0 +1,53 @@
+{
+  "title": "Settings",
+  "subtitle": "Customize TimeLens to your liking",
+  "general": "General",
+  "appearance": "Appearance",
+  "language": "Language",
+  "theme": {
+    "label": "Theme",
+    "dark": "Dark",
+    "light": "Light",
+    "system": "System"
+  },
+  "tracking": {
+    "title": "Tracking",
+    "active": "Screen Time Monitoring",
+    "samplingInterval": "Sampling Interval",
+    "debounce": "Debounce Time"
+  },
+  "startup": {
+    "title": "Startup",
+    "launchAtStartup": "Launch at startup",
+    "silentStartup": "Silent startup (start to tray)",
+    "autoOpenWidgets": "Auto-open widgets on launch",
+    "silentHint": "Only applies when launched by OS startup"
+  },
+  "widgets": {
+    "title": "Widgets",
+    "fadeOnBlur": "Fade when unfocused",
+    "fadeHint": "Widget becomes nearly transparent when covered; click to restore"
+  },
+  "shortcuts": {
+    "title": "Shortcuts",
+    "openWidgetCenter": "Open widget center",
+    "toggleWidgetVisibility": "Show/Hide widgets",
+    "startRecording": "Start recording",
+    "pauseRecording": "Pause recording",
+    "save": "Save shortcuts",
+    "saved": "Shortcuts saved"
+  },
+  "data": {
+    "title": "Data",
+    "export": "Export Data",
+    "exportCsv": "Export as CSV",
+    "clearData": "Clear All Data",
+    "comingSoon": "Coming Soon"
+  },
+  "about": {
+    "title": "About",
+    "version": "Version"
+  },
+  "saved": "Settings saved",
+  "addLanguageHint": "To add a new language, see docs/ADD_LANGUAGE.md"
+}
