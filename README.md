@@ -129,4 +129,4 @@ See [CHANGELOG.md](CHANGELOG.md).
 
 ## 📄 License
 
-MIT © 2024 TimeLens Contributors
+MIT © 2026 TimeLens Contributors
