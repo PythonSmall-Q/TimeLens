@@ -1,15 +1,14 @@
-# TimeLens
 
 <div align="center">
 
-![TimeLens Logo](docs/assets/logo.png)
+![TimeLens Logo](docs/assets/icon.png)
 
-**A lightweight screen time tracker & floating widget manager for your desktop**
+**TimeLens, a lightweight screen time tracker & floating widget manager for your desktop**
 
 [![CI](https://github.com/PythonSmall-Q/TimeLens/actions/workflows/ci.yml/badge.svg)](https://github.com/PythonSmall-Q/TimeLens/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/PythonSmall-Q/TimeLens)](https://github.com/PythonSmall-Q/TimeLens/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS-lightgrey)](https://github.com/PythonSmall-Q/TimeLens/releases)
+[![Platform](https://img.shields.io/badge/platform-Windows-lightgrey)](https://github.com/PythonSmall-Q/TimeLens/releases)
 
 [简体中文](README_zh.md) · [English](#)
 
