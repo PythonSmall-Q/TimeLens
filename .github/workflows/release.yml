@@ -42,6 +42,12 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Read version from package.json
+        id: pkg_version
+        shell: bash
+        run: |
+          echo "version=v$(node -p \"require('./package.json').version\")" >> "$GITHUB_OUTPUT"
+
       # ── Rust ────────────────────────────────────────────────────────────────
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -59,10 +65,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: "TimeLens ${{ github.ref_name }}"
+          tagName: ${{ steps.pkg_version.outputs.version }}
+          releaseName: "TimeLens ${{ steps.pkg_version.outputs.version }}"
           releaseBody: |
-            See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details.
+            See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/master/CHANGELOG.md) for details.
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
