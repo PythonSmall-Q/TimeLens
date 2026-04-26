@@ -46,7 +46,8 @@ jobs:
         id: pkg_version
         shell: bash
         run: |
-          echo "version=v$(node -p \"require('./package.json').version\")" >> "$GITHUB_OUTPUT"
+          VERSION=$(node -e "console.log(require('./package.json').version)")
+          echo "version=v${VERSION}" >> "$GITHUB_OUTPUT"
 
       # ── Rust ────────────────────────────────────────────────────────────────
       - name: Setup Rust toolchain
