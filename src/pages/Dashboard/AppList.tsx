@@ -1,3 +1,4 @@
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useStatsStore } from "@/stores/statsStore";
 import { formatDuration, appColor } from "@/utils/format";
@@ -5,6 +6,13 @@ import { formatDuration, appColor } from "@/utils/format";
 export default function AppList() {
   const { t } = useTranslation("dashboard");
   const { todayTotals, totalSecondsToday } = useStatsStore();
+  const [query, setQuery] = useState("");
+
+  const filteredTotals = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return todayTotals;
+    return todayTotals.filter((app) => app.app_name.toLowerCase().includes(q));
+  }, [query, todayTotals]);
 
   if (todayTotals.length === 0) {
     return (
@@ -14,9 +22,21 @@ export default function AppList() {
 
   return (
     <div className="glass-card p-5">
-      <h3 className="text-sm font-medium text-text-secondary mb-4">{t("allApps")}</h3>
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <h3 className="text-sm font-medium text-text-secondary">{t("allApps")}</h3>
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          className="ui-field !w-56 !py-1.5 !text-xs"
+          placeholder={t("searchApps")}
+          aria-label={t("searchApps")}
+        />
+      </div>
+      {filteredTotals.length === 0 && (
+        <p className="text-text-muted text-xs text-center py-3">{t("noSearchResult")}</p>
+      )}
       <div className="space-y-3">
-        {todayTotals.map((app, idx) => {
+        {filteredTotals.map((app, idx) => {
           const pct = totalSecondsToday > 0
             ? Math.round((app.total_seconds / totalSecondsToday) * 100)
             : 0;

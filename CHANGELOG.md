@@ -5,6 +5,43 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.4.0] - 2026-04-26
+
+### Added
+
+#### Global Shortcuts
+
+- **System-level global shortcuts** — powered by Tauri `globalShortcut`; shortcuts work even when TimeLens is not focused
+  - `Alt+W` — open Widget Center (focus main window + navigate)
+  - `Alt+Shift+W` — toggle visibility of all floating widgets (hide if any visible, otherwise restore all)
+  - `Alt+R` — resume screen-time monitoring
+  - `Alt+P` — pause screen-time monitoring
+- **Shortcut customization** — all four shortcuts are editable from Settings → Shortcuts; changes are saved to the backend and take effect immediately without restarting the app
+- **Conflict handling** — registering new shortcuts automatically unregisters the old ones; failures are silently caught to avoid crashes
+
+#### System Notifications
+
+- **Native OS notifications for app limits** — replaced the in-app banner-only warnings with real system notifications using `tauri-plugin-notification`
+  - 80 % warning — yellow notification when daily limit threshold is reached
+  - 90 % warning — orange notification when approaching the limit
+  - 100 % alert — red notification + blocking modal when limit is fully consumed
+- **Click-to-navigate** — clicking a notification brings the main window to the foreground and jumps to the Limits page
+- **Permission-aware** — gracefully handles denied notification permission (falls back silently)
+
+
+### Changed
+
+- App version bumped to **0.4.0** in `package.json`, `Cargo.toml`, `tauri.conf.json`, and the in-app update checker (`MainApp.tsx`)
+- Limit warning delivery mechanism upgraded from pure frontend toast to hybrid frontend toast + native OS notification
+- Shortcuts settings now stored in the backend database (`app_settings` table) instead of `localStorage` alone
+
+### Fixed
+
+- Potential race condition when rapidly changing shortcuts — shortcuts are now unregistered before new ones are registered
+- Widget toggle visibility now correctly distinguishes between "some visible" and "all hidden" states using `isVisible()` checks on every widget window
+
+---
+
 ## [0.3.0] - 2026-04-25
 
 ### Added

@@ -2,6 +2,8 @@ import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useEffect, useState, useCallback } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { getAllWebviewWindows, getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { register as registerGlobalShortcut, unregisterAll as unregisterAllGlobalShortcuts } from "@tauri-apps/plugin-global-shortcut";
+import { isPermissionGranted, requestPermission, sendNotification } from "@tauri-apps/plugin-notification";
 import MainLayout from "./components/layout/MainLayout";
 import Dashboard from "./pages/Dashboard";
 import WidgetCenter from "./pages/WidgetCenter";
@@ -14,7 +16,7 @@ import * as api from "@/services/tauriApi";
 import { formatDuration } from "@/utils/format";
 import { useTranslation } from "react-i18next";
 
-const CURRENT_VERSION = "0.3.0";
+const CURRENT_VERSION = "0.4.0";
 const LIMIT_WARNED_KEY = "timelens-limit-warned";
 const LIMIT_STORAGE_KEY = "timelens-app-limits";
 
@@ -41,6 +43,62 @@ export default function MainApp() {
 
   const dismissToast = (id: number) => setToasts((prev) => prev.filter((t) => t.id !== id));
 
+  const focusMainAndNavigate = useCallback(async (hash: string) => {
+    const win = getCurrentWebviewWindow();
+    window.location.hash = hash;
+    await win.show().catch(() => {});
+    await win.setFocus().catch(() => {});
+  }, []);
+
+  const notifyWithNavigate = useCallback(
+    async (title: string, body: string, hash: string) => {
+      let permission = "default";
+      try {
+        permission = (await isPermissionGranted()) ? "granted" : await requestPermission();
+      } catch {
+        permission = "denied";
+      }
+      if (permission !== "granted") return;
+
+      if (typeof Notification !== "undefined") {
+        const n = new Notification(title, { body });
+        n.onclick = () => {
+          void focusMainAndNavigate(hash);
+        };
+        return;
+      }
+
+      try {
+        sendNotification({ title, body });
+      } catch {
+        // ignore notification failures
+      }
+    },
+    [focusMainAndNavigate]
+  );
+
+  const toggleWidgetsVisibility = useCallback(async () => {
+    const all = await getAllWebviewWindows();
+    const widgets = all.filter((w) => /^(clock|todo|timer|note|status)-/.test(w.label));
+    const visibleFlags = await Promise.all(widgets.map((w) => w.isVisible().catch(() => false)));
+    const hasVisible = visibleFlags.some(Boolean);
+
+    if (hasVisible) {
+      await Promise.all(
+        widgets.map((w) =>
+          w
+            .hide()
+            .then(() => w.emit("timelens-widget-hidden", {}))
+            .catch(() => {})
+        )
+      );
+      return;
+    }
+
+    const configs = await api.getAllWidgets();
+    await Promise.all(configs.map((cfg) => api.openWidget(cfg).catch(() => {})));
+  }, []);
+
   const checkLimits = useCallback(async () => {
     let limits: AppLimit[] = [];
     try { limits = JSON.parse(localStorage.getItem(LIMIT_STORAGE_KEY) || "[]"); } catch { return; }
@@ -61,13 +119,33 @@ export default function MainApp() {
       const aw = warned.warned[lim.exePath] ?? [];
       if (aw.includes(threshold)) continue;
       warned.warned[lim.exePath] = [...aw, threshold];
+      const title =
+        threshold === 100
+          ? t("limits:limitReached100Title")
+          : threshold === 90
+          ? t("limits:limitReached90")
+          : t("limits:limitReached80");
+      const body =
+        threshold === 100
+          ? t("limits:limitReached100Body", {
+              app: lim.appName,
+              used: formatDuration(used),
+              limit: formatDuration(lim.dailyLimitSeconds),
+            })
+          : t(threshold === 90 ? "limits:limitReached90Body" : "limits:limitReached80Body", {
+              app: lim.appName,
+              used: formatDuration(used),
+              limit: formatDuration(lim.dailyLimitSeconds),
+            });
+      await notifyWithNavigate(title, body, "#/limits");
+
       if (threshold === 100) newModal = { appName: lim.appName, used, limit: lim.dailyLimitSeconds };
       else newToasts.push({ id: Date.now() + Math.random(), appName: lim.appName, level: threshold as 80 | 90, used, limit: lim.dailyLimitSeconds });
     }
     localStorage.setItem(LIMIT_WARNED_KEY, JSON.stringify(warned));
     if (newToasts.length) setToasts((prev) => [...prev, ...newToasts]);
     if (newModal) setLimitModal(newModal);
-  }, []);
+  }, [notifyWithNavigate, t]);
 
   useEffect(() => {
     // Initial data load
@@ -120,124 +198,62 @@ export default function MainApp() {
 
   useEffect(() => {
     let mounted = true;
-    let removeKeydown: (() => void) | null = null;
-    let removeShortcutChanged: (() => void) | null = null;
 
-    const normalize = (s: string) =>
-      s
-        .split("+")
-        .map((x) => x.trim())
-        .filter(Boolean)
-        .map((x) => {
-          const low = x.toLowerCase();
-          if (low === "control" || low === "ctrl") return "Ctrl";
-          if (low === "alt" || low === "option") return "Alt";
-          if (low === "shift") return "Shift";
-          if (low === "meta" || low === "cmd" || low === "command") return "Meta";
-          return x.length === 1 ? x.toUpperCase() : x[0].toUpperCase() + x.slice(1).toLowerCase();
-        })
-        .join("+");
+    const registerShortcuts = async (shortcuts: {
+      open_widget_center: string;
+      toggle_widget_visibility: string;
+      start_recording: string;
+      pause_recording: string;
+    }) => {
+      await unregisterAllGlobalShortcuts().catch(() => {});
 
-    const eventToCombo = (e: KeyboardEvent) => {
-      const parts: string[] = [];
-      if (e.ctrlKey) parts.push("Ctrl");
-      if (e.altKey) parts.push("Alt");
-      if (e.shiftKey) parts.push("Shift");
-      if (e.metaKey) parts.push("Meta");
-      const key = e.key.length === 1 ? e.key.toUpperCase() : e.key;
-      if (!["Control", "Alt", "Shift", "Meta"].includes(key)) {
-        parts.push(key);
-      }
-      return parts.join("+");
-    };
+      await registerGlobalShortcut(shortcuts.open_widget_center, () => {
+        void focusMainAndNavigate("#/widgets");
+      }).catch(() => {});
 
-    const toggleWidgets = async () => {
-      const all = await getAllWebviewWindows();
-      const widgets = all.filter((w) => /^(clock|todo|timer|note|status)-/.test(w.label));
-      const visibleFlags = await Promise.all(
-        widgets.map((w) => w.isVisible().catch(() => false))
-      );
-      const hasVisible = visibleFlags.some(Boolean);
+      await registerGlobalShortcut(shortcuts.toggle_widget_visibility, () => {
+        void toggleWidgetsVisibility();
+      }).catch(() => {});
 
-      if (hasVisible) {
-        await Promise.all(
-          widgets.map((w) =>
-            w
-              .hide()
-              .then(() => w.emit("timelens-widget-hidden", {}))
-              .catch(() => {})
-          )
-        );
-      } else {
-        const configs = await api.getAllWidgets();
-        await Promise.all(configs.map((cfg) => api.openWidget(cfg).catch(() => {})));
-      }
+      await registerGlobalShortcut(shortcuts.start_recording, () => {
+        setMonitoringActive(true);
+        setMonitorActive(true);
+        void api.setMonitoringActive(true);
+      }).catch(() => {});
+
+      await registerGlobalShortcut(shortcuts.pause_recording, () => {
+        setMonitoringActive(false);
+        setMonitorActive(false);
+        void api.setMonitoringActive(false);
+      }).catch(() => {});
     };
 
     const init = async () => {
       const settings = await api.getAppSettings().catch(() => null);
       if (!mounted || !settings) return;
-      let shortcutMap = {
-        openWidgetCenter: normalize(settings.shortcuts.open_widget_center),
-        toggleWidgetVisibility: normalize(settings.shortcuts.toggle_widget_visibility),
-        startRecording: normalize(settings.shortcuts.start_recording),
-        pauseRecording: normalize(settings.shortcuts.pause_recording),
-      };
+      await registerShortcuts(settings.shortcuts);
+    };
 
-      const onKeyDown = async (e: KeyboardEvent) => {
-        const combo = eventToCombo(e);
-        const win = getCurrentWebviewWindow();
-        if (combo === shortcutMap.openWidgetCenter) {
-          e.preventDefault();
-          window.location.hash = "#/widgets";
-          await win.show().catch(() => {});
-          await win.setFocus().catch(() => {});
-        } else if (combo === shortcutMap.toggleWidgetVisibility) {
-          e.preventDefault();
-          await toggleWidgets().catch(() => {});
-        } else if (combo === shortcutMap.startRecording) {
-          e.preventDefault();
-          setMonitoringActive(true);
-          setMonitorActive(true);
-        } else if (combo === shortcutMap.pauseRecording) {
-          e.preventDefault();
-          setMonitoringActive(false);
-          setMonitorActive(false);
-        }
-      };
-
-      window.addEventListener("keydown", onKeyDown);
-      removeKeydown = () => window.removeEventListener("keydown", onKeyDown);
-
-      const onShortcutChanged = (e: Event) => {
-        const ce = e as CustomEvent<{
-          open_widget_center: string;
-          toggle_widget_visibility: string;
-          start_recording: string;
-          pause_recording: string;
-        }>;
-        if (!ce.detail) return;
-        shortcutMap = {
-          openWidgetCenter: normalize(ce.detail.open_widget_center),
-          toggleWidgetVisibility: normalize(ce.detail.toggle_widget_visibility),
-          startRecording: normalize(ce.detail.start_recording),
-          pauseRecording: normalize(ce.detail.pause_recording),
-        };
-      };
-
-      window.addEventListener("timelens-shortcuts-changed", onShortcutChanged);
-      removeShortcutChanged = () =>
-        window.removeEventListener("timelens-shortcuts-changed", onShortcutChanged);
+    const onShortcutChanged = (e: Event) => {
+      const ce = e as CustomEvent<{
+        open_widget_center: string;
+        toggle_widget_visibility: string;
+        start_recording: string;
+        pause_recording: string;
+      }>;
+      if (!ce.detail) return;
+      void registerShortcuts(ce.detail);
     };
 
     init();
+    window.addEventListener("timelens-shortcuts-changed", onShortcutChanged);
 
     return () => {
       mounted = false;
-      if (removeKeydown) removeKeydown();
-      if (removeShortcutChanged) removeShortcutChanged();
+      window.removeEventListener("timelens-shortcuts-changed", onShortcutChanged);
+      void unregisterAllGlobalShortcuts();
     };
-  }, [setMonitoringActive, setMonitorActive]);
+  }, [focusMainAndNavigate, setMonitorActive, setMonitoringActive, toggleWidgetsVisibility]);
 
   return (
     <HashRouter>

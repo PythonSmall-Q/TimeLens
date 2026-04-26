@@ -7,6 +7,7 @@
   "rule100": "100% reached → blocking popup warning",
   "addLimit": "Add a New Limit",
   "searchApp": "Search running or recent apps…",
+  "manualExePlaceholder": "Or manually enter full executable path (e.g. C:\\Program Files\\App\\app.exe)",
   "dailyLimit": "Daily limit",
   "addBtn": "Add",
   "configuredLimits": "Active Limits",

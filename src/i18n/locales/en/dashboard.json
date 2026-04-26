@@ -22,5 +22,7 @@
   "hour": "{{hour}}:00",
   "dateLabel": "{{date}}",
   "selectDate": "Select Date",
-  "totalTime": "Total: {{time}}"
+  "totalTime": "Total: {{time}}",
+  "searchApps": "Search apps...",
+  "noSearchResult": "No matching apps"
 }

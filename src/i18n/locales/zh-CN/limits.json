@@ -7,6 +7,7 @@
   "rule100": "达到 100% → 弹窗阻断提示",
   "addLimit": "添加新限额",
   "searchApp": "搜索正在运行或近期使用的应用…",
+  "manualExePlaceholder": "或手动输入 exe 完整路径（例如 C:\\Program Files\\App\\app.exe）",
   "dailyLimit": "每日限额",
   "addBtn": "添加",
   "configuredLimits": "已配置限额",

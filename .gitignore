@@ -40,3 +40,8 @@ coverage/
 .env
 .env.local
 .env.production
+ROADMAP.md
+build_log.txt
+src-tauri/check_results.txt
+src-tauri/full_check.txt
+src-tauri/windows/Package.appxmanifest

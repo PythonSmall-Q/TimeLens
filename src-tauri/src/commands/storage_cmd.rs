@@ -1,5 +1,8 @@
 use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
+use std::sync::OnceLock;
 use chrono::Local;
+use rusqlite::params;
 use tauri::State;
 
 use crate::db;
@@ -9,6 +12,8 @@ use crate::models::{
 };
 
 pub type DbState = Arc<Mutex<rusqlite::Connection>>;
+
+static RUNNING_EXE_CACHE: OnceLock<Mutex<Option<(Instant, Vec<ExecutableOption>)>>> = OnceLock::new();
 
 fn today() -> String {
     Local::now().format("%Y-%m-%d").to_string()
@@ -240,11 +245,25 @@ pub fn get_recent_executables(limit: Option<u32>, db: State<DbState>) -> Result<
 pub fn get_running_executables() -> Result<Vec<ExecutableOption>, String> {
     #[cfg(target_os = "windows")]
     {
+        const CACHE_TTL: Duration = Duration::from_secs(20);
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+
+        let cache = RUNNING_EXE_CACHE.get_or_init(|| Mutex::new(None));
+        if let Ok(guard) = cache.lock() {
+            if let Some((ts, items)) = &*guard {
+                if ts.elapsed() < CACHE_TTL {
+                    return Ok(items.clone());
+                }
+            }
+        }
+
         use std::collections::BTreeSet;
         use std::process::Command;
+        use std::os::windows::process::CommandExt;
 
         let output = Command::new("tasklist")
             .args(["/fo", "csv", "/nh"])
+            .creation_flags(CREATE_NO_WINDOW)
             .output()
             .map_err(|e| e.to_string())?;
 
@@ -271,17 +290,269 @@ pub fn get_running_executables() -> Result<Vec<ExecutableOption>, String> {
             set.insert(first.to_string());
         }
 
-        return Ok(set
+        let items = set
             .into_iter()
             .map(|exe| ExecutableOption {
                 app_name: exe.clone(),
                 exe_path: exe,
             })
-            .collect());
+            .collect::<Vec<_>>();
+
+        if let Ok(mut guard) = cache.lock() {
+            *guard = Some((Instant::now(), items.clone()));
+        }
+
+        return Ok(items);
     }
 
     #[cfg(not(target_os = "windows"))]
     {
         Ok(vec![])
     }
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct ExportBundle {
+    app_usage: Vec<AppUsageRow>,
+    todos: Vec<TodoRow>,
+    widget_configs: Vec<WidgetConfig>,
+    ignored_apps: Vec<String>,
+    app_settings: Vec<SettingRow>,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct AppUsageRow {
+    id: Option<i64>,
+    date: String,
+    app_name: String,
+    exe_path: String,
+    window_title: String,
+    active_seconds: i64,
+    first_seen_at: String,
+    last_seen_at: String,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct TodoRow {
+    id: Option<i64>,
+    content: String,
+    done: bool,
+    created_at: String,
+    order_index: i64,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct SettingRow {
+    key: String,
+    value: String,
+}
+
+fn escape_csv(value: &str) -> String {
+    let escaped = value.replace('"', "\"\"");
+    format!("\"{}\"", escaped)
+}
+
+#[tauri::command]
+pub fn export_data_csv(db: State<DbState>) -> Result<String, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    let mut stmt = conn
+        .prepare(
+            "SELECT date, app_name, exe_path, window_title, active_seconds, first_seen_at, last_seen_at
+             FROM app_usage
+             ORDER BY first_seen_at ASC",
+        )
+        .map_err(|e| e.to_string())?;
+
+    let mut rows = stmt.query([]).map_err(|e| e.to_string())?;
+    let mut csv = String::from("date,app_name,exe_path,window_title,active_seconds,first_seen_at,last_seen_at\n");
+
+    while let Some(row) = rows.next().map_err(|e| e.to_string())? {
+        let date: String = row.get(0).map_err(|e| e.to_string())?;
+        let app_name: String = row.get(1).map_err(|e| e.to_string())?;
+        let exe_path: String = row.get(2).map_err(|e| e.to_string())?;
+        let window_title: String = row.get(3).map_err(|e| e.to_string())?;
+        let active_seconds: i64 = row.get(4).map_err(|e| e.to_string())?;
+        let first_seen_at: String = row.get(5).map_err(|e| e.to_string())?;
+        let last_seen_at: String = row.get(6).map_err(|e| e.to_string())?;
+
+        csv.push_str(&format!(
+            "{},{},{},{},{},{},{}\n",
+            escape_csv(&date),
+            escape_csv(&app_name),
+            escape_csv(&exe_path),
+            escape_csv(&window_title),
+            active_seconds,
+            escape_csv(&first_seen_at),
+            escape_csv(&last_seen_at),
+        ));
+    }
+
+    Ok(csv)
+}
+
+#[tauri::command]
+pub fn export_data_json(db: State<DbState>) -> Result<String, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+
+    let app_usage = {
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, date, app_name, exe_path, window_title, active_seconds, first_seen_at, last_seen_at
+                 FROM app_usage
+                 ORDER BY id ASC",
+            )
+            .map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map([], |row| {
+                Ok(AppUsageRow {
+                    id: row.get(0)?,
+                    date: row.get(1)?,
+                    app_name: row.get(2)?,
+                    exe_path: row.get(3)?,
+                    window_title: row.get(4)?,
+                    active_seconds: row.get(5)?,
+                    first_seen_at: row.get(6)?,
+                    last_seen_at: row.get(7)?,
+                })
+            })
+            .map_err(|e| e.to_string())?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())?
+    };
+
+    let todos = {
+        let mut stmt = conn
+            .prepare("SELECT id, content, done, created_at, order_index FROM todos ORDER BY order_index ASC, id ASC")
+            .map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map([], |row| {
+                Ok(TodoRow {
+                    id: row.get(0)?,
+                    content: row.get(1)?,
+                    done: row.get::<_, i32>(2)? != 0,
+                    created_at: row.get(3)?,
+                    order_index: row.get(4)?,
+                })
+            })
+            .map_err(|e| e.to_string())?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())?
+    };
+
+    let widget_configs = db::get_all_widget_configs(&conn).map_err(|e| e.to_string())?;
+    let ignored_apps = db::get_ignored_apps(&conn).map_err(|e| e.to_string())?;
+
+    let app_settings = {
+        let mut stmt = conn
+            .prepare("SELECT key, value FROM app_settings ORDER BY key ASC")
+            .map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map([], |row| {
+                Ok(SettingRow {
+                    key: row.get(0)?,
+                    value: row.get(1)?,
+                })
+            })
+            .map_err(|e| e.to_string())?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())?
+    };
+
+    let bundle = ExportBundle {
+        app_usage,
+        todos,
+        widget_configs,
+        ignored_apps,
+        app_settings,
+    };
+
+    serde_json::to_string_pretty(&bundle).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn import_data_json(payload: String, db: State<DbState>) -> Result<(), String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    let bundle: ExportBundle = serde_json::from_str(&payload).map_err(|e| e.to_string())?;
+
+    let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+
+    for row in bundle.app_usage {
+        tx.execute(
+            "INSERT INTO app_usage (date, app_name, exe_path, window_title, active_seconds, first_seen_at, last_seen_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            params![
+                row.date,
+                row.app_name,
+                row.exe_path,
+                row.window_title,
+                row.active_seconds,
+                row.first_seen_at,
+                row.last_seen_at,
+            ],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+
+    for row in bundle.todos {
+        tx.execute(
+            "INSERT INTO todos (id, content, done, created_at, order_index)
+             VALUES (?1, ?2, ?3, ?4, ?5)
+             ON CONFLICT(id) DO UPDATE SET
+               content = excluded.content,
+               done = excluded.done,
+               created_at = excluded.created_at,
+               order_index = excluded.order_index",
+            params![row.id, row.content, row.done as i32, row.created_at, row.order_index],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+
+    for cfg in bundle.widget_configs {
+        tx.execute(
+            "INSERT INTO widget_configs
+             (id, widget_type, x, y, width, height, opacity, always_on_top_mode, pinned, start_on_launch)
+                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+                         ON CONFLICT(id) DO UPDATE SET
+                             widget_type = excluded.widget_type,
+                             x = excluded.x,
+                             y = excluded.y,
+                             width = excluded.width,
+                             height = excluded.height,
+                             opacity = excluded.opacity,
+                             always_on_top_mode = excluded.always_on_top_mode,
+                             pinned = excluded.pinned,
+                             start_on_launch = excluded.start_on_launch",
+            params![
+                cfg.id,
+                cfg.widget_type,
+                cfg.x,
+                cfg.y,
+                cfg.width,
+                cfg.height,
+                cfg.opacity,
+                cfg.always_on_top_mode,
+                cfg.pinned as i32,
+                cfg.start_on_launch as i32,
+            ],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+
+    for exe in bundle.ignored_apps {
+        tx.execute(
+            "INSERT OR IGNORE INTO ignored_apps (exe_path) VALUES (?1)",
+            params![exe],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+
+    for setting in bundle.app_settings {
+        tx.execute(
+            "INSERT INTO app_settings (key, value)
+             VALUES (?1, ?2)
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            params![setting.key, setting.value],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+
+    tx.commit().map_err(|e| e.to_string())?;
+    Ok(())
 }

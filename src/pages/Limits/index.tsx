@@ -25,6 +25,7 @@ export default function Limits() {
   const [limits, setLimits] = useState<AppLimit[]>(loadLimits);
   const [executableOptions, setExecutableOptions] = useState<ExecutableOption[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [manualExePath, setManualExePath] = useState("");
   const [selectedExe, setSelectedExe] = useState("");
   const [selectedName, setSelectedName] = useState("");
   const [limitHours, setLimitHours] = useState(2);
@@ -32,15 +33,24 @@ export default function Limits() {
   const [showDropdown, setShowDropdown] = useState(false);
 
   useEffect(() => {
-    Promise.all([api.getRecentExecutables(200), api.getRunningExecutables()])
-      .then(([recent, running]) => {
+    const mergeOptions = (incoming: ExecutableOption[]) => {
+      setExecutableOptions((prev) => {
         const map = new Map<string, ExecutableOption>();
-        for (const row of [...running, ...recent]) {
+        for (const row of [...prev, ...incoming]) {
           if (!row.exe_path) continue;
           map.set(row.exe_path, row);
         }
-        setExecutableOptions(Array.from(map.values()));
-      })
+        return Array.from(map.values());
+      });
+    };
+
+    api.getRecentExecutables(200)
+      .then((recent) => mergeOptions(recent))
+      .catch(() => {});
+
+    // Load currently running executables in background to avoid blocking initial UI.
+    api.getRunningExecutables()
+      .then((running) => mergeOptions(running))
       .catch(() => {});
   }, []);
 
@@ -56,12 +66,18 @@ export default function Limits() {
   });
 
   const addLimit = () => {
-    if (!selectedExe) return;
+    const manual = manualExePath.trim();
+    const exePath = selectedExe || manual;
+    if (!exePath) return;
+
     const dailyLimitSeconds = limitHours * 3600 + limitMinutes * 60;
     if (dailyLimitSeconds <= 0) return;
+
+    const appName = selectedName || (exePath.split(/[\\/]/).pop() || exePath);
+
     const newLimit: AppLimit = {
-      exePath: selectedExe,
-      appName: selectedName,
+      exePath,
+      appName,
       dailyLimitSeconds,
       enabled: true,
     };
@@ -70,6 +86,7 @@ export default function Limits() {
     saveLimits(updated);
     setSelectedExe("");
     setSelectedName("");
+    setManualExePath("");
     setSearchQuery("");
     setLimitHours(2);
     setLimitMinutes(0);
@@ -166,6 +183,18 @@ export default function Limits() {
             </div>
           )}
         </div>
+        <div className="flex items-center gap-2">
+          <input
+            value={manualExePath}
+            onChange={(e) => {
+              setManualExePath(e.target.value);
+              setSelectedExe("");
+              setSelectedName("");
+            }}
+            className="ui-field"
+            placeholder={t("limits:manualExePlaceholder")}
+          />
+        </div>
         <div className="flex items-center gap-3 flex-wrap">
           <span className="text-sm text-text-secondary flex-shrink-0">{t("limits:dailyLimit")}</span>
           <div className="flex items-center gap-2">
@@ -196,7 +225,7 @@ export default function Limits() {
           </div>
           <button
             onClick={addLimit}
-            disabled={!selectedExe || (limitHours === 0 && limitMinutes === 0)}
+            disabled={(!(selectedExe || manualExePath.trim())) || (limitHours === 0 && limitMinutes === 0)}
             className={clsx(
               "ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs",
               "border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors",

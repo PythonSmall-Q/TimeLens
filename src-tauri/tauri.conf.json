@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "TimeLens",
-  "version": "0.3.0",
-  "identifier": "com.timelens.app",
+  "productName": "TimeLens - Time Management App with Widgets",
+  "version": "0.4.0",
+  "identifier": "ShanWenxiao.TimeLens-TimeManagementAppwithWidgets",
   "build": {
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build",
@@ -30,6 +30,10 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "publisher": "CN=67203FD7-3571-4CF3-9A8B-DE6BA454CE5B",
+    "homepage": "https://github.com/PythonSmall-Q/TimeLens",
+    "license": "MIT",
+    "copyright": "Copyright (c) 2026 TimeLens Contributors",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -41,10 +45,19 @@
     "shortDescription": "Screen time tracker and desktop widget manager",
     "longDescription": "TimeLens tracks how you spend time on your computer and provides handy desktop widgets for clocks, todos, and timers.",
     "windows": {
-      "wix": {
-        "language": "en-US"
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper",
+        "silent": true
       },
-      "nsis": {}
+      "wix": {
+        "language": "en-US",
+        "upgradeCode": "2f5fc4ca-e72f-46ce-a0a6-f2f7f8c1d923"
+      },
+      "nsis": {
+        "installMode": "perMachine",
+        "installerIcon": "icons/icon.ico",
+        "startMenuFolder": "TimeLens"
+      }
     },
     "macOS": {
       "entitlements": null,

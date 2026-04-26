@@ -70,6 +70,15 @@ export const getIgnoredApps = (): Promise<string[]> =>
 export const setIgnoredApps = (exePaths: string[]): Promise<void> =>
   invoke("set_ignored_apps", { exePaths });
 
+export const exportDataCsv = (): Promise<string> =>
+  invoke("export_data_csv");
+
+export const exportDataJson = (): Promise<string> =>
+  invoke("export_data_json");
+
+export const importDataJson = (payload: string): Promise<void> =>
+  invoke("import_data_json", { payload });
+
 // ── Todos ─────────────────────────────────────────────────────
 export const getTodos = (): Promise<TodoItem[]> => invoke("get_todos");
 

@@ -1,8 +1,11 @@
 [package]
 name = "timelens"
-version = "0.3.0"
+version = "0.4.0"
 description = "A screen time tracker and desktop widget manager"
-authors = []
+authors = ["Shan Wenxiao"]
+license = "MIT"
+repository = "https://github.com/PythonSmall-Q/TimeLens"
+homepage = "https://github.com/PythonSmall-Q/TimeLens"
 edition = "2021"
 rust-version = "1.77.2"
 
@@ -20,6 +23,8 @@ macos-private-api = ["tauri/macos-private-api"]
 [dependencies]
 tauri = { version = "2", features = ["tray-icon", "image-png", "image-ico"] }
 tauri-plugin-shell = "2"
+tauri-plugin-global-shortcut = "2"
+tauri-plugin-notification = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["full"] }

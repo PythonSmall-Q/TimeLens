@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSettingsStore } from "@/stores/settingsStore";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
@@ -40,6 +40,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 
 export default function Settings() {
   const { t } = useTranslation("settings");
+  const importJsonInputRef = useRef<HTMLInputElement | null>(null);
   const [launchAtStartup, setLaunchAtStartup] = useState(false);
   const [silentStartup, setSilentStartup] = useState(true);
   const [autoOpenWidgets, setAutoOpenWidgets] = useState(true);
@@ -47,6 +48,7 @@ export default function Settings() {
   const [executableOptions, setExecutableOptions] = useState<ExecutableOption[]>([]);
   const [ignoredApps, setIgnoredAppsState] = useState<string[]>([]);
   const [excludeQuery, setExcludeQuery] = useState("");
+  const [manualExePath, setManualExePath] = useState("");
   const [shortcuts, setShortcutState] = useState<ShortcutSettings>({
     open_widget_center: "Alt+W",
     toggle_widget_visibility: "Alt+Shift+W",
@@ -80,21 +82,26 @@ export default function Settings() {
       })
       .catch(() => {});
 
-    Promise.all([api.getRecentExecutables(300), api.getRunningExecutables()])
-      .then(([recent, running]) => {
+    const mergeOptions = (incoming: ExecutableOption[]) => {
+      setExecutableOptions((prev) => {
         const map = new Map<string, ExecutableOption>();
-        for (const row of [...running, ...recent]) {
+        for (const row of [...prev, ...incoming]) {
           if (!row.exe_path) continue;
           map.set(row.exe_path, row);
         }
-        const options = Array.from(map.values());
-        setExecutableOptions(options);
+        return Array.from(map.values());
+      });
+    };
+
+    api.getRecentExecutables(300)
+      .then((recent) => {
+        mergeOptions(recent);
 
         // Auto-seed TimeLens exclusion on first run
         api.getIgnoredApps().then((ignored) => {
           setIgnoredAppsState(ignored);
           if (ignored.length === 0 && excludeTimelens) {
-            const tlExes = options
+            const tlExes = recent
               .filter((x) => x.exe_path.toLowerCase().includes("timelens"))
               .map((x) => x.exe_path);
             if (tlExes.length > 0) {
@@ -104,6 +111,11 @@ export default function Settings() {
           }
         }).catch(() => {});
       })
+      .catch(() => {});
+
+    // Load running executables in background to avoid blocking settings UI.
+    api.getRunningExecutables()
+      .then((running) => mergeOptions(running))
       .catch(() => {});
 
     const fade = localStorage.getItem("timelens-widget-fade-on-blur");
@@ -126,6 +138,34 @@ export default function Settings() {
         ? prev.filter((p) => p !== exePath)
         : [...prev, exePath]
     );
+  };
+
+  const addManualExcludedApp = () => {
+    const path = manualExePath.trim();
+    if (!path) return;
+
+    const normalized = path.replace(/\//g, "\\");
+    setIgnoredAppsState((prev) => (prev.includes(normalized) ? prev : [...prev, normalized]));
+
+    const appName = normalized.split(/[\\/]/).pop() || normalized;
+    setExecutableOptions((prev) => {
+      if (prev.some((x) => x.exe_path === normalized)) return prev;
+      return [{ app_name: appName, exe_path: normalized }, ...prev];
+    });
+
+    setManualExePath("");
+  };
+
+  const downloadTextFile = (fileName: string, content: string, contentType: string) => {
+    const blob = new Blob([content], { type: contentType });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -170,6 +210,7 @@ export default function Settings() {
         <Row label={t("tracking.active")}>
           <button
             onClick={() => setMonitoringActive(!monitoringActive)}
+            title={t("tracking.active")}
             className={clsx(
               "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
               monitoringActive ? "bg-accent-blue" : "bg-surface-hover"
@@ -462,6 +503,20 @@ export default function Settings() {
               <p className="px-3 py-3 text-xs text-text-muted">{t("data.noExeFound")}</p>
             )}
           </div>
+          <div className="flex items-center gap-2">
+            <input
+              value={manualExePath}
+              onChange={(e) => setManualExePath(e.target.value)}
+              className="ui-field"
+              placeholder={t("data.manualExePlaceholder")}
+            />
+            <button
+              onClick={addManualExcludedApp}
+              className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors whitespace-nowrap"
+            >
+              {t("data.addManualExe")}
+            </button>
+          </div>
           <div className="flex justify-end">
             <button
               onClick={async () => {
@@ -475,20 +530,61 @@ export default function Settings() {
         </div>
 
         <Row label={t("data.export")}>
-          <button
-            disabled
-            className="text-xs px-3 py-1.5 rounded-lg border border-surface-border
-                       text-text-muted cursor-not-allowed opacity-50"
-          >
-            {t("data.exportCsv")} ({t("data.comingSoon")})
-          </button>
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            <button
+              onClick={async () => {
+                const csv = await api.exportDataCsv();
+                const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+                downloadTextFile(`timelens-export-${stamp}.csv`, csv, "text/csv;charset=utf-8");
+              }}
+              className="text-xs px-3 py-1.5 rounded-lg border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
+            >
+              {t("data.exportCsv")}
+            </button>
+            <button
+              onClick={async () => {
+                const json = await api.exportDataJson();
+                const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+                downloadTextFile(`timelens-backup-${stamp}.json`, json, "application/json;charset=utf-8");
+              }}
+              className="text-xs px-3 py-1.5 rounded-lg border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
+            >
+              {t("data.exportJson")}
+            </button>
+            <button
+              onClick={() => importJsonInputRef.current?.click()}
+              className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
+            >
+              {t("data.importJson")}
+            </button>
+            <input
+              ref={importJsonInputRef}
+              type="file"
+              accept="application/json,.json"
+              className="hidden"
+              title={t("data.importJson")}
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                try {
+                  const content = await file.text();
+                  await api.importDataJson(content);
+                  window.location.reload();
+                } catch {
+                  // Keep silent for now to match existing settings behavior.
+                } finally {
+                  e.target.value = "";
+                }
+              }}
+            />
+          </div>
         </Row>
       </Section>
 
       {/* About */}
       <Section icon={Info} title={t("about.title")}>
         <Row label={t("about.version")}>
-          <span className="text-xs font-mono text-text-secondary">v0.3.0</span>
+          <span className="text-xs font-mono text-text-secondary">v0.4.0</span>
         </Row>
         <Row label="GitHub">
           <a

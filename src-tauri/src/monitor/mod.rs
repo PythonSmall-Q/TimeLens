@@ -2,6 +2,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use chrono::Local;
 use tauri::{AppHandle, Emitter};
+use tokio::time::{interval, MissedTickBehavior};
 
 use crate::models::ActiveWindowInfo;
 
@@ -182,13 +183,14 @@ pub fn start_monitor_task(
     interval_ms: u64,
     debounce_ms: u64,
 ) {
-    std::thread::spawn(move || {
+    tauri::async_runtime::spawn(async move {
         let mut current: Option<Segment> = None;
-        let poll_interval = Duration::from_millis(interval_ms);
+        let mut ticker = interval(Duration::from_millis(interval_ms));
+        ticker.set_missed_tick_behavior(MissedTickBehavior::Skip);
         let debounce = Duration::from_millis(debounce_ms);
 
         loop {
-            std::thread::sleep(poll_interval);
+            ticker.tick().await;
 
             // Check if monitoring is paused
             let active = {
@@ -246,24 +248,18 @@ pub fn start_monitor_task(
                             let elapsed = seg.start.elapsed();
                             if elapsed >= debounce {
                                 let seconds = elapsed.as_secs() as i64;
-                                let seg_clone = seg.clone();
-                                let db_arc = db.clone();
-                                let today_c = today.clone();
-                                let last_seen = now_ts.clone();
-                                std::thread::spawn(move || {
-                                    if let Ok(conn) = db_arc.lock() {
-                                        let _ = crate::db::insert_app_usage(
-                                            &conn,
-                                            &today_c,
-                                            &seg_clone.app_name,
-                                            &seg_clone.exe_path,
-                                            &seg_clone.window_title,
-                                            seconds,
-                                            &seg_clone.first_seen_at,
-                                            &last_seen,
-                                        );
-                                    }
-                                });
+                                if let Ok(conn) = db.lock() {
+                                    let _ = crate::db::insert_app_usage(
+                                        &conn,
+                                        &today,
+                                        &seg.app_name,
+                                        &seg.exe_path,
+                                        &seg.window_title,
+                                        seconds,
+                                        &seg.first_seen_at,
+                                        &now_ts,
+                                    );
+                                }
                             }
                             // Start fresh segment
                             current = Some(Segment {

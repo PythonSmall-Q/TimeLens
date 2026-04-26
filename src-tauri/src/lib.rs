@@ -73,6 +73,8 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(tauri_plugin_notification::init())
         .setup(|app| {
             // ── Database ──────────────────────────────────────
             let data_dir = app.path().app_data_dir()?;
@@ -174,6 +176,9 @@ pub fn run() {
             commands::get_running_executables,
             commands::get_ignored_apps,
             commands::set_ignored_apps,
+            commands::export_data_csv,
+            commands::export_data_json,
+            commands::import_data_json,
             // Storage – todos
             commands::get_todos,
             commands::add_todo,

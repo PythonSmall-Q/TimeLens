@@ -22,5 +22,7 @@
   "hour": "{{hour}}时",
   "dateLabel": "{{date}}",
   "selectDate": "选择日期",
-  "totalTime": "共 {{time}}"
+  "totalTime": "共 {{time}}",
+  "searchApps": "搜索应用名...",
+  "noSearchResult": "没有匹配的应用"
 }

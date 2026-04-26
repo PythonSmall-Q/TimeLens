@@ -130,3 +130,25 @@ See [CHANGELOG.md](CHANGELOG.md).
 ## 📄 License
 
 MIT © 2026 TimeLens Contributors
+
+---
+
+## 🏬 Microsoft Store (MSIX)
+
+
+Store listing:
+
+- URL: `https://apps.microsoft.com/detail/9MVT208CSF6P`
+- Store ID: `9MVT208CSF6P`
+- Store protocol: `ms-windows-store://pdp/?productid=9MVT208CSF6P`
+
+Build an MSIX package draft:
+
+```powershell
+./scripts/build-msix.ps1 -Version 0.4.0.0
+```
+
+Notes:
+
+- Replace placeholder logo files under `src-tauri/windows/msix-staging/Assets` with real Store assets.
+- Sign the resulting `.msix` with your Store-associated certificate before submission.
