@@ -81,6 +81,19 @@ npm run tauri:build
 #   macOS:   src-tauri/target/release/bundle/dmg/*.dmg
 ```
 
+### 发布 Release（以 v0.5.0 为例）
+
+```bash
+# 1. 先推送 master（按当前仓库约定）
+git push origin refs/heads/master:refs/heads/master
+
+# 2. 创建并推送版本标签
+git tag -a v0.5.0 -m "release: v0.5.0"
+git push origin v0.5.0
+```
+
+说明：推送 `v*` 标签后会触发 `.github/workflows/release.yml` 自动发布流程。
+
 ---
 
 ## 🗂 项目结构

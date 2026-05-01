@@ -83,6 +83,19 @@ npm run tauri:build
 #   macOS:   src-tauri/target/release/bundle/dmg/*.dmg
 ```
 
+### Release Publishing (v0.5.0 example)
+
+```bash
+# 1. Push master first (current repo convention)
+git push origin refs/heads/master:refs/heads/master
+
+# 2. Create and push the version tag
+git tag -a v0.5.0 -m "release: v0.5.0"
+git push origin v0.5.0
+```
+
+Notes: Pushing a `v*` tag triggers `.github/workflows/release.yml`.
+
 ---
 
 ## 🗂 Project Structure

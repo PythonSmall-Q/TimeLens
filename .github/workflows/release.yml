@@ -5,6 +5,11 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing git tag to release (e.g. v0.5.0)"
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -24,6 +29,33 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve release tag
+        id: release_tag
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            TAG="${GITHUB_REF_NAME}"
+          else
+            TAG="${{ inputs.tag }}"
+          fi
+
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.]+)?$ ]]; then
+            echo "Invalid tag format: $TAG"
+            echo "Expected format like v0.5.0"
+            exit 1
+          fi
+
+          git fetch --tags --force
+          if ! git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "Tag not found: $TAG"
+            echo "Create/push the tag first, then re-run release."
+            exit 1
+          fi
+
+          echo "version=$TAG" >> "$GITHUB_OUTPUT"
 
       # ── macOS: universal binary needs both targets ──────────────────────────
       - name: Add macOS targets
@@ -42,18 +74,11 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Read version from package.json
-        id: pkg_version
-        shell: bash
-        run: |
-          VERSION=$(node -e "console.log(require('./package.json').version)")
-          echo "version=v${VERSION}" >> "$GITHUB_OUTPUT"
-
       - name: Extract release notes from CHANGELOG.md
         id: changelog
         shell: bash
         run: |
-          VERSION_NO_V="${{ steps.pkg_version.outputs.version }}"
+          VERSION_NO_V="${{ steps.release_tag.outputs.version }}"
           VERSION_NO_V="${VERSION_NO_V#v}"
 
           SECTION=$(awk -v version="$VERSION_NO_V" '
@@ -91,8 +116,8 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: ${{ steps.pkg_version.outputs.version }}
-          releaseName: "TimeLens ${{ steps.pkg_version.outputs.version }}"
+          tagName: ${{ steps.release_tag.outputs.version }}
+          releaseName: "TimeLens ${{ steps.release_tag.outputs.version }}"
           releaseBody: ${{ steps.changelog.outputs.notes }}
           releaseDraft: false
           prerelease: false
