@@ -1,6 +1,6 @@
 import { NavLink } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { LayoutDashboard, Layers, Settings, Clock, Activity, Bell } from "lucide-react";
+import { LayoutDashboard, Layers, Settings, Clock, Activity, Bell, Tag, Target, Focus, Globe } from "lucide-react";
 import { useStatsStore } from "@/stores/statsStore";
 import { formatDuration } from "@/utils/format";
 import { todayString } from "@/utils/format";
@@ -10,11 +10,15 @@ const NAV_ITEMS = [
   { to: "/dashboard", icon: LayoutDashboard, labelKey: "dashboard:title" },
   { to: "/widgets", icon: Layers, labelKey: "widgets:widgetCenter" },
   { to: "/limits", icon: Bell, labelKey: "limits:title" },
+  { to: "/browser", icon: Globe, labelKey: "browserUsage:title" },
+  { to: "/categories", icon: Tag, labelKey: "categories:title" },
+  { to: "/goals", icon: Target, labelKey: "goals:title" },
+  { to: "/focus", icon: Focus, labelKey: "focus:title" },
   { to: "/settings", icon: Settings, labelKey: "settings:title" },
 ];
 
 export default function Sidebar() {
-  const { t } = useTranslation(["common", "dashboard", "widgets", "settings"]);
+  const { t } = useTranslation(["common", "dashboard", "widgets", "settings", "limits", "browserUsage", "categories", "goals", "focus"]);
   const { sidebarTodaySeconds, currentApp, monitorStatus, selectedDate, periodMode } = useStatsStore();
   const showCurrentApp = periodMode === "day" && selectedDate === todayString();
 

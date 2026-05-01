@@ -29,6 +29,56 @@ export interface DailyUsage {
   total_seconds: number;
 }
 
+export interface CategoryUsageSummary {
+  category: string;
+  total_seconds: number;
+}
+
+export interface CategoryDailyUsage {
+  date: string;
+  category: string;
+  total_seconds: number;
+}
+
+export interface AppCategoryRule {
+  app_name: string;
+  exe_path: string;
+  category: string;
+  source: string;
+  updated_at: string;
+}
+
+export interface CategorySuggestion {
+  category: string;
+  confidence: number;
+  reason: string;
+}
+
+export interface UsageGoal {
+  id?: number;
+  scope_type: "category" | "app";
+  scope_value: string;
+  period: "daily" | "weekly";
+  operator: "at_least" | "at_most";
+  target_seconds: number;
+  enabled: boolean;
+}
+
+export interface GoalProgress {
+  goal: UsageGoal;
+  used_seconds: number;
+  progress_ratio: number;
+  is_completed: boolean;
+}
+
+export interface FocusSession {
+  id?: number;
+  started_at: string;
+  ended_at: string | null;
+  trigger_type: string;
+  reason: string;
+}
+
 export interface AppUsageRow {
   id?: number;
   date: string;
@@ -57,6 +107,7 @@ export interface TodoItem {
 export interface WidgetConfig {
   id: string;
   widget_type: "clock" | "todo" | "timer" | "note" | "status";
+  monitor_index: number;
   x: number;
   y: number;
   width: number;
@@ -95,7 +146,34 @@ export interface AppSettingsPayload {
   silent_startup: boolean;
   auto_open_widgets: boolean;
   ignore_system_processes: boolean;
+  idle_time_policy: "count" | "exclude";
+  track_window_titles: boolean;
+  browser_extension_enabled: boolean;
   shortcuts: ShortcutSettings;
+}
+
+export interface BrowserSession {
+  id?: number;
+  browser_name: string;
+  tab_url: string;
+  host: string;
+  title: string;
+  started_at: string;
+  ended_at: string;
+  duration_seconds: number;
+  locale: string;
+  synced_at: string;
+}
+
+export interface BrowserExtensionStatus {
+  enabled: boolean;
+  api_base_url: string;
+  connected: boolean;
+  last_sync_at: string | null;
+  last_browser_name: string | null;
+  last_locale: string | null;
+  recent_session_count: number;
+  recent_sessions: BrowserSession[];
 }
 
 export interface InstallChannelInfo {
@@ -117,4 +195,18 @@ export interface LimitToast {
   level: 80 | 90;
   used: number;
   limit: number;
+}
+
+export interface BrowserDomainStats {
+  host: string;
+  total_seconds: number;
+  visit_count: number;
+  last_visited_at: string;
+}
+
+export interface BrowserDomainLimit {
+  host: string;
+  daily_limit_seconds: number;
+  enabled: boolean;
+  updated_at: string;
 }

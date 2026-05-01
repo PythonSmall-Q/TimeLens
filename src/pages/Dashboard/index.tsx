@@ -6,6 +6,10 @@ import TodayOverview from "./TodayOverview";
 import AppRankingChart from "./AppRankingChart";
 import HourlyTimeline from "./HourlyTimeline";
 import AppList from "./AppList";
+import GoalProgressBar from "./GoalProgressBar";
+import CategoryInsights from "./CategoryInsights";
+import UsageHeatmap from "./UsageHeatmap";
+import TrendComparePanel from "./TrendComparePanel";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { todayString, daysAgo } from "@/utils/format";
 import { formatDuration } from "@/utils/format";
@@ -68,6 +72,8 @@ export default function Dashboard() {
     fetchToday,
     fetchForDate,
     fetchForRange,
+    fetchCategoryForRange,
+    fetchDailyTotalsRange,
     fetchWeekComparison,
     loading,
     periodMode,
@@ -110,6 +116,14 @@ export default function Dashboard() {
     }
     fetchForDate(selectedDate);
   }, [fetchForDate, fetchToday, periodMode, selectedDate]);
+
+  useEffect(() => {
+    const end = todayString();
+    const startDate = new Date(`${end}T00:00:00`);
+    startDate.setDate(startDate.getDate() - 364);
+    const start = startDate.toISOString().slice(0, 10);
+    fetchDailyTotalsRange(start, end);
+  }, [fetchDailyTotalsRange]);
 
   const isToday = selectedDate === todayString();
 
@@ -160,6 +174,11 @@ export default function Dashboard() {
       fetchWeekComparison(rangeDays.start, rangeDays.end, fmt(prevStart), fmt(prevEnd));
     }
   }, [periodMode, rangeDays, fetchForRange, fetchWeekComparison]);
+
+  useEffect(() => {
+    if (periodMode !== "day") return;
+    fetchCategoryForRange(selectedDate, selectedDate);
+  }, [periodMode, selectedDate, fetchCategoryForRange]);
 
   return (
     <div className="p-6 space-y-5 animate-fade-in">
@@ -249,6 +268,8 @@ export default function Dashboard() {
         <div className="text-center py-4 text-text-muted text-sm">{t("common:loading")}</div>
       )}
 
+      <GoalProgressBar />
+
       {/* Overview cards */}
       <TodayOverview />
 
@@ -257,6 +278,12 @@ export default function Dashboard() {
         <AppRankingChart />
         <HourlyTimeline />
       </div>
+
+      <CategoryInsights />
+
+      <UsageHeatmap />
+
+      <TrendComparePanel />
 
       {/* Full list */}
       <AppList />

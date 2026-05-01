@@ -1,3 +1,4 @@
+pub mod api_server;
 pub mod commands;
 pub mod db;
 pub mod models;
@@ -68,6 +69,12 @@ fn set_tray_menu_texts<R: tauri::Runtime>(
     let _ = quit.set_text(texts.quit);
 }
 
+fn format_seconds(secs: i64) -> String {
+    let h = secs / 3600;
+    let m = (secs % 3600) / 60;
+    if h > 0 { format!("{}h {}m", h, m) } else { format!("{}m", m) }
+}
+
 pub fn run() {
     env_logger::init();
 
@@ -76,6 +83,7 @@ pub fn run() {
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             // ── Database ──────────────────────────────────────
             let data_dir = app.path().app_data_dir()?;
@@ -148,6 +156,111 @@ pub fn run() {
                 500,   // ignore segments shorter than 500 ms
             );
 
+            // ── Local HTTP API ────────────────────────────────
+            {
+                let api_db: DbState = {
+                    let conn = db::open(&db_path)
+                        .expect("Third db connection for API server");
+                    Arc::new(Mutex::new(conn))
+                };
+                let api_token = uuid::Uuid::new_v4().to_string();
+                api_server::start_api_server(
+                    api_db,
+                    monitor_status.clone(),
+                    49152,
+                    api_token,
+                );
+            }
+
+            // ── Browser domain limit monitor ──────────────────
+            {
+                let notif_db: DbState = {
+                    let conn = db::open(&db_path)
+                        .expect("Fourth db connection for domain limit notifier");
+                    Arc::new(Mutex::new(conn))
+                };
+                let app_handle_notif = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    // in-memory set to avoid repeated notifications per day
+                    let mut notified: std::collections::HashMap<String, Vec<u8>> =
+                        std::collections::HashMap::new();
+                    let mut last_date = String::new();
+
+                    loop {
+                        tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+
+                        let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+                        if today != last_date {
+                            notified.clear();
+                            last_date = today.clone();
+                        }
+
+                        let Ok(conn) = notif_db.lock() else { continue };
+                        let Ok(limits) = db::get_browser_domain_limits(&conn) else { continue };
+                        let enabled_limits: Vec<_> = limits.into_iter().filter(|l| l.enabled).collect();
+                        if enabled_limits.is_empty() { continue }
+
+                        for lim in &enabled_limits {
+                            let used = db::get_browser_domain_today_seconds(&conn, &lim.host, &today)
+                                .unwrap_or(0);
+                            if lim.daily_limit_seconds <= 0 { continue }
+                            let ratio = used as f64 / lim.daily_limit_seconds as f64;
+                            let threshold: u8 = if ratio >= 1.0 { 100 } else if ratio >= 0.9 { 90 } else { 0 };
+                            if threshold == 0 { continue }
+                            let already = notified.entry(lim.host.clone()).or_default();
+                            if already.contains(&threshold) { continue }
+                            already.push(threshold);
+
+                            let (title, body) = if threshold == 100 {
+                                (
+                                    format!("TimeLens – {} limit reached", lim.host),
+                                    format!(
+                                        "You've reached the daily limit for {} ({})",
+                                        lim.host,
+                                        format_seconds(lim.daily_limit_seconds),
+                                    ),
+                                )
+                            } else {
+                                (
+                                    format!("TimeLens – {} at {}%", lim.host, threshold),
+                                    format!(
+                                        "You've used {}% of your daily limit for {} ({} / {})",
+                                        threshold,
+                                        lim.host,
+                                        format_seconds(used),
+                                        format_seconds(lim.daily_limit_seconds),
+                                    ),
+                                )
+                            };
+
+                            let _ = app_handle_notif.emit("browser-domain-limit-reached", serde_json::json!({
+                                "host": lim.host,
+                                "threshold": threshold,
+                                "used_seconds": used,
+                                "limit_seconds": lim.daily_limit_seconds,
+                            }));
+
+                            #[cfg(target_os = "windows")]
+                            {
+                                use tauri_plugin_notification::NotificationExt;
+                                let _ = app_handle_notif.notification()
+                                    .builder()
+                                    .title(&title)
+                                    .body(&body)
+                                    .show();
+                            }
+                            #[cfg(not(target_os = "windows"))]
+                            {
+                                let _ = app_handle_notif.emit("native-notification", serde_json::json!({
+                                    "title": title,
+                                    "body": body,
+                                }));
+                            }
+                        }
+                    }
+                });
+            }
+
             // ── System tray ───────────────────────────────────
             setup_tray(app, monitor_status, tray_language)?;
 
@@ -173,6 +286,22 @@ pub fn run() {
             commands::get_app_comparison_in_ranges,
             commands::get_today_hourly,
             commands::get_recent_daily_totals,
+            commands::get_category_totals_in_range,
+            commands::get_daily_totals_in_range,
+            commands::get_category_daily_totals_in_range,
+            commands::get_app_categories,
+            commands::upsert_app_category,
+            commands::remove_app_category,
+            commands::suggest_category_for_app,
+            commands::get_usage_goals,
+            commands::save_usage_goal,
+            commands::remove_usage_goal,
+            commands::get_goal_progress,
+            commands::set_focus_mode_active,
+            commands::get_focus_mode_active,
+            commands::start_focus_session,
+            commands::stop_focus_session,
+            commands::list_focus_sessions,
             commands::get_recent_executables,
             commands::get_running_executables,
             commands::get_ignored_apps,
@@ -198,13 +327,24 @@ pub fn run() {
             commands::set_widget_always_on_top,
             // App settings / startup / shortcuts
             commands::get_app_settings,
+            commands::get_browser_extension_status,
             commands::get_install_channel_info,
             commands::set_launch_at_startup,
             commands::set_silent_startup,
             commands::set_auto_open_widgets,
+            commands::set_browser_extension_enabled,
             commands::set_ignore_system_processes,
+            commands::set_idle_time_policy,
+            commands::set_track_window_titles,
             commands::set_shortcuts,
             commands::send_native_notification,
+            // Browser domain
+            commands::get_browser_domain_stats,
+            commands::get_browser_ignored_domains,
+            commands::set_browser_ignored_domains,
+            commands::get_browser_domain_limits,
+            commands::save_browser_domain_limit,
+            commands::remove_browser_domain_limit,
         ])
         .run(tauri::generate_context!())
         .expect("error while running TimeLens");
@@ -346,6 +486,7 @@ fn spawn_widget(app: &AppHandle, widget_type: &str) {
     let cfg = models::WidgetConfig {
         id,
         widget_type: widget_type.to_string(),
+        monitor_index: -1,
         x: 120.0,
         y: 120.0,
         width,

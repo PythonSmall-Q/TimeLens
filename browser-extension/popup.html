@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TimeLens Browser Companion</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="hero">
+        <p class="eyebrow">TimeLens</p>
+        <h1 data-i18n="browserCompanion">Browser Companion</h1>
+        <p class="subhead" data-i18n="subtitle">See local app status and your latest browser sessions without opening the desktop app.</p>
+      </header>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2 data-i18n="connection">Desktop connection</h2>
+          <span id="status-badge" class="badge pending" data-i18n="checking">Checking</span>
+        </div>
+        <p id="status-text" class="muted">Trying to reach the local TimeLens API.</p>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2 data-i18n="today">Today in TimeLens</h2>
+          <button id="refresh-button" class="ghost-button" type="button" data-i18n="refresh">Refresh</button>
+        </div>
+        <ul id="today-list" class="metric-list">
+          <li class="empty" data-i18n="noData">No data yet</li>
+        </ul>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2 data-i18n="recentSessions">Recent tab sessions</h2>
+          <span id="active-tab-pill" class="pill" data-i18n="noActiveTab">No active tab</span>
+        </div>
+        <ul id="recent-list" class="session-list">
+          <li class="empty" data-i18n="noSessions">No tracked browser sessions yet</li>
+        </ul>
+      </section>
+    </main>
+
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

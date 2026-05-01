@@ -1,0 +1,11 @@
+{
+  "extensionName": {
+    "message": "TimeLens 浏览器伴侣"
+  },
+  "extensionDescription": {
+    "message": "TimeLens 浏览器伴侣。跟踪活跃标签页会话，检测空闲状态，并将浏览器使用数据同步到本地桌面应用。"
+  },
+  "extensionActionTitle": {
+    "message": "TimeLens 浏览器伴侣"
+  }
+}

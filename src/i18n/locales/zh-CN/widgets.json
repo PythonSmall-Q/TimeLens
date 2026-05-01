@@ -78,5 +78,18 @@
     "minutes": "分钟",
     "pomodoroComplete": "番茄完成！休息一下吧。",
     "breakComplete": "休息结束，继续加油！"
-  }
+  },
+  "marketplace": "小组件市场",
+  "selfAdd": "自行添加",
+  "myWidgetsTab": "我的小组件",
+  "installed": "已添加",
+  "addOne": "添加",
+  "addFromTemplate": "基于模板添加",
+  "marketplaceDesc": "浏览可用的小组件类型，添加到桌面。",
+  "selfAddDesc": "基于官方小组件模板，创建你自己的多个小组件实例。",
+  "clockDesc": "始终置顶的浮动时钟，支持12/24小时制与指针/数字模式。",
+  "todoDesc": "快速访问的浮动待办列表，无需切换窗口即可记录任务。",
+  "timerDesc": "集番茄钟、倒计时、正计时于一体的紧凑悬浮窗口。",
+  "noteDesc": "浮动便签本，随手记录想法，不影响当前工作流。",
+  "statusDesc": "习惯打卡小组件，追踪每日目标与连续完成天数。"
 }

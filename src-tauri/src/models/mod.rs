@@ -48,6 +48,89 @@ pub struct DailyUsage {
     pub total_seconds: i64,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CategoryUsageSummary {
+    pub category: String,
+    pub total_seconds: i64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CategoryDailyUsage {
+    pub date: String,
+    pub category: String,
+    pub total_seconds: i64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AppCategoryRule {
+    pub app_name: String,
+    pub exe_path: String,
+    pub category: String,
+    pub source: String, // "manual" | "suggested"
+    pub updated_at: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CategorySuggestion {
+    pub category: String,
+    pub confidence: f64,
+    pub reason: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct UsageGoal {
+    pub id: Option<i64>,
+    pub scope_type: String, // "category" | "app"
+    pub scope_value: String,
+    pub period: String,     // "daily" | "weekly"
+    pub operator: String,   // "at_least" | "at_most"
+    pub target_seconds: i64,
+    pub enabled: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct GoalProgress {
+    pub goal: UsageGoal,
+    pub used_seconds: i64,
+    pub progress_ratio: f64,
+    pub is_completed: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct FocusSession {
+    pub id: Option<i64>,
+    pub started_at: String,
+    pub ended_at: Option<String>,
+    pub trigger_type: String, // "manual" | "rule"
+    pub reason: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct BrowserSession {
+    pub id: Option<i64>,
+    pub browser_name: String,
+    pub tab_url: String,
+    pub host: String,
+    pub title: String,
+    pub started_at: String,
+    pub ended_at: String,
+    pub duration_seconds: i64,
+    pub locale: String,
+    pub synced_at: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct BrowserExtensionStatus {
+    pub enabled: bool,
+    pub api_base_url: String,
+    pub connected: bool,
+    pub last_sync_at: Option<String>,
+    pub last_browser_name: Option<String>,
+    pub last_locale: Option<String>,
+    pub recent_session_count: i64,
+    pub recent_sessions: Vec<BrowserSession>,
+}
+
 // ── Todo ───────────────────────────────────────────────────────
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TodoItem {
@@ -63,6 +146,7 @@ pub struct TodoItem {
 pub struct WidgetConfig {
     pub id: String,
     pub widget_type: String,
+    pub monitor_index: i32,
     pub x: f64,
     pub y: f64,
     pub width: f64,
@@ -78,6 +162,7 @@ impl Default for WidgetConfig {
         Self {
             id: String::new(),
             widget_type: String::new(),
+            monitor_index: -1,
             x: 100.0,
             y: 100.0,
             width: 320.0,
@@ -88,6 +173,22 @@ impl Default for WidgetConfig {
             start_on_launch: true,
         }
     }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct BrowserDomainStats {
+    pub host: String,
+    pub total_seconds: i64,
+    pub visit_count: i64,
+    pub last_visited_at: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct BrowserDomainLimit {
+    pub host: String,
+    pub daily_limit_seconds: i64,
+    pub enabled: bool,
+    pub updated_at: String,
 }
 
 // ── Active window info emitted by monitor ─────────────────────

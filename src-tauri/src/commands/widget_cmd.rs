@@ -69,6 +69,25 @@ fn infer_monitor_bounds(app: &AppHandle) -> Option<Rect> {
     })
 }
 
+fn monitor_bounds_by_index(app: &AppHandle, monitor_index: i32) -> Option<Rect> {
+    let main = app.get_webview_window("main")?;
+    if monitor_index >= 0 {
+        if let Ok(monitors) = main.available_monitors() {
+            if let Some(monitor) = monitors.get(monitor_index as usize) {
+                let pos = monitor.position();
+                let size = monitor.size();
+                return Some(Rect {
+                    x: pos.x as f64,
+                    y: pos.y as f64,
+                    width: size.width as f64,
+                    height: size.height as f64,
+                });
+            }
+        }
+    }
+    infer_monitor_bounds(app)
+}
+
 fn collect_open_widget_rects(app: &AppHandle) -> Vec<Rect> {
     let mut out = Vec::new();
     for (label, win) in app.webview_windows() {
@@ -91,8 +110,8 @@ fn collect_open_widget_rects(app: &AppHandle) -> Vec<Rect> {
     out
 }
 
-fn compute_spawn_position(app: &AppHandle, preferred_x: f64, preferred_y: f64, width: f64, height: f64) -> (f64, f64) {
-    let bounds = infer_monitor_bounds(app).unwrap_or(Rect {
+fn compute_spawn_position(app: &AppHandle, preferred_x: f64, preferred_y: f64, width: f64, height: f64, monitor_index: i32) -> (f64, f64) {
+    let bounds = monitor_bounds_by_index(app, monitor_index).unwrap_or(Rect {
         x: 0.0,
         y: 0.0,
         width: 2560.0,
@@ -151,11 +170,12 @@ pub async fn create_widget(
         (x, y)
     };
 
-    let (x, y) = compute_spawn_position(&app, preferred_x, preferred_y, width, height);
+    let (x, y) = compute_spawn_position(&app, preferred_x, preferred_y, width, height, -1);
 
     let config = WidgetConfig {
         id: id.clone(),
         widget_type: widget_type.clone(),
+        monitor_index: -1,
         x,
         y,
         width,
@@ -240,10 +260,19 @@ pub fn build_widget_window_sync(app: &AppHandle, config: &WidgetConfig) -> Resul
         (200.0, 120.0)
     };
 
+    let (x, y) = compute_spawn_position(
+        app,
+        config.x,
+        config.y,
+        width,
+        height,
+        config.monitor_index,
+    );
+
     WebviewWindowBuilder::new(app, &config.id, url)
         .title(&format!("TimeLens - {}", config.widget_type))
         .inner_size(width, height)
-        .position(config.x, config.y)
+        .position(x, y)
         .decorations(false)
         .always_on_top(config.always_on_top_mode == "always")
         .skip_taskbar(false)

@@ -304,6 +304,34 @@ fn get_foreground_window_info() -> Option<(String, String, String)> {
     None
 }
 
+// ── Idle detection ────────────────────────────────────────────
+
+/// Returns seconds since the last keyboard/mouse input event.
+/// Returns 0 on platforms where detection is not implemented.
+#[cfg(target_os = "windows")]
+fn get_idle_seconds() -> u64 {
+    use windows::Win32::System::SystemInformation::GetTickCount;
+    use windows::Win32::UI::Input::KeyboardAndMouse::{GetLastInputInfo, LASTINPUTINFO};
+    unsafe {
+        let mut lii = LASTINPUTINFO {
+            cbSize: std::mem::size_of::<LASTINPUTINFO>() as u32,
+            dwTime: 0,
+        };
+        if GetLastInputInfo(&mut lii).as_bool() {
+            let now_tick = GetTickCount();
+            let diff = now_tick.wrapping_sub(lii.dwTime);
+            (diff as u64) / 1000
+        } else {
+            0
+        }
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn get_idle_seconds() -> u64 {
+    0
+}
+
 // ── Background monitor task ───────────────────────────────────
 
 /// Spawn a background task that polls every `interval_ms` milliseconds.
@@ -322,6 +350,13 @@ pub fn start_monitor_task(
         ticker.set_missed_tick_behavior(MissedTickBehavior::Skip);
         let debounce = Duration::from_millis(debounce_ms);
 
+        // ── Cached settings (refreshed every 30 ticks) ─────
+        let mut settings_tick: u32 = 0;
+        let settings_refresh: u32 = 30;
+        let mut track_window_titles: bool = true;
+        let mut idle_time_policy: String = "count".to_string();
+        let idle_threshold_secs: u64 = 300; // 5-minute idle threshold
+
         loop {
             ticker.tick().await;
 
@@ -335,6 +370,51 @@ pub fn start_monitor_task(
                 continue;
             }
 
+            // Refresh settings periodically
+            settings_tick += 1;
+            if settings_tick >= settings_refresh {
+                settings_tick = 0;
+                if let Ok(conn) = db.lock() {
+                    track_window_titles =
+                        crate::db::get_bool_setting(&conn, "track_window_titles", true)
+                            .unwrap_or(true);
+                    idle_time_policy =
+                        crate::db::get_setting(&conn, "idle_time_policy")
+                            .ok()
+                            .flatten()
+                            .unwrap_or_else(|| "count".to_string());
+                }
+            }
+
+            // Idle detection
+            let idle_secs = get_idle_seconds();
+            let is_idle = idle_secs >= idle_threshold_secs;
+
+            if is_idle && idle_time_policy == "exclude" {
+                // Flush the current segment before the idle gap, then stop accumulating
+                if let Some(seg) = current.take() {
+                    let elapsed = seg.start.elapsed();
+                    if elapsed >= debounce {
+                        let seconds = elapsed.as_secs() as i64;
+                        let now_ts = Local::now().format("%Y-%m-%dT%H:%M:%S").to_string();
+                        let today = Local::now().format("%Y-%m-%d").to_string();
+                        if let Ok(conn) = db.lock() {
+                            let _ = crate::db::insert_app_usage(
+                                &conn,
+                                &today,
+                                &seg.app_name,
+                                &seg.exe_path,
+                                &seg.window_title,
+                                seconds,
+                                &seg.first_seen_at,
+                                &now_ts,
+                            );
+                        }
+                    }
+                }
+                continue;
+            }
+
             let now_ts = Local::now().format("%Y-%m-%dT%H:%M:%S").to_string();
             let today = Local::now().format("%Y-%m-%d").to_string();
 
@@ -342,13 +422,20 @@ pub fn start_monitor_task(
                 None => {
                     // Nothing to track
                 }
-                Some((app_name, window_title, exe_path)) => {
+                Some((app_name, raw_title, exe_path)) => {
+                    // Respect track_window_titles setting
+                    let window_title = if track_window_titles {
+                        raw_title.clone()
+                    } else {
+                        String::new()
+                    };
+
                     // Update status for frontend queries
                     {
                         let mut s = status.lock().unwrap();
                         s.current_app = app_name.clone();
                         s.current_exe_path = exe_path.clone();
-                        s.current_title = window_title.clone();
+                        s.current_title = raw_title.clone();
                     }
 
                     // Emit event so the frontend can show live "current app"
@@ -357,7 +444,7 @@ pub fn start_monitor_task(
                         ActiveWindowInfo {
                             app_name: app_name.clone(),
                             exe_path: exe_path.clone(),
-                            window_title: window_title.clone(),
+                            window_title: raw_title.clone(),
                             timestamp: now_ts.clone(),
                         },
                     );

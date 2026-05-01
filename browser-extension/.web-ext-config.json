@@ -1,0 +1,21 @@
+{
+  "sourceDir": ".",
+  "artifactsDir": "dist",
+  "ignoreFiles": [
+    "dist/**",
+    "package.json",
+    "package-lock.json",
+    ".web-ext-config.json",
+    "scripts/**",
+    "*.md",
+    ".git/**",
+    "node_modules/**"
+  ],
+  "build": {
+    "overwriteDest": true
+  },
+  "lint": {
+    "boring": false,
+    "selfHosted": false
+  }
+}

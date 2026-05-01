@@ -78,5 +78,18 @@
     "minutes": "min",
     "pomodoroComplete": "Pomodoro complete! Take a break.",
     "breakComplete": "Break over. Back to work!"
-  }
+  },
+  "marketplace": "Marketplace",
+  "selfAdd": "Add Widgets",
+  "myWidgetsTab": "My Widgets",
+  "installed": "Installed",
+  "addOne": "Add",
+  "addFromTemplate": "Add",
+  "marketplaceDesc": "Browse available widget types and add them to your desktop.",
+  "selfAddDesc": "Create your own widget instances based on official widget templates.",
+  "clockDesc": "Always-on-top floating clock. Supports 12/24h and analog/digital modes.",
+  "todoDesc": "Quick-access floating todo list to capture tasks without switching windows.",
+  "timerDesc": "Pomodoro, countdown, and stopwatch modes in a compact floating window.",
+  "noteDesc": "Floating sticky-note pad for jotting down ideas without leaving your workflow.",
+  "statusDesc": "Habit tracker widget to track daily goals and streaks."
 }

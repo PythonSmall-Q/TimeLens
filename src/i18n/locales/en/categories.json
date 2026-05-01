@@ -1,0 +1,23 @@
+{
+  "title": "App Categories",
+  "subtitle": "Tag apps with categories to get insights by activity type",
+  "addRule": "Add App Category",
+  "exePlaceholder": "Select a recent app…",
+  "categoryLabel": "Category",
+  "noRules": "No category rules yet. Add an app above to get started.",
+  "suggestedCategory": "Suggested: {{cat}} — click to apply",
+  "applySuggestion": "Apply suggested category",
+  "presets": {
+    "Work": "Work",
+    "Social": "Social",
+    "Entertainment": "Entertainment",
+    "Development": "Development",
+    "Productivity": "Productivity",
+    "Education": "Education",
+    "Gaming": "Gaming",
+    "Browsing": "Browsing",
+    "Communication": "Communication",
+    "System": "System",
+    "uncategorized": "Uncategorized"
+  }
+}

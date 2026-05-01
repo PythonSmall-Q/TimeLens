@@ -7,6 +7,10 @@ import enDashboard from "./locales/en/dashboard.json";
 import enWidgets from "./locales/en/widgets.json";
 import enSettings from "./locales/en/settings.json";
 import enLimits from "./locales/en/limits.json";
+import enCategories from "./locales/en/categories.json";
+import enGoals from "./locales/en/goals.json";
+import enFocus from "./locales/en/focus.json";
+import enBrowserUsage from "./locales/en/browserUsage.json";
 
 // ZH-CN
 import zhCommon from "./locales/zh-CN/common.json";
@@ -14,6 +18,10 @@ import zhDashboard from "./locales/zh-CN/dashboard.json";
 import zhWidgets from "./locales/zh-CN/widgets.json";
 import zhSettings from "./locales/zh-CN/settings.json";
 import zhLimits from "./locales/zh-CN/limits.json";
+import zhCategories from "./locales/zh-CN/categories.json";
+import zhGoals from "./locales/zh-CN/goals.json";
+import zhFocus from "./locales/zh-CN/focus.json";
+import zhBrowserUsage from "./locales/zh-CN/browserUsage.json";
 
 /**
  * To add a new language:
@@ -49,6 +57,10 @@ i18n
         widgets: enWidgets,
         settings: enSettings,
         limits: enLimits,
+        categories: enCategories,
+        goals: enGoals,
+        focus: enFocus,
+        browserUsage: enBrowserUsage,
       },
       "zh-CN": {
         common: zhCommon,
@@ -56,6 +68,10 @@ i18n
         widgets: zhWidgets,
         settings: zhSettings,
         limits: zhLimits,
+        categories: zhCategories,
+        goals: zhGoals,
+        focus: zhFocus,
+        browserUsage: zhBrowserUsage,
       },
     },
     lng: resolveInitialLanguage(),

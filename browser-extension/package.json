@@ -1,0 +1,14 @@
+{
+  "name": "timelens-browser-extension",
+  "version": "1.0.0",
+  "description": "Browser companion for TimeLens — tracks tab sessions and syncs screen-time data with the desktop app.",
+  "scripts": {
+    "lint": "web-ext lint --source-dir .",
+    "build": "web-ext build --source-dir . --artifacts-dir dist --overwrite-dest",
+    "build:firefox": "web-ext build --source-dir . --artifacts-dir dist --overwrite-dest --filename timelens-{version}-firefox.zip",
+    "build:chrome": "node scripts/build-chrome.js"
+  },
+  "devDependencies": {
+    "web-ext": "^8.3.0"
+  }
+}

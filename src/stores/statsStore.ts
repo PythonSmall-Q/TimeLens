@@ -1,5 +1,7 @@
 import { create } from "zustand";
 import type {
+  CategoryDailyUsage,
+  CategoryUsageSummary,
   AppUsageComparison,
   AppUsageSummary,
   DailyUsage,
@@ -22,12 +24,24 @@ interface StatsState {
   selectedDate: string;
   periodMode: PeriodMode;
   weekComparison: AppUsageComparison[];
+  categoryTotals: CategoryUsageSummary[];
+  categoryDailyTotals: CategoryDailyUsage[];
+  heatmapDailyTotals: DailyUsage[];
+  comparisonResults: AppUsageComparison[];
 
   fetchToday: () => Promise<void>;
   fetchTodaySummary: () => Promise<void>;
   fetchForDate: (date: string) => Promise<void>;
   fetchForRange: (startDate: string, endDate: string) => Promise<void>;
+  fetchCategoryForRange: (startDate: string, endDate: string) => Promise<void>;
+  fetchDailyTotalsRange: (startDate: string, endDate: string) => Promise<void>;
   fetchWeekComparison: (
+    currentStart: string,
+    currentEnd: string,
+    previousStart: string,
+    previousEnd: string
+  ) => Promise<void>;
+  fetchComparison: (
     currentStart: string,
     currentEnd: string,
     previousStart: string,
@@ -55,6 +69,10 @@ export const useStatsStore = create<StatsState>((set, get) => ({
   selectedDate: todayStr(),
   periodMode: "day",
   weekComparison: [],
+  categoryTotals: [],
+  categoryDailyTotals: [],
+  heatmapDailyTotals: [],
+  comparisonResults: [],
 
   fetchToday: async () => {
     set({ loading: true });
@@ -113,13 +131,48 @@ export const useStatsStore = create<StatsState>((set, get) => ({
   fetchForRange: async (startDate: string, endDate: string) => {
     set({ loading: true });
     try {
-      const totals = await api.getAppTotalsInRange(startDate, endDate);
+      const [totals, categoryTotals, categoryDailyTotals, heatmapDailyTotals] = await Promise.all([
+        api.getAppTotalsInRange(startDate, endDate),
+        api.getCategoryTotalsInRange(startDate, endDate),
+        api.getCategoryDailyTotalsInRange(startDate, endDate),
+        api.getDailyTotalsInRange(startDate, endDate),
+      ]);
       const total = totals.reduce((s, r) => s + r.total_seconds, 0);
-      set({ todayTotals: totals, totalSecondsToday: total, todayHourly: [] });
+      set({
+        todayTotals: totals,
+        totalSecondsToday: total,
+        todayHourly: [],
+        categoryTotals,
+        categoryDailyTotals,
+        heatmapDailyTotals,
+      });
     } catch (e) {
       console.error("fetchForRange failed", e);
     } finally {
       set({ loading: false });
+    }
+  },
+
+  fetchCategoryForRange: async (startDate: string, endDate: string) => {
+    try {
+      const [categoryTotals, categoryDailyTotals] = await Promise.all([
+        api.getCategoryTotalsInRange(startDate, endDate),
+        api.getCategoryDailyTotalsInRange(startDate, endDate),
+      ]);
+      set({ categoryTotals, categoryDailyTotals });
+    } catch (e) {
+      console.error("fetchCategoryForRange failed", e);
+      set({ categoryTotals: [], categoryDailyTotals: [] });
+    }
+  },
+
+  fetchDailyTotalsRange: async (startDate: string, endDate: string) => {
+    try {
+      const rows = await api.getDailyTotalsInRange(startDate, endDate);
+      set({ heatmapDailyTotals: rows });
+    } catch (e) {
+      console.error("fetchDailyTotalsRange failed", e);
+      set({ heatmapDailyTotals: [] });
     }
   },
 
@@ -135,6 +188,21 @@ export const useStatsStore = create<StatsState>((set, get) => ({
     } catch (e) {
       console.error("fetchWeekComparison failed", e);
       set({ weekComparison: [] });
+    }
+  },
+
+  fetchComparison: async (currentStart, currentEnd, previousStart, previousEnd) => {
+    try {
+      const rows = await api.getAppComparisonInRanges(
+        currentStart,
+        currentEnd,
+        previousStart,
+        previousEnd
+      );
+      set({ comparisonResults: rows });
+    } catch (e) {
+      console.error("fetchComparison failed", e);
+      set({ comparisonResults: [] });
     }
   },
 

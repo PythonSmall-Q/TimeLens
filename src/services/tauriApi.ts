@@ -3,15 +3,25 @@ import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import type {
   AppUsageSummary,
   AppUsageComparison,
+  AppCategoryRule,
   AppUsagePage,
+  CategoryDailyUsage,
+  CategorySuggestion,
+  CategoryUsageSummary,
   ExecutableOption,
+  FocusSession,
+  GoalProgress,
   HourlyDistribution,
   DailyUsage,
   TodoItem,
+  UsageGoal,
   WidgetConfig,
   MonitorStatus,
   ActiveWindowInfo,
   AppSettingsPayload,
+  BrowserExtensionStatus,
+  BrowserDomainStats,
+  BrowserDomainLimit,
   InstallChannelInfo,
   ShortcutSettings,
 } from "@/types";
@@ -59,6 +69,77 @@ export const getTodayHourly = (): Promise<HourlyDistribution[]> =>
 
 export const getRecentDailyTotals = (days: number): Promise<DailyUsage[]> =>
   invoke("get_recent_daily_totals", { days });
+
+export const getCategoryTotalsInRange = (
+  startDate: string,
+  endDate: string
+): Promise<CategoryUsageSummary[]> =>
+  invoke("get_category_totals_in_range", { startDate, endDate });
+
+export const getDailyTotalsInRange = (
+  startDate: string,
+  endDate: string
+): Promise<DailyUsage[]> =>
+  invoke("get_daily_totals_in_range", { startDate, endDate });
+
+export const getCategoryDailyTotalsInRange = (
+  startDate: string,
+  endDate: string
+): Promise<CategoryDailyUsage[]> =>
+  invoke("get_category_daily_totals_in_range", { startDate, endDate });
+
+export const getAppCategories = (): Promise<AppCategoryRule[]> =>
+  invoke("get_app_categories");
+
+export const upsertAppCategory = (
+  appName: string,
+  exePath: string,
+  category: string,
+  source: "manual" | "suggested" = "manual"
+): Promise<void> =>
+  invoke("upsert_app_category", { appName, exePath, category, source });
+
+export const removeAppCategory = (exePath: string): Promise<void> =>
+  invoke("remove_app_category", { exePath });
+
+export const suggestCategoryForApp = (
+  appName: string,
+  exePath: string
+): Promise<CategorySuggestion> =>
+  invoke("suggest_category_for_app", { appName, exePath });
+
+export const getUsageGoals = (): Promise<UsageGoal[]> =>
+  invoke("get_usage_goals");
+
+export const saveUsageGoal = (goal: UsageGoal): Promise<UsageGoal> =>
+  invoke("save_usage_goal", { goal });
+
+export const removeUsageGoal = (id: number): Promise<void> =>
+  invoke("remove_usage_goal", { id });
+
+export const getGoalProgress = (weekStartDay = 1): Promise<GoalProgress[]> =>
+  invoke("get_goal_progress", { weekStartDay });
+
+export const setFocusModeActive = (active: boolean): Promise<void> =>
+  invoke("set_focus_mode_active", { active });
+
+export const getFocusModeActive = (): Promise<boolean> =>
+  invoke("get_focus_mode_active");
+
+export const startFocusSession = (
+  reason?: string,
+  triggerType: "manual" | "rule" = "manual"
+): Promise<number> =>
+  invoke("start_focus_session", { reason, triggerType });
+
+export const stopFocusSession = (id: number): Promise<void> =>
+  invoke("stop_focus_session", { id });
+
+export const listFocusSessions = (
+  startAt?: string,
+  endAt?: string
+): Promise<FocusSession[]> =>
+  invoke("list_focus_sessions", { startAt, endAt });
 
 export const getRecentExecutables = (limit = 200): Promise<ExecutableOption[]> =>
   invoke("get_recent_executables", { limit });
@@ -146,8 +227,20 @@ export const setAutoOpenWidgets = (enabled: boolean): Promise<void> =>
 export const setIgnoreSystemProcesses = (enabled: boolean): Promise<void> =>
   invoke("set_ignore_system_processes", { enabled });
 
+export const setIdleTimePolicy = (policy: "count" | "exclude"): Promise<void> =>
+  invoke("set_idle_time_policy", { policy });
+
+export const setTrackWindowTitles = (enabled: boolean): Promise<void> =>
+  invoke("set_track_window_titles", { enabled });
+
 export const getInstallChannelInfo = (): Promise<InstallChannelInfo> =>
   invoke("get_install_channel_info");
+
+export const getBrowserExtensionStatus = (): Promise<BrowserExtensionStatus> =>
+  invoke("get_browser_extension_status");
+
+export const setBrowserExtensionEnabled = (enabled: boolean): Promise<void> =>
+  invoke("set_browser_extension_enabled", { enabled });
 
 export const sendNativeNotification = (
   title: string,
@@ -155,3 +248,30 @@ export const sendNativeNotification = (
   alarm = false
 ): Promise<void> =>
   invoke("send_native_notification", { title, body, alarm });
+
+// ── Browser domain usage ──────────────────────────────────────
+
+export const getBrowserDomainStats = (
+  startDate?: string,
+  endDate?: string
+): Promise<BrowserDomainStats[]> =>
+  invoke("get_browser_domain_stats", { startDate, endDate });
+
+export const getBrowserIgnoredDomains = (): Promise<string[]> =>
+  invoke("get_browser_ignored_domains");
+
+export const setBrowserIgnoredDomains = (hosts: string[]): Promise<void> =>
+  invoke("set_browser_ignored_domains", { hosts });
+
+export const getBrowserDomainLimits = (): Promise<BrowserDomainLimit[]> =>
+  invoke("get_browser_domain_limits");
+
+export const saveBrowserDomainLimit = (
+  host: string,
+  dailyLimitSeconds: number,
+  enabled: boolean
+): Promise<void> =>
+  invoke("save_browser_domain_limit", { host, dailyLimitSeconds, enabled });
+
+export const removeBrowserDomainLimit = (host: string): Promise<void> =>
+  invoke("remove_browser_domain_limit", { host });

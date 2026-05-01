@@ -10,6 +10,10 @@ import Dashboard from "./pages/Dashboard";
 import WidgetCenter from "./pages/WidgetCenter";
 import Settings from "./pages/Settings";
 import Limits from "./pages/Limits";
+import Categories from "./pages/Categories";
+import Goals from "./pages/Goals";
+import FocusMode from "./pages/FocusMode";
+import BrowserUsage from "./pages/BrowserUsage";
 import { useStatsStore } from "./stores/statsStore";
 import { useSettingsStore } from "./stores/settingsStore";
 import type { ActiveWindowInfo, AppLimit } from "./types";
@@ -18,7 +22,7 @@ import { formatDuration } from "@/utils/format";
 import { useTranslation } from "react-i18next";
 import { todayString } from "@/utils/format";
 
-const CURRENT_VERSION = "0.5.0";
+const CURRENT_VERSION = "1.0.0";
 const LIMIT_WARNED_KEY = "timelens-limit-warned";
 const LIMIT_STORAGE_KEY = "timelens-app-limits";
 
@@ -50,7 +54,7 @@ export default function MainApp() {
     periodMode,
   } = useStatsStore();
   const { setMonitoringActive } = useSettingsStore();
-  const { t } = useTranslation(["common", "limits"]);
+  const { t } = useTranslation(["common", "limits", "browserUsage"]);
 
   const [updateInfo, setUpdateInfo] = useState<{ version: string; notes: string; url: string } | null>(null);
 
@@ -187,11 +191,27 @@ export default function MainApp() {
       setMonitorActive(active);
     });
 
+    // Listen to browser domain limit notifications from backend
+    const unlistenDomainLimit = listen<{ host: string; percent: number; used_seconds: number; limit_seconds: number }>(
+      "browser-domain-limit-reached",
+      async (e) => {
+        const { host, percent, used_seconds, limit_seconds } = e.payload;
+        const title = percent >= 100
+          ? t("browserUsage:limitReached100", { host })
+          : t("browserUsage:limitReached90", { host });
+        const body = percent >= 100
+          ? t("browserUsage:limitReached100Body", { host, used: formatDuration(used_seconds), limit: formatDuration(limit_seconds) })
+          : t("browserUsage:limitReached90Body", { host, used: formatDuration(used_seconds), limit: formatDuration(limit_seconds) });
+        await notifyWithNavigate(title, body, "#/browser", percent >= 100);
+      }
+    );
+
     return () => {
       clearInterval(interval);
       clearInterval(limitInterval);
       unlistenPromise.then((u) => u());
       unlistenMonitor.then((u) => u());
+      unlistenDomainLimit.then((u) => u());
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [checkLimits, fetchMonitorStatus, fetchToday, fetchTodaySummary, periodMode, selectedDate]);
@@ -313,6 +333,10 @@ export default function MainApp() {
           <Route path="/widgets" element={<WidgetCenter />} />
           <Route path="/settings" element={<Settings />} />
                   <Route path="/limits" element={<Limits />} />
+          <Route path="/categories" element={<Categories />} />
+          <Route path="/goals" element={<Goals />} />
+          <Route path="/focus" element={<FocusMode />} />
+          <Route path="/browser" element={<BrowserUsage />} />
         </Routes>
       </MainLayout>
 

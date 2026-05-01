@@ -3,14 +3,15 @@ use std::sync::{Arc, Mutex};
 use std::sync::OnceLock;
 #[cfg(target_os = "windows")]
 use std::time::{Duration, Instant};
-use chrono::Local;
+use chrono::{Datelike, Local};
 use rusqlite::params;
 use tauri::State;
 
 use crate::db;
 use crate::models::{
-    AppUsageComparison, AppUsageSummary, DailyUsage, ExecutableOption, HourlyDistribution,
-    TodoItem, WidgetConfig,
+    AppCategoryRule, AppUsageComparison, AppUsageSummary, CategorySuggestion,
+    BrowserSession, CategoryDailyUsage, CategoryUsageSummary, DailyUsage, ExecutableOption, FocusSession,
+    GoalProgress, HourlyDistribution, TodoItem, UsageGoal, WidgetConfig,
 };
 
 pub type DbState = Arc<Mutex<rusqlite::Connection>>;
@@ -20,6 +21,73 @@ static RUNNING_EXE_CACHE: OnceLock<Mutex<Option<(Instant, Vec<ExecutableOption>)
 
 fn today() -> String {
     Local::now().format("%Y-%m-%d").to_string()
+}
+
+fn current_week_range(week_start_day: i32) -> (String, String) {
+    let now = Local::now().date_naive();
+    let weekday = now.weekday().num_days_from_sunday() as i64;
+    let start_offset = if week_start_day == 1 {
+        if weekday == 0 { 6 } else { weekday - 1 }
+    } else {
+        weekday
+    };
+    let week_start = now - chrono::Duration::days(start_offset);
+    let week_end = week_start + chrono::Duration::days(6);
+    (
+        week_start.format("%Y-%m-%d").to_string(),
+        week_end.format("%Y-%m-%d").to_string(),
+    )
+}
+
+fn suggest_category(app_name: &str, exe_path: &str) -> CategorySuggestion {
+    let key = format!(
+        "{} {}",
+        app_name.to_ascii_lowercase(),
+        exe_path.to_ascii_lowercase()
+    );
+
+    let rules: [(&str, &[&str], f64, &str); 4] = [
+        (
+            "work",
+            &["code", "idea", "devenv", "slack", "teams", "notion", "excel", "word"],
+            0.88,
+            "matched productivity keyword",
+        ),
+        (
+            "entertainment",
+            &["steam", "game", "epic", "spotify", "video", "player", "netflix"],
+            0.86,
+            "matched entertainment keyword",
+        ),
+        (
+            "study",
+            &["anki", "obsidian", "coursera", "udemy", "jupyter", "pdf", "lecture"],
+            0.84,
+            "matched learning keyword",
+        ),
+        (
+            "social",
+            &["wechat", "qq", "discord", "telegram", "whatsapp", "messenger", "weibo"],
+            0.85,
+            "matched social keyword",
+        ),
+    ];
+
+    for (category, kws, confidence, reason) in rules {
+        if kws.iter().any(|kw| key.contains(kw)) {
+            return CategorySuggestion {
+                category: category.to_string(),
+                confidence,
+                reason: reason.to_string(),
+            };
+        }
+    }
+
+    CategorySuggestion {
+        category: "uncategorized".to_string(),
+        confidence: 0.3,
+        reason: "no keyword match".to_string(),
+    }
 }
 
 // ── Screen time queries ───────────────────────────────────────
@@ -152,6 +220,169 @@ pub fn get_recent_daily_totals(days: u32, db: State<DbState>) -> Result<Vec<Dail
         .into_iter()
         .map(|(date, total_seconds)| DailyUsage { date, total_seconds })
         .collect())
+}
+
+#[tauri::command]
+pub fn get_category_totals_in_range(
+    start_date: String,
+    end_date: String,
+    db: State<DbState>,
+) -> Result<Vec<CategoryUsageSummary>, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    let rows = db::get_category_totals_in_range(&conn, &start_date, &end_date)
+        .map_err(|e| e.to_string())?;
+    Ok(rows
+        .into_iter()
+        .map(|(category, total_seconds)| CategoryUsageSummary {
+            category,
+            total_seconds,
+        })
+        .collect())
+}
+
+#[tauri::command]
+pub fn get_daily_totals_in_range(
+    start_date: String,
+    end_date: String,
+    db: State<DbState>,
+) -> Result<Vec<DailyUsage>, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    let rows = db::get_daily_totals_in_range(&conn, &start_date, &end_date)
+        .map_err(|e| e.to_string())?;
+    Ok(rows
+        .into_iter()
+        .map(|(date, total_seconds)| DailyUsage { date, total_seconds })
+        .collect())
+}
+
+#[tauri::command]
+pub fn get_category_daily_totals_in_range(
+    start_date: String,
+    end_date: String,
+    db: State<DbState>,
+) -> Result<Vec<CategoryDailyUsage>, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    let rows = db::get_category_daily_totals_in_range(&conn, &start_date, &end_date)
+        .map_err(|e| e.to_string())?;
+    Ok(rows
+        .into_iter()
+        .map(|(date, category, total_seconds)| CategoryDailyUsage {
+            date,
+            category,
+            total_seconds,
+        })
+        .collect())
+}
+
+#[tauri::command]
+pub fn get_app_categories(db: State<DbState>) -> Result<Vec<AppCategoryRule>, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    db::get_all_app_categories(&conn).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn upsert_app_category(
+    app_name: String,
+    exe_path: String,
+    category: String,
+    source: Option<String>,
+    db: State<DbState>,
+) -> Result<(), String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    db::upsert_app_category_rule(
+        &conn,
+        &app_name,
+        &exe_path,
+        &category,
+        source.as_deref().unwrap_or("manual"),
+    )
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn remove_app_category(exe_path: String, db: State<DbState>) -> Result<(), String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    db::delete_app_category_rule(&conn, &exe_path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn suggest_category_for_app(app_name: String, exe_path: String) -> CategorySuggestion {
+    suggest_category(&app_name, &exe_path)
+}
+
+#[tauri::command]
+pub fn get_usage_goals(db: State<DbState>) -> Result<Vec<UsageGoal>, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    db::get_usage_goals(&conn).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn save_usage_goal(goal: UsageGoal, db: State<DbState>) -> Result<UsageGoal, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    let id = db::upsert_usage_goal(&conn, &goal).map_err(|e| e.to_string())?;
+    Ok(UsageGoal {
+        id: Some(id),
+        ..goal
+    })
+}
+
+#[tauri::command]
+pub fn remove_usage_goal(id: i64, db: State<DbState>) -> Result<(), String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    db::delete_usage_goal(&conn, id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_goal_progress(
+    week_start_day: Option<i32>,
+    db: State<DbState>,
+) -> Result<Vec<GoalProgress>, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    let (week_start, week_end) = current_week_range(week_start_day.unwrap_or(1));
+    db::get_goal_progress(&conn, &today(), &week_start, &week_end).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn set_focus_mode_active(active: bool, db: State<DbState>) -> Result<(), String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    db::set_bool_setting(&conn, "focus_mode_active", active).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_focus_mode_active(db: State<DbState>) -> Result<bool, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    db::get_bool_setting(&conn, "focus_mode_active", false).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn start_focus_session(
+    reason: Option<String>,
+    trigger_type: Option<String>,
+    db: State<DbState>,
+) -> Result<i64, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    db::start_focus_session(
+        &conn,
+        trigger_type.as_deref().unwrap_or("manual"),
+        reason.as_deref().unwrap_or(""),
+    )
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn stop_focus_session(id: i64, db: State<DbState>) -> Result<(), String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    db::stop_focus_session(&conn, id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn list_focus_sessions(
+    start_at: Option<String>,
+    end_at: Option<String>,
+    db: State<DbState>,
+) -> Result<Vec<FocusSession>, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    db::list_focus_sessions(&conn, start_at.as_deref(), end_at.as_deref()).map_err(|e| e.to_string())
 }
 
 // ── Todo commands ─────────────────────────────────────────────
@@ -320,6 +551,8 @@ pub fn get_running_executables() -> Result<Vec<ExecutableOption>, String> {
 #[derive(serde::Serialize, serde::Deserialize)]
 struct ExportBundle {
     app_usage: Vec<AppUsageRow>,
+    #[serde(default)]
+    browser_sessions: Vec<BrowserSession>,
     todos: Vec<TodoRow>,
     widget_configs: Vec<WidgetConfig>,
     ignored_apps: Vec<String>,
@@ -545,6 +778,8 @@ pub fn export_data_json(db: State<DbState>) -> Result<String, String> {
         rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())?
     };
 
+    let browser_sessions = db::get_recent_browser_sessions(&conn, 100_000).map_err(|e| e.to_string())?;
+
     let widget_configs = db::get_all_widget_configs(&conn).map_err(|e| e.to_string())?;
     let ignored_apps = db::get_ignored_apps(&conn).map_err(|e| e.to_string())?;
 
@@ -565,6 +800,7 @@ pub fn export_data_json(db: State<DbState>) -> Result<String, String> {
 
     let bundle = ExportBundle {
         app_usage,
+        browser_sessions,
         todos,
         widget_configs,
         ignored_apps,
@@ -612,13 +848,45 @@ pub fn import_data_json(payload: String, db: State<DbState>) -> Result<(), Strin
         .map_err(|e| e.to_string())?;
     }
 
+    for session in bundle.browser_sessions {
+        tx.execute(
+            "INSERT INTO browser_sessions
+             (id, browser_name, tab_url, host, title, started_at, ended_at, duration_seconds, locale, synced_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+             ON CONFLICT(id) DO UPDATE SET
+               browser_name = excluded.browser_name,
+               tab_url = excluded.tab_url,
+               host = excluded.host,
+               title = excluded.title,
+               started_at = excluded.started_at,
+               ended_at = excluded.ended_at,
+               duration_seconds = excluded.duration_seconds,
+               locale = excluded.locale,
+               synced_at = excluded.synced_at",
+            params![
+                session.id,
+                session.browser_name,
+                session.tab_url,
+                session.host,
+                session.title,
+                session.started_at,
+                session.ended_at,
+                session.duration_seconds,
+                session.locale,
+                session.synced_at,
+            ],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+
     for cfg in bundle.widget_configs {
         tx.execute(
             "INSERT INTO widget_configs
-             (id, widget_type, x, y, width, height, opacity, always_on_top_mode, pinned, start_on_launch)
-                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+             (id, widget_type, monitor_index, x, y, width, height, opacity, always_on_top_mode, pinned, start_on_launch)
+                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
                          ON CONFLICT(id) DO UPDATE SET
                              widget_type = excluded.widget_type,
+                             monitor_index = excluded.monitor_index,
                              x = excluded.x,
                              y = excluded.y,
                              width = excluded.width,
@@ -630,6 +898,7 @@ pub fn import_data_json(payload: String, db: State<DbState>) -> Result<(), Strin
             params![
                 cfg.id,
                 cfg.widget_type,
+                cfg.monitor_index,
                 cfg.x,
                 cfg.y,
                 cfg.width,

@@ -1,0 +1,23 @@
+{
+  "title": "应用分类",
+  "subtitle": "为应用打标签，按活动类型查看使用洞察",
+  "addRule": "添加分类规则",
+  "exePlaceholder": "选择最近使用的应用…",
+  "categoryLabel": "分类",
+  "noRules": "暂无分类规则，请在上方添加应用。",
+  "suggestedCategory": "建议分类：{{cat}} — 点击应用",
+  "applySuggestion": "应用建议分类",
+  "presets": {
+    "Work": "工作",
+    "Social": "社交",
+    "Entertainment": "娱乐",
+    "Development": "开发",
+    "Productivity": "效率",
+    "Education": "学习",
+    "Gaming": "游戏",
+    "Browsing": "浏览",
+    "Communication": "沟通",
+    "System": "系统",
+    "uncategorized": "未分类"
+  }
+}

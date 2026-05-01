@@ -21,7 +21,13 @@
     "excludeTimelens": "Exclude TimeLens from stats",
     "excludeTimelensHint": "Hide TimeLens own usage from screen-time records",
     "ignoreSystemProcesses": "Ignore system processes",
-    "ignoreSystemProcessesHint": "Exclude non-interactive System32/SysWOW64 processes (keep explorer/taskmgr and other interactive apps)"
+    "ignoreSystemProcessesHint": "Exclude non-interactive System32/SysWOW64 processes (keep explorer/taskmgr and other interactive apps)",
+    "trackWindowTitles": "Track window title details",
+    "trackWindowTitlesHint": "Record window title granularity (for example VS Code projects or browser tabs)",
+    "idleTimePolicy": "Idle time policy",
+    "idleCount": "Count idle",
+    "idleExclude": "Exclude idle",
+    "idleTimePolicyHint": "Choose whether idle time is counted into totals or excluded"
   },
   "startup": {
     "title": "Startup",
@@ -34,6 +40,25 @@
     "title": "Widgets",
     "fadeOnBlur": "Fade when unfocused",
     "fadeHint": "Widget becomes nearly transparent when covered; click to restore"
+  },
+  "browser": {
+    "title": "Browser Extension",
+    "enable": "Enable browser companion link",
+    "status": "Connection status",
+    "connected": "Connected",
+    "waiting": "Waiting for extension",
+    "apiUrl": "Local API",
+    "copyApiUrl": "Copy URL",
+    "linkConfig": "Link payload",
+    "copyConfig": "Copy config",
+    "hint": "Install the browser-extension folder as an unpacked extension in a Chromium browser. The extension reads desktop status and writes tab sessions back to TimeLens.",
+    "lastBrowser": "Last browser: {{browser}}",
+    "lastLocale": "Browser language: {{locale}}",
+    "lastSync": "Last sync: {{time}}",
+    "recentSessions": "Browser sessions received: {{count}}",
+    "noSessions": "No browser sessions synced yet",
+    "refresh": "Refresh status",
+    "none": "None"
   },
   "shortcuts": {
     "title": "Shortcuts",
@@ -48,9 +73,7 @@
     "title": "Data",
     "excludeApps": "Excluded applications",
     "searchExe": "Search running/recent executables",
-    "manualExePlaceholder": "Manually enter full executable path (e.g. C:\\Program Files\\App\\app.exe)",
-    "addManualExe": "Add path",
-    "noExeFound": "No executable found",
+    "noExcludedApps": "No apps excluded yet — pick an app above to add it",
     "saveExcludedApps": "Save excluded apps",
     "export": "Export Data",
     "exportCsv": "Export as CSV",

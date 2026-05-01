@@ -4,6 +4,7 @@ import { Bell, Plus, Trash2, AlertTriangle } from "lucide-react";
 import * as api from "@/services/tauriApi";
 import type { AppLimit, AppUsageSummary, ExecutableOption } from "@/types";
 import { formatDuration } from "@/utils/format";
+import ExePickerInput from "@/components/ExePickerInput";
 import clsx from "clsx";
 
 const STORAGE_KEY = "timelens-app-limits";
@@ -24,13 +25,10 @@ export default function Limits() {
   const { t } = useTranslation(["limits", "common"]);
   const [limits, setLimits] = useState<AppLimit[]>(loadLimits);
   const [executableOptions, setExecutableOptions] = useState<ExecutableOption[]>([]);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [manualExePath, setManualExePath] = useState("");
   const [selectedExe, setSelectedExe] = useState("");
   const [selectedName, setSelectedName] = useState("");
   const [limitHours, setLimitHours] = useState(2);
   const [limitMinutes, setLimitMinutes] = useState(0);
-  const [showDropdown, setShowDropdown] = useState(false);
   const [todayUsage, setTodayUsage] = useState<AppUsageSummary[]>([]);
 
   const usageMap = useMemo(() => {
@@ -72,24 +70,15 @@ export default function Limits() {
 
   const alreadyLimitedPaths = new Set(limits.map((l) => l.exePath));
 
-  const filteredOptions = executableOptions.filter((x) => {
-    if (alreadyLimitedPaths.has(x.exe_path)) return false;
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) return true;
-    return (
-      x.app_name.toLowerCase().includes(q) || x.exe_path.toLowerCase().includes(q)
-    );
-  });
 
   const addLimit = () => {
-    const manual = manualExePath.trim();
-    const exePath = selectedExe || manual;
+    const exePath = selectedExe;
     if (!exePath) return;
 
     const dailyLimitSeconds = limitHours * 3600 + limitMinutes * 60;
     if (dailyLimitSeconds <= 0) return;
 
-    const appName = selectedName || (exePath.split(/[\\/]/).pop() || exePath);
+    const appName = selectedName || exePath.split(/[\\/]/).pop() || exePath;
 
     const newLimit: AppLimit = {
       exePath,
@@ -102,11 +91,8 @@ export default function Limits() {
     saveLimits(updated);
     setSelectedExe("");
     setSelectedName("");
-    setManualExePath("");
-    setSearchQuery("");
     setLimitHours(2);
     setLimitMinutes(0);
-    setShowDropdown(false);
   };
 
   const removeLimit = (exePath: string) => {
@@ -155,62 +141,16 @@ export default function Limits() {
       {/* Add new limit */}
       <div className="glass-card p-5 space-y-3 relative z-20">
         <h2 className="text-sm font-semibold text-text-primary">{t("limits:addLimit")}</h2>
-        <div className="relative">
-          <input
-            value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value);
-              setSelectedExe("");
-              setSelectedName("");
-              setShowDropdown(true);
-            }}
-            onFocus={() => setShowDropdown(true)}
-            onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
-            className="ui-field"
-            placeholder={t("limits:searchApp")}
-          />
-          {showDropdown && searchQuery && filteredOptions.length > 0 && (
-            <div className="absolute z-30 left-0 right-0 mt-1 max-h-48 overflow-y-auto rounded-xl border border-surface-border bg-surface-card shadow-lg divide-y divide-surface-border">
-              {filteredOptions.slice(0, 25).map((row) => (
-                <button
-                  key={row.exe_path}
-                  onMouseDown={() => {
-                    setSelectedExe(row.exe_path);
-                    setSelectedName(row.app_name);
-                    setSearchQuery(row.app_name);
-                    setShowDropdown(false);
-                  }}
-                  className={clsx(
-                    "w-full flex flex-col items-start px-3 py-2 text-xs hover:bg-surface-hover transition-colors text-left",
-                    selectedExe === row.exe_path && "bg-surface-hover"
-                  )}
-                >
-                  <span className="text-text-primary font-medium">{row.app_name}</span>
-                  <span className="text-text-muted truncate max-w-full" title={row.exe_path}>
-                    {row.exe_path}
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
-          {showDropdown && searchQuery && filteredOptions.length === 0 && (
-            <div className="absolute z-30 left-0 right-0 mt-1 rounded-xl border border-surface-border bg-surface-card shadow-lg">
-              <p className="px-3 py-3 text-xs text-text-muted">{t("limits:noAppsFound")}</p>
-            </div>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          <input
-            value={manualExePath}
-            onChange={(e) => {
-              setManualExePath(e.target.value);
-              setSelectedExe("");
-              setSelectedName("");
-            }}
-            className="ui-field"
-            placeholder={t("limits:manualExePlaceholder")}
-          />
-        </div>
+        <ExePickerInput
+          options={executableOptions}
+          placeholder={t("limits:searchApp")}
+          value={selectedName}
+          excludePaths={alreadyLimitedPaths}
+          onChange={(appName, exePath) => {
+            setSelectedName(appName);
+            setSelectedExe(exePath);
+          }}
+        />
         <div className="flex items-center gap-3 flex-wrap">
           <span className="text-sm text-text-secondary flex-shrink-0">{t("limits:dailyLimit")}</span>
           <div className="flex items-center gap-2">
@@ -241,7 +181,7 @@ export default function Limits() {
           </div>
           <button
             onClick={addLimit}
-            disabled={(!(selectedExe || manualExePath.trim())) || (limitHours === 0 && limitMinutes === 0)}
+            disabled={!selectedExe || (limitHours === 0 && limitMinutes === 0)}
             className={clsx(
               "ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs",
               "border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors",

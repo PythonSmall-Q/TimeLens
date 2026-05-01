@@ -21,7 +21,13 @@
     "excludeTimelens": "从统计中排除 TimeLens",
     "excludeTimelensHint": "在屏幕时间记录中隐藏 TimeLens 自身的使用时长",
     "ignoreSystemProcesses": "忽略系统进程",
-    "ignoreSystemProcessesHint": "排除 System32/SysWOW64 下非交互系统进程（保留 explorer、taskmgr 等交互程序）"
+    "ignoreSystemProcessesHint": "排除 System32/SysWOW64 下非交互系统进程（保留 explorer、taskmgr 等交互程序）",
+    "trackWindowTitles": "记录窗口标题细节",
+    "trackWindowTitlesHint": "按窗口标题细分统计（例如 VS Code 项目或浏览器标签页）",
+    "idleTimePolicy": "空闲时间策略",
+    "idleCount": "计入空闲",
+    "idleExclude": "扣除空闲",
+    "idleTimePolicyHint": "选择空闲时段是否计入总时长"
   },
   "startup": {
     "title": "启动",
@@ -34,6 +40,25 @@
     "title": "小组件",
     "fadeOnBlur": "失焦时透明化",
     "fadeHint": "小组件被覆盖时近透明显示，点击后恢复"
+  },
+  "browser": {
+    "title": "浏览器扩展",
+    "enable": "启用浏览器伴侣连接",
+    "status": "连接状态",
+    "connected": "已连接",
+    "waiting": "等待扩展连接",
+    "apiUrl": "本地 API",
+    "copyApiUrl": "复制地址",
+    "linkConfig": "连接配置",
+    "copyConfig": "复制配置",
+    "hint": "将 browser-extension 目录作为未打包扩展加载到 Chromium 浏览器中。扩展会读取桌面端状态，并把标签页会话回写到 TimeLens。",
+    "lastBrowser": "最近浏览器：{{browser}}",
+    "lastLocale": "浏览器语言：{{locale}}",
+    "lastSync": "最近同步：{{time}}",
+    "recentSessions": "已接收浏览器会话：{{count}}",
+    "noSessions": "还没有同步任何浏览器会话",
+    "refresh": "刷新状态",
+    "none": "无"
   },
   "shortcuts": {
     "title": "快捷键",
@@ -48,9 +73,7 @@
     "title": "数据",
     "excludeApps": "排除应用",
     "searchExe": "搜索正在运行/近期记录的 exe",
-    "manualExePlaceholder": "手动输入 exe 完整路径（例如 C:\\Program Files\\App\\app.exe）",
-    "addManualExe": "添加路径",
-    "noExeFound": "未找到可选 exe",
+    "noExcludedApps": "尚未排除任何应用 — 在上方选择应用后将添加到此处",
     "saveExcludedApps": "保存排除应用",
     "export": "导出数据",
     "exportCsv": "导出为 CSV",

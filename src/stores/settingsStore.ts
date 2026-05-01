@@ -11,6 +11,8 @@ interface SettingsState {
   debounceMs: number;
   autoOpenWidgets: boolean;
   ignoreSystemProcesses: boolean;
+  idleTimePolicy: "count" | "exclude";
+  trackWindowTitles: boolean;
   weekStartDay: 0 | 1; // 0 = Sunday, 1 = Monday
   excludeTimelens: boolean;
   setLanguage: (lang: string) => void;
@@ -20,6 +22,8 @@ interface SettingsState {
   setDebounce: (ms: number) => void;
   setAutoOpenWidgets: (active: boolean) => void;
   setIgnoreSystemProcesses: (active: boolean) => void;
+  setIdleTimePolicy: (policy: "count" | "exclude") => void;
+  setTrackWindowTitles: (active: boolean) => void;
   setWeekStartDay: (day: 0 | 1) => void;
   setExcludeTimelens: (val: boolean) => void;
 }
@@ -34,6 +38,8 @@ export const useSettingsStore = create<SettingsState>()(
       debounceMs: 500,
       autoOpenWidgets: true,
       ignoreSystemProcesses: false,
+      idleTimePolicy: "count",
+      trackWindowTitles: true,
       weekStartDay: 1,
       excludeTimelens: true,
 
@@ -67,6 +73,20 @@ export const useSettingsStore = create<SettingsState>()(
         set({ ignoreSystemProcesses });
         api.setIgnoreSystemProcesses(ignoreSystemProcesses).catch((e) => {
           console.error("setIgnoreSystemProcesses failed", e);
+        });
+      },
+
+      setIdleTimePolicy: (idleTimePolicy) => {
+        set({ idleTimePolicy });
+        api.setIdleTimePolicy(idleTimePolicy).catch((e) => {
+          console.error("setIdleTimePolicy failed", e);
+        });
+      },
+
+      setTrackWindowTitles: (trackWindowTitles) => {
+        set({ trackWindowTitles });
+        api.setTrackWindowTitles(trackWindowTitles).catch((e) => {
+          console.error("setTrackWindowTitles failed", e);
         });
       },
 

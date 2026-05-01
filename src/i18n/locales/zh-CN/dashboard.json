@@ -24,5 +24,16 @@
   "selectDate": "选择日期",
   "totalTime": "共 {{time}}",
   "searchApps": "搜索应用名...",
-  "noSearchResult": "没有匹配的应用"
+  "noSearchResult": "没有匹配的应用",
+  "goalProgress": "目标进度",
+  "goalEmpty": "尚未配置目标",
+  "categoryView": "按分类查看",
+  "categoryTrend": "分类时长趋势",
+  "noCategoryData": "暂无分类数据",
+  "usageHeatmap": "使用热力图（近 365 天）",
+  "trendCompare": "A/B 趋势对比",
+  "periodA": "时期 A",
+  "periodB": "时期 B",
+  "topIncrease": "增长 Top",
+  "topDecrease": "下降 Top"
 }

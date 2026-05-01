@@ -1,6 +1,7 @@
 use tauri::State;
 
 use crate::commands::storage_cmd::DbState;
+use crate::models::{BrowserExtensionStatus, BrowserSession};
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct ShortcutSettings {
@@ -16,6 +17,9 @@ pub struct AppSettingsPayload {
     pub silent_startup: bool,
     pub auto_open_widgets: bool,
     pub ignore_system_processes: bool,
+    pub idle_time_policy: String,
+    pub track_window_titles: bool,
+    pub browser_extension_enabled: bool,
     pub shortcuts: ShortcutSettings,
 }
 
@@ -159,6 +163,13 @@ pub fn get_app_settings(db: State<DbState>) -> Result<AppSettingsPayload, String
         .map_err(|e| e.to_string())?;
     let ignore_system_processes = crate::db::get_bool_setting(&conn, "ignore_system_processes", false)
         .map_err(|e| e.to_string())?;
+    let idle_time_policy = crate::db::get_setting(&conn, "idle_time_policy")
+        .map_err(|e| e.to_string())?
+        .unwrap_or_else(|| "count".to_string());
+    let track_window_titles = crate::db::get_bool_setting(&conn, "track_window_titles", true)
+        .map_err(|e| e.to_string())?;
+    let browser_extension_enabled = crate::db::get_bool_setting(&conn, "browser_extension_enabled", true)
+        .map_err(|e| e.to_string())?;
 
     let mut shortcuts = default_shortcuts();
     if let Some(v) = crate::db::get_setting(&conn, "shortcut_open_widget_center")
@@ -187,8 +198,44 @@ pub fn get_app_settings(db: State<DbState>) -> Result<AppSettingsPayload, String
         silent_startup,
         auto_open_widgets,
         ignore_system_processes,
+        idle_time_policy,
+        track_window_titles,
+        browser_extension_enabled,
         shortcuts,
     })
+}
+
+#[tauri::command]
+pub fn get_browser_extension_status(db: State<DbState>) -> Result<BrowserExtensionStatus, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    let enabled = crate::db::get_bool_setting(&conn, "browser_extension_enabled", true)
+        .map_err(|e| e.to_string())?;
+    let last_sync_at = crate::db::get_setting(&conn, "browser_extension_last_sync_at")
+        .map_err(|e| e.to_string())?;
+    let last_browser_name = crate::db::get_setting(&conn, "browser_extension_last_browser_name")
+        .map_err(|e| e.to_string())?;
+    let last_locale = crate::db::get_setting(&conn, "browser_extension_last_locale")
+        .map_err(|e| e.to_string())?;
+    let recent_sessions = crate::db::get_recent_browser_sessions(&conn, 6)
+        .map_err(|e| e.to_string())?;
+    let recent_session_count = crate::db::count_browser_sessions(&conn).map_err(|e| e.to_string())?;
+
+    Ok(BrowserExtensionStatus {
+        enabled,
+        api_base_url: "http://127.0.0.1:49152".to_string(),
+        connected: last_sync_at.is_some(),
+        last_sync_at,
+        last_browser_name,
+        last_locale,
+        recent_session_count,
+        recent_sessions,
+    })
+}
+
+#[tauri::command]
+pub fn set_browser_extension_enabled(enabled: bool, db: State<DbState>) -> Result<(), String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    crate::db::set_bool_setting(&conn, "browser_extension_enabled", enabled).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -215,6 +262,22 @@ pub fn set_auto_open_widgets(enabled: bool, db: State<DbState>) -> Result<(), St
 pub fn set_ignore_system_processes(enabled: bool, db: State<DbState>) -> Result<(), String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
     crate::db::set_bool_setting(&conn, "ignore_system_processes", enabled).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn set_idle_time_policy(policy: String, db: State<DbState>) -> Result<(), String> {
+    let normalized = match policy.as_str() {
+        "count" | "exclude" => policy,
+        _ => return Err("idle_time_policy must be 'count' or 'exclude'".to_string()),
+    };
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    crate::db::set_setting(&conn, "idle_time_policy", &normalized).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn set_track_window_titles(enabled: bool, db: State<DbState>) -> Result<(), String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    crate::db::set_bool_setting(&conn, "track_window_titles", enabled).map_err(|e| e.to_string())
 }
 
 #[tauri::command]

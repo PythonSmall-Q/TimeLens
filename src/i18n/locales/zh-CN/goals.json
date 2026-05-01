@@ -1,0 +1,22 @@
+{
+  "title": "使用目标",
+  "subtitle": "为应用或分类设置时间目标，培养健康习惯",
+  "addGoal": "添加目标",
+  "newGoal": "新建目标",
+  "noGoals": "暂无目标，点击「添加目标」创建。",
+  "allApps": "全部应用",
+  "period_daily": "每天",
+  "period_weekly": "每周",
+  "op_at_most": "不超过",
+  "op_at_least": "至少",
+  "minutes": "分钟",
+  "scopeValuePlaceholder": "目标值",
+  "scopeValueLabel": "目标值",
+  "scopeTypeLabel": "目标类型",
+  "scopeType_app": "软件",
+  "scopeType_category": "分类",
+  "searchAppPlaceholder": "搜索并选择软件",
+  "periodLabel": "周期",
+  "operatorLabel": "条件",
+  "minutesLabel": "目标分钟数"
+}

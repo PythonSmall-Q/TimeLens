@@ -1,0 +1,13 @@
+{
+  "title": "专注模式",
+  "subtitle": "屏蔽干扰，追踪深度工作时间",
+  "activeTitle": "专注会话进行中",
+  "inactiveTitle": "专注模式已关闭",
+  "hint": "开启专注会话，屏蔽干扰应用，保持专注",
+  "start": "开始专注",
+  "stop": "结束会话",
+  "history": "会话历史",
+  "noHistory": "暂无已完成的会话",
+  "triggerManual": "手动触发",
+  "triggerAuto": "自动触发"
+}

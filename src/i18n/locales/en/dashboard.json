@@ -24,5 +24,16 @@
   "selectDate": "Select Date",
   "totalTime": "Total: {{time}}",
   "searchApps": "Search apps...",
-  "noSearchResult": "No matching apps"
+  "noSearchResult": "No matching apps",
+  "goalProgress": "Goal Progress",
+  "goalEmpty": "No goals configured yet",
+  "categoryView": "By Category",
+  "categoryTrend": "Category Trend",
+  "noCategoryData": "No category data yet",
+  "usageHeatmap": "Usage Heatmap (Last 365 Days)",
+  "trendCompare": "A/B Trend Compare",
+  "periodA": "Period A",
+  "periodB": "Period B",
+  "topIncrease": "Top Increase",
+  "topDecrease": "Top Decrease"
 }

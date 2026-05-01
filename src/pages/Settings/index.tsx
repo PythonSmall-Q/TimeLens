@@ -2,10 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSettingsStore } from "@/stores/settingsStore";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
-import { Moon, Sun, Activity, Database, Info, Rocket, Keyboard, PanelsTopLeft } from "lucide-react";
+import { Moon, Sun, Activity, Database, Info, Rocket, Keyboard, PanelsTopLeft, Puzzle } from "lucide-react";
 import clsx from "clsx";
 import * as api from "@/services/tauriApi";
-import type { ExecutableOption, ShortcutSettings } from "@/types";
+import type { BrowserExtensionStatus, ExecutableOption, ShortcutSettings } from "@/types";
+import ExePickerInput from "@/components/ExePickerInput";
 
 function Section({
   icon: Icon,
@@ -47,8 +48,9 @@ export default function Settings() {
   const [fadeOnBlur, setFadeOnBlur] = useState(true);
   const [executableOptions, setExecutableOptions] = useState<ExecutableOption[]>([]);
   const [ignoredApps, setIgnoredAppsState] = useState<string[]>([]);
-  const [excludeQuery, setExcludeQuery] = useState("");
-  const [manualExePath, setManualExePath] = useState("");
+  const [excludePickerValue, setExcludePickerValue] = useState("");
+  const [browserExtensionEnabled, setBrowserExtensionEnabledState] = useState(true);
+  const [browserExtensionStatus, setBrowserExtensionStatus] = useState<BrowserExtensionStatus | null>(null);
   const [shortcuts, setShortcutState] = useState<ShortcutSettings>({
     open_widget_center: "Alt+W",
     toggle_widget_visibility: "Alt+Shift+W",
@@ -68,6 +70,10 @@ export default function Settings() {
     setAutoOpenWidgets: setStoreAutoOpenWidgets,
     ignoreSystemProcesses,
     setIgnoreSystemProcesses,
+    idleTimePolicy,
+    setIdleTimePolicy,
+    trackWindowTitles,
+    setTrackWindowTitles,
     weekStartDay,
     setWeekStartDay,
     excludeTimelens,
@@ -81,8 +87,15 @@ export default function Settings() {
         setSilentStartup(s.silent_startup);
         setAutoOpenWidgets(s.auto_open_widgets);
         setIgnoreSystemProcesses(s.ignore_system_processes);
+        setIdleTimePolicy(s.idle_time_policy);
+        setTrackWindowTitles(s.track_window_titles);
+        setBrowserExtensionEnabledState(s.browser_extension_enabled);
         setShortcutState(s.shortcuts);
       })
+      .catch(() => {});
+
+    api.getBrowserExtensionStatus()
+      .then(setBrowserExtensionStatus)
       .catch(() => {});
 
     const mergeOptions = (incoming: ExecutableOption[]) => {
@@ -129,12 +142,6 @@ export default function Settings() {
     setShortcutState((prev) => ({ ...prev, [key]: value }));
   };
 
-  const filteredExecutables = executableOptions.filter((x) => {
-    const q = excludeQuery.trim().toLowerCase();
-    if (!q) return true;
-    return x.app_name.toLowerCase().includes(q) || x.exe_path.toLowerCase().includes(q);
-  });
-
   const toggleIgnoredApp = (exePath: string) => {
     setIgnoredAppsState((prev) =>
       prev.includes(exePath)
@@ -143,20 +150,15 @@ export default function Settings() {
     );
   };
 
-  const addManualExcludedApp = () => {
-    const path = manualExePath.trim();
-    if (!path) return;
-
-    const normalized = path.replace(/\//g, "\\");
+  const addPickedExcludedApp = (appName: string, exePath: string) => {
+    if (!exePath) return;
+    const normalized = exePath.replace(/\//g, "\\");
     setIgnoredAppsState((prev) => (prev.includes(normalized) ? prev : [...prev, normalized]));
-
-    const appName = normalized.split(/[\\/]/).pop() || normalized;
     setExecutableOptions((prev) => {
       if (prev.some((x) => x.exe_path === normalized)) return prev;
       return [{ app_name: appName, exe_path: normalized }, ...prev];
     });
-
-    setManualExePath("");
+    setExcludePickerValue("");
   };
 
   const downloadTextFile = (fileName: string, content: string, contentType: string) => {
@@ -170,6 +172,25 @@ export default function Settings() {
     link.remove();
     URL.revokeObjectURL(url);
   };
+
+  const refreshBrowserExtensionStatus = async () => {
+    try {
+      const status = await api.getBrowserExtensionStatus();
+      setBrowserExtensionStatus(status);
+    } catch {
+      // keep silent to match current settings UX
+    }
+  };
+
+  const browserLinkPayload = JSON.stringify(
+    {
+      app: "TimeLens",
+      apiBaseUrl: browserExtensionStatus?.api_base_url ?? "http://127.0.0.1:49152",
+      enabled: browserExtensionEnabled,
+    },
+    null,
+    2,
+  );
 
   return (
     <div className="p-6 space-y-5 animate-fade-in">
@@ -338,6 +359,49 @@ export default function Settings() {
           </button>
         </Row>
         <p className="text-xs text-text-muted text-right">{t("tracking.ignoreSystemProcessesHint")}</p>
+        <Row label={t("tracking.trackWindowTitles")}>
+          <button
+            onClick={() => {
+              const next = !trackWindowTitles;
+              setTrackWindowTitles(next);
+            }}
+            title={t("tracking.trackWindowTitles")}
+            className={clsx(
+              "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+              trackWindowTitles ? "bg-accent-blue" : "bg-surface-hover"
+            )}
+          >
+            <span
+              className={clsx(
+                "inline-block h-4 w-4 rounded-full bg-white shadow transition-transform",
+                trackWindowTitles ? "translate-x-6" : "translate-x-1"
+              )}
+            />
+          </button>
+        </Row>
+        <p className="text-xs text-text-muted text-right">{t("tracking.trackWindowTitlesHint")}</p>
+        <Row label={t("tracking.idleTimePolicy")}> 
+          <div className="flex gap-2">
+            {([
+              ["count", t("tracking.idleCount")],
+              ["exclude", t("tracking.idleExclude")],
+            ] as const).map(([val, label]) => (
+              <button
+                key={val}
+                onClick={() => setIdleTimePolicy(val)}
+                className={clsx(
+                  "px-3 py-1.5 rounded-lg text-xs border transition-colors",
+                  idleTimePolicy === val
+                    ? "border-accent-blue bg-accent-blue/15 text-accent-blue"
+                    : "border-surface-border text-text-muted hover:text-text-secondary"
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </Row>
+        <p className="text-xs text-text-muted text-right">{t("tracking.idleTimePolicyHint")}</p>
 
   </Section>
 
@@ -435,6 +499,102 @@ export default function Settings() {
         <p className="text-xs text-text-muted text-right">{t("widgets.fadeHint")}</p>
       </Section>
 
+      <Section icon={Puzzle} title={t("browser.title")}> 
+        <Row label={t("browser.enable")}> 
+          <button
+            onClick={async () => {
+              const next = !browserExtensionEnabled;
+              setBrowserExtensionEnabledState(next);
+              await api.setBrowserExtensionEnabled(next).catch(() => setBrowserExtensionEnabledState(!next));
+              await refreshBrowserExtensionStatus();
+            }}
+            title={t("browser.enable")}
+            className={clsx(
+              "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+              browserExtensionEnabled ? "bg-accent-blue" : "bg-surface-hover"
+            )}
+          >
+            <span
+              className={clsx(
+                "inline-block h-4 w-4 rounded-full bg-white shadow transition-transform",
+                browserExtensionEnabled ? "translate-x-6" : "translate-x-1"
+              )}
+            />
+          </button>
+        </Row>
+        <Row label={t("browser.status")}>
+          <span className={clsx(
+            "text-xs px-2.5 py-1 rounded-full border",
+            browserExtensionStatus?.connected
+              ? "border-accent-green/40 text-accent-green bg-accent-green/10"
+              : "border-surface-border text-text-muted bg-surface-hover"
+          )}>
+            {browserExtensionStatus?.connected ? t("browser.connected") : t("browser.waiting")}
+          </span>
+        </Row>
+        <Row label={t("browser.apiUrl")}>
+          <div className="flex items-center gap-2 justify-end flex-wrap">
+            <span className="text-xs font-mono text-text-secondary">
+              {browserExtensionStatus?.api_base_url ?? "http://127.0.0.1:49152"}
+            </span>
+            <button
+              onClick={async () => {
+                await navigator.clipboard.writeText(browserExtensionStatus?.api_base_url ?? "http://127.0.0.1:49152");
+              }}
+              className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
+            >
+              {t("browser.copyApiUrl")}
+            </button>
+          </div>
+        </Row>
+        <Row label={t("browser.linkConfig")}>
+          <button
+            onClick={async () => {
+              await navigator.clipboard.writeText(browserLinkPayload);
+            }}
+            className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
+          >
+            {t("browser.copyConfig")}
+          </button>
+        </Row>
+        <div className="rounded-lg border border-surface-border bg-surface-hover/40 p-3 space-y-2">
+          <p className="text-xs text-text-secondary">{t("browser.hint")}</p>
+          <div className="flex flex-wrap gap-2 text-xs text-text-muted">
+            <span className="px-2 py-1 rounded-full bg-surface-hover">Chrome</span>
+            <span className="px-2 py-1 rounded-full bg-surface-hover">Edge</span>
+            <span className="px-2 py-1 rounded-full bg-surface-hover">Brave</span>
+          </div>
+          <div className="text-xs text-text-muted space-y-1">
+            <p>{t("browser.lastBrowser", { browser: browserExtensionStatus?.last_browser_name ?? t("browser.none") })}</p>
+            <p>{t("browser.lastLocale", { locale: browserExtensionStatus?.last_locale ?? t("browser.none") })}</p>
+            <p>{t("browser.lastSync", { time: browserExtensionStatus?.last_sync_at ?? t("browser.none") })}</p>
+            <p>{t("browser.recentSessions", { count: browserExtensionStatus?.recent_session_count ?? 0 })}</p>
+          </div>
+          <div className="space-y-2 max-h-48 overflow-y-auto">
+            {(browserExtensionStatus?.recent_sessions ?? []).map((session) => (
+              <div key={`${session.started_at}-${session.tab_url}`} className="rounded-lg border border-surface-border px-3 py-2">
+                <div className="text-xs text-text-primary truncate">{session.title || session.host}</div>
+                <div className="text-[11px] text-text-muted truncate">{session.host || session.tab_url}</div>
+                <div className="text-[11px] text-text-muted">
+                  {session.browser_name} · {Math.floor(session.duration_seconds / 60)}m · {session.locale || t("browser.none")}
+                </div>
+              </div>
+            ))}
+            {(browserExtensionStatus?.recent_sessions ?? []).length === 0 && (
+              <p className="text-xs text-text-muted">{t("browser.noSessions")}</p>
+            )}
+          </div>
+          <div className="flex justify-end">
+            <button
+              onClick={refreshBrowserExtensionStatus}
+              className="text-xs px-3 py-1.5 rounded-lg border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
+            >
+              {t("browser.refresh")}
+            </button>
+          </div>
+        </div>
+      </Section>
+
       {/* Shortcuts */}
       <Section icon={Keyboard} title={t("shortcuts.title")}>
         <Row label={t("shortcuts.openWidgetCenter")}>
@@ -494,14 +654,17 @@ export default function Settings() {
       <Section icon={Database} title={t("data.title")}>
         <div className="space-y-2">
           <div className="text-sm text-text-secondary">{t("data.excludeApps")}</div>
-          <input
-            value={excludeQuery}
-            onChange={(e) => setExcludeQuery(e.target.value)}
-            className="ui-field"
+          <ExePickerInput
+            options={executableOptions}
             placeholder={t("data.searchExe")}
+            value={excludePickerValue}
+            onChange={(appName, exePath) => {
+              if (exePath) { addPickedExcludedApp(appName, exePath); }
+              else { setExcludePickerValue(appName); }
+            }}
           />
           <div className="max-h-48 overflow-y-auto rounded-lg border border-surface-border divide-y divide-surface-border">
-            {filteredExecutables.map((row) => {
+            {executableOptions.filter((x) => ignoredApps.includes(x.exe_path)).map((row) => {
               const checked = ignoredApps.includes(row.exe_path);
               return (
                 <label
@@ -523,23 +686,10 @@ export default function Settings() {
                 </label>
               );
             })}
-            {filteredExecutables.length === 0 && (
-              <p className="px-3 py-3 text-xs text-text-muted">{t("data.noExeFound")}</p>
+            
+            {executableOptions.filter((x: ExecutableOption) => ignoredApps.includes(x.exe_path)).length === 0 && (
+              <p className="px-3 py-3 text-xs text-text-muted">{t("data.noExcludedApps")}</p>
             )}
-          </div>
-          <div className="flex items-center gap-2">
-            <input
-              value={manualExePath}
-              onChange={(e) => setManualExePath(e.target.value)}
-              className="ui-field"
-              placeholder={t("data.manualExePlaceholder")}
-            />
-            <button
-              onClick={addManualExcludedApp}
-              className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors whitespace-nowrap"
-            >
-              {t("data.addManualExe")}
-            </button>
           </div>
           <div className="flex justify-end">
             <button
@@ -608,7 +758,7 @@ export default function Settings() {
       {/* About */}
       <Section icon={Info} title={t("about.title")}>
         <Row label={t("about.version")}>
-          <span className="text-xs font-mono text-text-secondary">v0.5.0</span>
+          <span className="text-xs font-mono text-text-secondary">v1.0.0</span>
         </Row>
         <Row label="GitHub">
           <a

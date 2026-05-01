@@ -6,7 +6,7 @@
   <Identity
     Name="ShanWenxiao.TimeLens-TimeManagementAppwithWidgets"
     Publisher="CN=67203FD7-3571-4CF3-9A8B-DE6BA454CE5B"
-    Version="0.5.0.0" />
+    Version="1.0.0.0" />
 
   <Properties>
     <DisplayName>TimeLens - Time Management App with Widgets</DisplayName>

@@ -1,0 +1,22 @@
+{
+  "title": "Usage Goals",
+  "subtitle": "Set time goals for apps or categories to build healthy habits",
+  "addGoal": "Add Goal",
+  "newGoal": "New Goal",
+  "noGoals": "No goals yet. Click \"Add Goal\" to create one.",
+  "allApps": "All apps",
+  "period_daily": "Daily",
+  "period_weekly": "Weekly",
+  "op_at_most": "At most",
+  "op_at_least": "At least",
+  "minutes": "minutes",
+  "scopeValuePlaceholder": "Target value",
+  "scopeValueLabel": "Target value",
+  "scopeTypeLabel": "Target type",
+  "scopeType_app": "App",
+  "scopeType_category": "Category",
+  "searchAppPlaceholder": "Search and select an app",
+  "periodLabel": "Period",
+  "operatorLabel": "Operator",
+  "minutesLabel": "Target minutes"
+}

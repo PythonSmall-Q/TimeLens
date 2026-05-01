@@ -1,0 +1,11 @@
+{
+  "extensionName": {
+    "message": "TimeLens Browser Companion"
+  },
+  "extensionDescription": {
+    "message": "Companion extension for TimeLens. Tracks active tab sessions, detects idle time, and syncs browser usage data to the local desktop app."
+  },
+  "extensionActionTitle": {
+    "message": "TimeLens Browser Companion"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "title": "Focus Mode",
+  "subtitle": "Block distractions and track deep work sessions",
+  "activeTitle": "Focus session in progress",
+  "inactiveTitle": "Focus mode is off",
+  "hint": "Start a session to block distracting apps and stay on task",
+  "start": "Start Focus",
+  "stop": "End Session",
+  "history": "Session History",
+  "noHistory": "No completed sessions yet",
+  "triggerManual": "Manual",
+  "triggerAuto": "Auto-triggered"
+}

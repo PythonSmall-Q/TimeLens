@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { availableMonitors, monitorFromPoint, type Monitor } from "@tauri-apps/api/window";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import ClockWidget from "./ClockWidget";
 import TodoWidget from "./TodoWidget";
@@ -22,6 +23,22 @@ export default function WidgetWindow({ widgetId, widgetType }: Props) {
   const positionSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const topModeRef = useRef<"always" | "focus" | "never">("focus");
   const [isBlurred, setIsBlurred] = useState(false);
+
+  const getMonitorIndexForRect = async (x: number, y: number, width: number, height: number) => {
+    try {
+      const target = await monitorFromPoint(x + width / 2, y + height / 2);
+      if (!target) return -1;
+      const monitors = await availableMonitors();
+      return monitors.findIndex((monitor: Monitor) => (
+        monitor.position.x === target.position.x
+        && monitor.position.y === target.position.y
+        && monitor.size.width === target.size.width
+        && monitor.size.height === target.size.height
+      ));
+    } catch {
+      return -1;
+    }
+  };
 
   useEffect(() => {
     // Load widget opacity preset once.
@@ -80,8 +97,10 @@ export default function WidgetWindow({ widgetId, widgetType }: Props) {
             ws.find((w) => w.id === widgetId)
           );
           if (config) {
+            const monitorIndex = await getMonitorIndexForRect(pos.x, pos.y, size.width, size.height);
             await api.saveWidgetConfig({
               ...config,
+              monitor_index: monitorIndex,
               x: pos.x,
               y: pos.y,
               width: size.width,
