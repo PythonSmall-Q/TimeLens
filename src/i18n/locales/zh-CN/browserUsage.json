@@ -21,6 +21,7 @@
   "hasLimit": "限额",
   "noBrowserData": "暂无浏览器数据",
   "noBrowserDataHint": "请安装并连接浏览器扩展，以追踪网站使用情况。",
+  "noBrowserDataEdgeAddon": "前往 Edge 加载项商店搜索 \"TimeLens Browser Companion\" 以开始使用。",
   "noResults": "未找到相关域名",
   "ignoredDomains": "已忽略的域名",
   "ignoredDomainsHint": "已忽略的域名不会出现在统计中，也不会计入限额。",

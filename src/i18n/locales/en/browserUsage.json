@@ -21,6 +21,7 @@
   "hasLimit": "Limit",
   "noBrowserData": "No browser data yet",
   "noBrowserDataHint": "Install and connect the browser extension to track website usage.",
+  "noBrowserDataEdgeAddon": "Search \"TimeLens Browser Companion\" in the Edge Add-ons Store to get started.",
   "noResults": "No domains found",
   "ignoredDomains": "Ignored Domains",
   "ignoredDomainsHint": "Ignored domains are hidden from stats and not tracked against any limit.",

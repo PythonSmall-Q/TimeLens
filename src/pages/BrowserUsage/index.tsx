@@ -373,7 +373,12 @@ export default function BrowserUsage() {
             {search ? t("browserUsage:noResults") : t("browserUsage:noBrowserData")}
           </p>
           {!search && (
-            <p className="text-text-muted text-xs">{t("browserUsage:noBrowserDataHint")}</p>
+            <>
+              <p className="text-text-muted text-xs">{t("browserUsage:noBrowserDataHint")}</p>
+              <p className="text-accent-blue text-xs font-medium">
+                {t("browserUsage:noBrowserDataEdgeAddon")}
+              </p>
+            </>
           )}
         </div>
       ) : (

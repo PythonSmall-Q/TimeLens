@@ -53,3 +53,4 @@ src-tauri/windows/out/TimeLens-0.5.0.0.msix
 src-tauri/windows/msix-staging/AppxManifest.xml
 src-tauri/windows/msix-staging/timelens.exe
 browser-extension.zip
+src-tauri/windows/msix-staging/timelens.exe

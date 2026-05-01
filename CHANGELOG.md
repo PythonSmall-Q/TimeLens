@@ -5,6 +5,72 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [1.0.0] - 2026-05-01
+
+### Added
+
+#### Categories
+
+- New **Categories** page — manually group apps into custom categories such as "Work / Entertainment / Social / Utilities"
+- **CategoryInsights** component — new dashboard card visualizing category time distribution and trends via pie and area charts
+- Category data persisted to SQLite with aggregate queries and stats by category
+
+#### Goals
+
+- New **Goals** page — create, edit, and delete daily / weekly usage goals
+  - Goals can target a **category** or a **single app**
+  - Configurable duration down to hour + minute granularity
+- **GoalProgressBar** component — new dashboard progress bars showing completion percentage for each goal
+
+#### Focus Mode
+
+- New **FocusMode** page — start focused timer sessions
+  - Real-time countdown display with option to abandon mid-session
+  - Configurable focus duration
+
+#### Dashboard Enhancements
+
+- **TrendComparePanel** — compare usage trends across different periods (period-over-period change, absolute and percentage deltas, color-coded)
+- **UsageHeatmap** — yearly usage heatmap rendered as calendar cells showing daily screen-time intensity over the past year
+
+#### Browser Extension
+
+- New **Chrome browser extension** (`browser-extension/`)
+  - Tracks browsing time per website / tab
+  - Standalone popup showing browser usage stats (progress bars + percentages)
+  - Supports `en` / `zh_CN` localization
+  - Includes `build-chrome.js` script for one-click packaging
+
+#### API Server
+
+- New local **REST API** module (`src-tauri/src/api_server/`)
+  - Exposes endpoints for third-party tools (e.g. Obsidian, Raycast) to read usage data
+  - Supports querying app lists, usage statistics, and browser data
+
+#### UI / Components
+
+- **ExePickerInput** — improved app-picker component supporting search / selection from currently running processes and historical executables
+- **WidgetCenter upgrades** — improved per-widget startup configuration and friendlier empty-state messaging
+
+#### Internationalization
+
+- New i18n namespaces:
+  - `categories` — category management labels
+  - `goals` — goal system labels
+  - `focus` — focus mode labels
+  - `browserUsage` — browser extension labels
+- `dashboard`, `settings`, and `widgets` namespaces significantly expanded to cover all new features
+
+### Changed
+
+- Version bumped to **1.0.0**, marking the first stable release
+- `package.json`, `src-tauri/Cargo.toml`, and `src-tauri/tauri.conf.json` synchronized to the new version
+- Settings page refactored with new configuration entries for categories, goals, and browser data
+- Database schema significantly expanded with new tables / indexes for categories, goals, and browser usage
+- Backend command modules (`storage_cmd`, `widget_cmd`, etc.) refactored to support new features
+
+---
+
 ## [0.5.0] - 2026-05-01
 
 ### Added
