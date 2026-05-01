@@ -19,11 +19,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - platform: windows-latest
-            args: ""
-          - platform: macos-latest
-            args: "--target universal-apple-darwin"
+          include:
+            - platform: windows-latest
+              args: ""
+            - platform: macos-latest
+              args: "--target universal-apple-darwin"
+            - platform: ubuntu-latest
+              args: ""
 
     runs-on: ${{ matrix.platform }}
 
@@ -87,12 +89,15 @@ jobs:
             in_section { print }
           ' CHANGELOG.md)
 
+          MACOS_NOTE="\n\n---\n\n### 🚩 macOS 无签名运行说明\n\n**首次打开如遇“无法验证开发者”或“已损坏”提示，请右键 App → 打开，或在终端执行：**\n\n\n    xattr -dr com.apple.quarantine /Applications/TimeLens.app\n\n**如仍无法运行，请在“系统设置 → 隐私与安全性”中允许此 App。**\n"
+
           if [ -z "$SECTION" ]; then
-            echo "notes=No changelog entry found for version ${VERSION_NO_V}." >> "$GITHUB_OUTPUT"
+            echo "notes=No changelog entry found for version ${VERSION_NO_V}.${MACOS_NOTE}" >> "$GITHUB_OUTPUT"
           else
             {
               echo "notes<<EOF"
               printf '%s\n' "$SECTION"
+              printf '%b' "$MACOS_NOTE"
               echo "EOF"
             } >> "$GITHUB_OUTPUT"
           fi

@@ -28,6 +28,9 @@ dist-ssr/
 # Tauri
 src-tauri/target/
 src-tauri/gen/
+src-tauri/windows/msix-staging/
+src-tauri/windows/out/
+src-tauri/windows/msix-staging/timelens.exe
 
 # Icon generation scripts (dev utility only)
 generate-icons.mjs
@@ -45,3 +48,7 @@ build_log.txt
 src-tauri/check_results.txt
 src-tauri/full_check.txt
 src-tauri/windows/Package.appxmanifest
+src-tauri/windows/msix-staging/timelens.exe
+src-tauri/windows/out/TimeLens-0.5.0.0.msix
+src-tauri/windows/msix-staging/AppxManifest.xml
+src-tauri/windows/msix-staging/timelens.exe
