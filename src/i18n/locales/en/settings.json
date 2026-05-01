@@ -19,7 +19,9 @@
     "weekStartMonday": "Monday",
     "weekStartSunday": "Sunday",
     "excludeTimelens": "Exclude TimeLens from stats",
-    "excludeTimelensHint": "Hide TimeLens own usage from screen-time records"
+    "excludeTimelensHint": "Hide TimeLens own usage from screen-time records",
+    "ignoreSystemProcesses": "Ignore system processes",
+    "ignoreSystemProcessesHint": "Exclude non-interactive System32/SysWOW64 processes (keep explorer/taskmgr and other interactive apps)"
   },
   "startup": {
     "title": "Startup",

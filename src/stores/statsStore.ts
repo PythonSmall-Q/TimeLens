@@ -14,6 +14,7 @@ interface StatsState {
   todayTotals: AppUsageSummary[];
   todayHourly: HourlyDistribution[];
   totalSecondsToday: number;
+  sidebarTodaySeconds: number;
   weeklyTotals: DailyUsage[];
   monitorStatus: MonitorStatus;
   currentApp: string;
@@ -23,6 +24,7 @@ interface StatsState {
   weekComparison: AppUsageComparison[];
 
   fetchToday: () => Promise<void>;
+  fetchTodaySummary: () => Promise<void>;
   fetchForDate: (date: string) => Promise<void>;
   fetchForRange: (startDate: string, endDate: string) => Promise<void>;
   fetchWeekComparison: (
@@ -45,6 +47,7 @@ export const useStatsStore = create<StatsState>((set, get) => ({
   todayTotals: [],
   todayHourly: [],
   totalSecondsToday: 0,
+  sidebarTodaySeconds: 0,
   weeklyTotals: [],
   monitorStatus: { active: true, current_app: "", current_exe_path: "", current_title: "" },
   currentApp: "",
@@ -61,7 +64,12 @@ export const useStatsStore = create<StatsState>((set, get) => ({
         api.getTodayHourly(),
       ]);
       const total = totals.reduce((s, r) => s + r.total_seconds, 0);
-      set({ todayTotals: totals, todayHourly: hourly, totalSecondsToday: total });
+      set({
+        todayTotals: totals,
+        todayHourly: hourly,
+        totalSecondsToday: total,
+        sidebarTodaySeconds: total,
+      });
     } catch (e) {
       console.error("fetchToday failed", e);
     } finally {
@@ -69,8 +77,24 @@ export const useStatsStore = create<StatsState>((set, get) => ({
     }
   },
 
+  fetchTodaySummary: async () => {
+    try {
+      const totals = await api.getTodayAppTotals();
+      const total = totals.reduce((s, r) => s + r.total_seconds, 0);
+      set({ sidebarTodaySeconds: total });
+    } catch (e) {
+      console.error("fetchTodaySummary failed", e);
+    }
+  },
+
   fetchForDate: async (date: string) => {
-    set({ loading: true, selectedDate: date });
+    set({
+      loading: true,
+      selectedDate: date,
+      todayTotals: [],
+      todayHourly: [],
+      totalSecondsToday: 0,
+    });
     try {
       const [totals, hourly] = await Promise.all([
         api.getAppTotalsForDate(date),
@@ -80,6 +104,7 @@ export const useStatsStore = create<StatsState>((set, get) => ({
       set({ todayTotals: totals, todayHourly: hourly, totalSecondsToday: total });
     } catch (e) {
       console.error("fetchForDate failed", e);
+      set({ todayTotals: [], todayHourly: [], totalSecondsToday: 0 });
     } finally {
       set({ loading: false });
     }

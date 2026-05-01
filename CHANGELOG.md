@@ -5,6 +5,43 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.5.0] - 2026-05-01
+
+### Added
+
+- Update channel split policy:
+  - Microsoft Store installs now only receive update reminders (no in-app updater trigger)
+  - macOS and non-Store installs attempt in-app updater first, with release-page fallback
+- Linux foreground-window detection MVP:
+  - Wayland path via `zbus` (GNOME Shell `Eval` best-effort)
+  - X11 path via `x11rb` (`_NET_ACTIVE_WINDOW` + `_NET_WM_PID`)
+- Data-layer performance upgrades:
+  - New `daily_app_usage` pre-aggregation table for date/range queries
+  - New paginated command `get_app_usage_page` for large history reads
+- New setting: **Ignore system processes**
+  - Excludes non-interactive processes under `System32` / `SysWOW64`
+  - Keeps interactive executables such as `explorer.exe` and `taskmgr.exe`
+
+### Changed
+
+- App version bumped to **0.5.0** in `package.json`, `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`, and UI version labels
+- App-limit alerts now rely on OS notifications only (removed in-app blocking modal)
+- Dashboard date behavior:
+  - Removed implicit day-mode re-fetch loop that could override historical views
+  - Auto-refresh of today data now only happens when currently viewing **today** in day mode
+- "Current App / 正在使用" now appears only in **today + day mode**; hidden for historical day/week/month navigation
+- Widget spawn behavior:
+  - Prefers the user's last moved widget position
+  - If occupied, applies collision avoidance in order: **down first, then right**
+- `ignored_apps` values are normalized for path separator and case to improve matching reliability
+
+### Fixed
+
+- Prevented mismatch where historical dashboard views displayed real-time active-app info
+- Reduced large-range query pressure by switching range/day totals to pre-aggregated source table
+
+---
+
 ## [0.4.0] - 2026-04-26
 
 ### Added

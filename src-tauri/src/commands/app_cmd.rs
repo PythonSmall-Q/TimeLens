@@ -15,7 +15,78 @@ pub struct AppSettingsPayload {
     pub launch_at_startup: bool,
     pub silent_startup: bool,
     pub auto_open_widgets: bool,
+    pub ignore_system_processes: bool,
     pub shortcuts: ShortcutSettings,
+}
+
+#[derive(serde::Serialize)]
+pub struct InstallChannelInfo {
+    pub platform: String,
+    pub channel: String,
+    pub should_trigger_update: bool,
+}
+
+#[cfg(target_os = "windows")]
+fn is_microsoft_store_install() -> bool {
+    if std::env::var("APPX_PACKAGE_FAMILY_NAME").is_ok() {
+        return true;
+    }
+
+    if let Ok(exe) = std::env::current_exe() {
+        let p = exe.to_string_lossy().to_ascii_lowercase();
+        if p.contains("\\windowsapps\\") {
+            return true;
+        }
+    }
+
+    false
+}
+
+#[cfg(not(target_os = "windows"))]
+fn is_microsoft_store_install() -> bool {
+    false
+}
+
+#[tauri::command]
+pub fn get_install_channel_info() -> InstallChannelInfo {
+    #[cfg(target_os = "windows")]
+    {
+        let is_store = is_microsoft_store_install();
+        return InstallChannelInfo {
+            platform: "windows".to_string(),
+            channel: if is_store {
+                "microsoft-store".to_string()
+            } else {
+                "direct".to_string()
+            },
+            should_trigger_update: !is_store,
+        };
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        return InstallChannelInfo {
+            platform: "macos".to_string(),
+            channel: "direct".to_string(),
+            should_trigger_update: true,
+        };
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        return InstallChannelInfo {
+            platform: "linux".to_string(),
+            channel: "direct".to_string(),
+            should_trigger_update: true,
+        };
+    }
+
+    #[allow(unreachable_code)]
+    InstallChannelInfo {
+        platform: "unknown".to_string(),
+        channel: "direct".to_string(),
+        should_trigger_update: true,
+    }
 }
 
 #[cfg(target_os = "windows")]
@@ -86,6 +157,8 @@ pub fn get_app_settings(db: State<DbState>) -> Result<AppSettingsPayload, String
         .map_err(|e| e.to_string())?;
     let auto_open_widgets = crate::db::get_bool_setting(&conn, "auto_open_widgets", true)
         .map_err(|e| e.to_string())?;
+    let ignore_system_processes = crate::db::get_bool_setting(&conn, "ignore_system_processes", false)
+        .map_err(|e| e.to_string())?;
 
     let mut shortcuts = default_shortcuts();
     if let Some(v) = crate::db::get_setting(&conn, "shortcut_open_widget_center")
@@ -113,6 +186,7 @@ pub fn get_app_settings(db: State<DbState>) -> Result<AppSettingsPayload, String
         launch_at_startup,
         silent_startup,
         auto_open_widgets,
+        ignore_system_processes,
         shortcuts,
     })
 }
@@ -138,6 +212,12 @@ pub fn set_auto_open_widgets(enabled: bool, db: State<DbState>) -> Result<(), St
 }
 
 #[tauri::command]
+pub fn set_ignore_system_processes(enabled: bool, db: State<DbState>) -> Result<(), String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    crate::db::set_bool_setting(&conn, "ignore_system_processes", enabled).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub fn set_shortcuts(shortcuts: ShortcutSettings, db: State<DbState>) -> Result<(), String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
     crate::db::set_setting(&conn, "shortcut_open_widget_center", &shortcuts.open_widget_center)
@@ -154,4 +234,62 @@ pub fn set_shortcuts(shortcuts: ShortcutSettings, db: State<DbState>) -> Result<
         .map_err(|e| e.to_string())?;
 
     Ok(())
+}
+
+fn xml_escape(input: &str) -> String {
+    input
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&apos;")
+}
+
+#[cfg(target_os = "windows")]
+fn send_windows_toast(title: &str, body: &str, alarm: bool) -> Result<(), String> {
+    use windows::Data::Xml::Dom::XmlDocument;
+    use windows::UI::Notifications::{ToastNotification, ToastNotificationManager};
+
+    let scenario = if alarm { " scenario=\"alarm\"" } else { "" };
+    let audio = if alarm {
+        "<audio src=\"ms-winsoundevent:Notification.Looping.Alarm2\" loop=\"true\"/>"
+    } else {
+        ""
+    };
+
+    let xml = format!(
+        "<toast{scenario}><visual><binding template=\"ToastGeneric\"><text>{}</text><text>{}</text></binding></visual>{audio}</toast>",
+        xml_escape(title),
+        xml_escape(body)
+    );
+
+    let doc = XmlDocument::new().map_err(|e| format!("xml document create failed: {e}"))?;
+    doc.LoadXml(&xml.into())
+        .map_err(|e| format!("toast xml load failed: {e}"))?;
+
+    let toast = ToastNotification::CreateToastNotification(&doc)
+        .map_err(|e| format!("create toast failed: {e}"))?;
+
+    let app_id = "ShanWenxiao.TimeLens-TimeManagementAppwithWidgets";
+    let notifier = ToastNotificationManager::CreateToastNotifierWithId(&app_id.into())
+        .or_else(|_| ToastNotificationManager::CreateToastNotifier())
+        .map_err(|e| format!("create notifier failed: {e}"))?;
+
+    notifier
+        .Show(&toast)
+        .map_err(|e| format!("show toast failed: {e}"))
+}
+
+#[tauri::command]
+pub fn send_native_notification(title: String, body: String, alarm: Option<bool>) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        return send_windows_toast(&title, &body, alarm.unwrap_or(false));
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = (&title, &body, &alarm);
+        Err("native toast alarm is only implemented on Windows".to_string())
+    }
 }

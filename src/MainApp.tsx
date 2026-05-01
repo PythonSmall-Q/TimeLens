@@ -4,6 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import { getAllWebviewWindows, getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { register as registerGlobalShortcut, unregisterAll as unregisterAllGlobalShortcuts } from "@tauri-apps/plugin-global-shortcut";
 import { isPermissionGranted, requestPermission, sendNotification } from "@tauri-apps/plugin-notification";
+import { check } from "@tauri-apps/plugin-updater";
 import MainLayout from "./components/layout/MainLayout";
 import Dashboard from "./pages/Dashboard";
 import WidgetCenter from "./pages/WidgetCenter";
@@ -11,14 +12,19 @@ import Settings from "./pages/Settings";
 import Limits from "./pages/Limits";
 import { useStatsStore } from "./stores/statsStore";
 import { useSettingsStore } from "./stores/settingsStore";
-import type { ActiveWindowInfo, AppLimit, LimitToast } from "./types";
+import type { ActiveWindowInfo, AppLimit } from "./types";
 import * as api from "@/services/tauriApi";
 import { formatDuration } from "@/utils/format";
 import { useTranslation } from "react-i18next";
+import { todayString } from "@/utils/format";
 
-const CURRENT_VERSION = "0.4.0";
+const CURRENT_VERSION = "0.5.0";
 const LIMIT_WARNED_KEY = "timelens-limit-warned";
 const LIMIT_STORAGE_KEY = "timelens-app-limits";
+
+function normalizeExePath(path: string): string {
+  return path.trim().toLowerCase().replace(/\//g, "\\");
+}
 
 function compareVersions(a: string, b: string): number {
   const pa = a.split(".").map(Number);
@@ -33,15 +39,20 @@ function compareVersions(a: string, b: string): number {
 }
 
 export default function MainApp() {
-  const { fetchToday, fetchWeekly, fetchMonitorStatus, setCurrentApp, setMonitorActive } = useStatsStore();
+  const {
+    fetchToday,
+    fetchTodaySummary,
+    fetchWeekly,
+    fetchMonitorStatus,
+    setCurrentApp,
+    setMonitorActive,
+    selectedDate,
+    periodMode,
+  } = useStatsStore();
   const { setMonitoringActive } = useSettingsStore();
   const { t } = useTranslation(["common", "limits"]);
 
   const [updateInfo, setUpdateInfo] = useState<{ version: string; notes: string; url: string } | null>(null);
-  const [toasts, setToasts] = useState<LimitToast[]>([]);
-  const [limitModal, setLimitModal] = useState<{ appName: string; used: number; limit: number } | null>(null);
-
-  const dismissToast = (id: number) => setToasts((prev) => prev.filter((t) => t.id !== id));
 
   const focusMainAndNavigate = useCallback(async (hash: string) => {
     const win = getCurrentWebviewWindow();
@@ -51,7 +62,8 @@ export default function MainApp() {
   }, []);
 
   const notifyWithNavigate = useCallback(
-    async (title: string, body: string, hash: string) => {
+    async (title: string, body: string, hash: string, alarm = false) => {
+      void hash;
       let permission = "default";
       try {
         permission = (await isPermissionGranted()) ? "granted" : await requestPermission();
@@ -60,21 +72,17 @@ export default function MainApp() {
       }
       if (permission !== "granted") return;
 
-      if (typeof Notification !== "undefined") {
-        const n = new Notification(title, { body });
-        n.onclick = () => {
-          void focusMainAndNavigate(hash);
-        };
-        return;
-      }
-
       try {
-        sendNotification({ title, body });
+        await api.sendNativeNotification(title, body, alarm);
       } catch {
-        // ignore notification failures
+        try {
+          await sendNotification({ title, body, ongoing: alarm });
+        } catch {
+          // ignore notification failures
+        }
       }
     },
-    [focusMainAndNavigate]
+    []
   );
 
   const toggleWidgetsVisibility = useCallback(async () => {
@@ -109,10 +117,15 @@ export default function MainApp() {
     try { warned = JSON.parse(localStorage.getItem(LIMIT_WARNED_KEY) || '{"date":"","warned":{}}'); } catch { /* */ }
     if (warned.date !== today) warned = { date: today, warned: {} };
     const totals = await api.getTodayAppTotals().catch(() => []);
-    const newToasts: LimitToast[] = [];
-    let newModal: { appName: string; used: number; limit: number } | null = null;
+    const totalsMap = new Map<string, number>();
+    for (const row of totals) {
+      const key = normalizeExePath(row.exe_path);
+      totalsMap.set(key, (totalsMap.get(key) ?? 0) + row.total_seconds);
+    }
+
     for (const lim of enabled) {
-      const used = totals.find((u) => u.exe_path === lim.exePath)?.total_seconds ?? 0;
+      const used = totalsMap.get(normalizeExePath(lim.exePath)) ?? 0;
+      if (lim.dailyLimitSeconds <= 0) continue;
       const ratio = used / lim.dailyLimitSeconds;
       const threshold = ratio >= 1.0 ? 100 : ratio >= 0.9 ? 90 : ratio >= 0.8 ? 80 : 0;
       if (!threshold) continue;
@@ -137,28 +150,30 @@ export default function MainApp() {
               used: formatDuration(used),
               limit: formatDuration(lim.dailyLimitSeconds),
             });
-      await notifyWithNavigate(title, body, "#/limits");
-
-      if (threshold === 100) newModal = { appName: lim.appName, used, limit: lim.dailyLimitSeconds };
-      else newToasts.push({ id: Date.now() + Math.random(), appName: lim.appName, level: threshold as 80 | 90, used, limit: lim.dailyLimitSeconds });
+      await notifyWithNavigate(title, body, "#/limits", true);
     }
     localStorage.setItem(LIMIT_WARNED_KEY, JSON.stringify(warned));
-    if (newToasts.length) setToasts((prev) => [...prev, ...newToasts]);
-    if (newModal) setLimitModal(newModal);
   }, [notifyWithNavigate, t]);
 
   useEffect(() => {
     // Initial data load
-    fetchToday();
+    fetchTodaySummary();
+    if (periodMode === "day" && selectedDate === todayString()) {
+      fetchToday();
+    }
     fetchWeekly();
     fetchMonitorStatus();
 
-    // Refresh every 30 s + limit check every 60 s
+    // Refresh monitor state every 30 s, and refresh daily stats only when viewing today.
     const interval = setInterval(() => {
-      fetchToday();
+      fetchTodaySummary();
+      if (periodMode === "day" && selectedDate === todayString()) {
+        fetchToday();
+      }
       fetchMonitorStatus();
     }, 30_000);
-  const limitInterval = setInterval(checkLimits, 60_000);
+    void checkLimits();
+    const limitInterval = setInterval(checkLimits, 60_000);
 
     // Listen to real-time window changes
     const unlistenPromise = listen<ActiveWindowInfo>("active-window-changed", (e) => {
@@ -174,12 +189,12 @@ export default function MainApp() {
 
     return () => {
       clearInterval(interval);
-        clearInterval(limitInterval);
+      clearInterval(limitInterval);
       unlistenPromise.then((u) => u());
       unlistenMonitor.then((u) => u());
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [checkLimits]);
+  }, [checkLimits, fetchMonitorStatus, fetchToday, fetchTodaySummary, periodMode, selectedDate]);
 
   // Update check – once after 4 s
   useEffect(() => {
@@ -189,12 +204,46 @@ export default function MainApp() {
         if (!res.ok) return;
         const data = await res.json() as { tag_name?: string; body?: string; html_url?: string };
         const latest = (data.tag_name ?? "").replace(/^v/, "");
-        if (latest && compareVersions(latest, CURRENT_VERSION) > 0)
-          setUpdateInfo({ version: latest, notes: data.body ?? "", url: data.html_url ?? "" });
+        if (!(latest && compareVersions(latest, CURRENT_VERSION) > 0)) return;
+
+        const channel = await api.getInstallChannelInfo();
+        setUpdateInfo({ version: latest, notes: data.body ?? "", url: data.html_url ?? "" });
+
+        if (!channel.should_trigger_update) {
+          await notifyWithNavigate(
+            t("common:updateAvailableTitle"),
+            t("common:updateAvailableBody", { version: latest, current: CURRENT_VERSION }),
+            "#/settings"
+          );
+          return;
+        }
+
+        try {
+          const update = await check();
+          if (update) {
+            await update.downloadAndInstall();
+            await notifyWithNavigate(
+              t("common:updateAvailableTitle"),
+              t("common:updateInstallReady", { version: latest }),
+              "#/settings"
+            );
+            return;
+          }
+        } catch {
+          // fallback to release page
+        }
+
+        if (data.html_url) window.open(data.html_url, "_blank", "noopener,noreferrer");
+
+        await notifyWithNavigate(
+          t("common:updateAvailableTitle"),
+          t("common:updateAvailableBody", { version: latest, current: CURRENT_VERSION }),
+          "#/settings"
+        );
       } catch { /* offline */ }
     }, 4000);
     return () => clearTimeout(timer);
-  }, []);
+  }, [notifyWithNavigate, t]);
 
   useEffect(() => {
     let mounted = true;
@@ -266,42 +315,6 @@ export default function MainApp() {
                   <Route path="/limits" element={<Limits />} />
         </Routes>
       </MainLayout>
-
-      {/* ── Limit toasts (80 / 90 %) ── */}
-      {toasts.length > 0 && (
-        <div className="fixed top-4 right-4 z-50 space-y-2 max-w-xs pointer-events-none">
-          {toasts.map((toast) => (
-            <div key={toast.id} className="glass-card flex items-start gap-3 p-3 shadow-lg border border-surface-border animate-fade-in pointer-events-auto">
-              <span className={toast.level === 90 ? "text-accent-red" : "text-yellow-400"}>⚠</span>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold text-text-primary">
-                  {toast.level === 80 ? t("limits:limitReached80") : t("limits:limitReached90")}
-                </p>
-                <p className="text-xs text-text-muted mt-0.5">
-                  {t(toast.level === 80 ? "limits:limitReached80Body" : "limits:limitReached90Body", { app: toast.appName, used: formatDuration(toast.used), limit: formatDuration(toast.limit) })}
-                </p>
-              </div>
-              <button onClick={() => dismissToast(toast.id)} className="text-text-muted hover:text-text-primary text-xs flex-shrink-0">✕</button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* ── Limit 100% modal ── */}
-      {limitModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="glass-card max-w-sm w-full mx-4 p-6 space-y-4 text-center shadow-2xl">
-            <div className="text-4xl">🚨</div>
-            <h2 className="text-lg font-bold text-text-primary">{t("limits:limitReached100Title")}</h2>
-            <p className="text-sm text-text-secondary leading-relaxed">
-              {t("limits:limitReached100Body", { app: limitModal.appName, used: formatDuration(limitModal.used), limit: formatDuration(limitModal.limit) })}
-            </p>
-            <button onClick={() => setLimitModal(null)} className="w-full py-2.5 rounded-xl text-sm font-medium bg-accent-blue/20 text-accent-blue hover:bg-accent-blue/30 transition-colors border border-accent-blue/30">
-              {t("limits:dismiss")}
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* ── Update available modal ── */}
       {updateInfo && (

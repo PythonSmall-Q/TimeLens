@@ -1,6 +1,6 @@
 [package]
 name = "timelens"
-version = "0.4.0"
+version = "0.5.0"
 description = "A screen time tracker and desktop widget manager"
 authors = ["Shan Wenxiao"]
 license = "MIT"
@@ -25,6 +25,7 @@ tauri = { version = "2", features = ["tray-icon", "image-png", "image-ico"] }
 tauri-plugin-shell = "2"
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-notification = "2"
+tauri-plugin-updater = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["full"] }
@@ -36,12 +37,18 @@ env_logger = "0.11"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows = { version = "0.58", features = [
+    "Data_Xml_Dom",
+    "UI_Notifications",
     "Win32_Foundation",
     "Win32_UI_WindowsAndMessaging",
     "Win32_System_Threading",
     "Win32_System_ProcessStatus",
 ] }
 winreg = "0.55"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+x11rb = "0.13"
+zbus = { version = "4", default-features = true }
 
 [profile.dev]
 incremental = true

@@ -165,7 +165,140 @@ fn get_foreground_window_info() -> Option<(String, String, String)> {
     Some((app_name.clone(), window_title, app_name))
 }
 
-#[cfg(not(any(target_os = "windows", target_os = "macos")))]
+#[cfg(target_os = "linux")]
+fn get_foreground_window_info() -> Option<(String, String, String)> {
+    if std::env::var("WAYLAND_DISPLAY").is_ok() {
+        if let Some(v) = get_wayland_foreground_window_info() {
+            return Some(v);
+        }
+    }
+
+    get_x11_foreground_window_info()
+}
+
+#[cfg(target_os = "linux")]
+fn get_wayland_foreground_window_info() -> Option<(String, String, String)> {
+    use zbus::blocking::{Connection, Proxy};
+
+    let conn = Connection::session().ok()?;
+    let proxy = Proxy::new(
+        &conn,
+        "org.gnome.Shell",
+        "/org/gnome/Shell",
+        "org.gnome.Shell",
+    )
+    .ok()?;
+
+    let script = r#"
+        const focus = global.display.get_focus_window();
+        if (!focus) {
+            '';
+        } else {
+            const tracker = Shell.WindowTracker.get_default();
+            const app = tracker.get_window_app(focus);
+            const appName = app ? app.get_name() : 'Unknown';
+            const title = focus.get_title() || '';
+            appName + '|' + title;
+        }
+    "#;
+
+    let (ok, result): (bool, String) = proxy.call("Eval", &(script)).ok()?;
+    if !ok {
+        return None;
+    }
+
+    let text = result.trim().trim_matches('"');
+    if text.is_empty() {
+        return None;
+    }
+
+    let mut parts = text.splitn(2, '|');
+    let app_name = parts.next().unwrap_or("Unknown").trim().to_string();
+    let window_title = parts.next().unwrap_or("").trim().to_string();
+    let exe_path = app_name.clone();
+
+    if app_name.is_empty() {
+        return None;
+    }
+
+    Some((app_name, window_title, exe_path))
+}
+
+#[cfg(target_os = "linux")]
+fn get_x11_foreground_window_info() -> Option<(String, String, String)> {
+    use x11rb::connection::Connection;
+    use x11rb::protocol::xproto::{AtomEnum, ConnectionExt};
+
+    let (conn, screen_num) = x11rb::connect(None).ok()?;
+    let root = conn.setup().roots.get(screen_num)?.root;
+
+    let atom_active = conn
+        .intern_atom(false, b"_NET_ACTIVE_WINDOW")
+        .ok()?
+        .reply()
+        .ok()?
+        .atom;
+    let active_reply = conn
+        .get_property(false, root, atom_active, AtomEnum::WINDOW, 0, 1)
+        .ok()?
+        .reply()
+        .ok()?;
+    let active_window = active_reply.value32()?.next()?;
+
+    let atom_pid = conn
+        .intern_atom(false, b"_NET_WM_PID")
+        .ok()?
+        .reply()
+        .ok()?
+        .atom;
+    let pid_reply = conn
+        .get_property(false, active_window, atom_pid, AtomEnum::CARDINAL, 0, 1)
+        .ok()?
+        .reply()
+        .ok()?;
+    let pid = pid_reply.value32()?.next()?;
+
+    let atom_utf8 = conn
+        .intern_atom(false, b"UTF8_STRING")
+        .ok()?
+        .reply()
+        .ok()?
+        .atom;
+    let atom_name = conn
+        .intern_atom(false, b"_NET_WM_NAME")
+        .ok()?
+        .reply()
+        .ok()?
+        .atom;
+    let title_reply = conn
+        .get_property(false, active_window, atom_name, atom_utf8, 0, 4096)
+        .ok()?
+        .reply()
+        .ok()?;
+    let window_title = String::from_utf8_lossy(&title_reply.value)
+        .trim_matches(char::from(0))
+        .to_string();
+
+    let exe_path = std::fs::read_link(format!("/proc/{pid}/exe"))
+        .ok()
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_default();
+
+    let app_name = std::fs::read_to_string(format!("/proc/{pid}/comm"))
+        .ok()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .or_else(|| {
+            std::path::Path::new(&exe_path)
+                .file_stem()
+                .map(|s| s.to_string_lossy().to_string())
+        })
+        .unwrap_or_else(|| "Unknown".to_string());
+
+    Some((app_name, window_title, exe_path))
+}
+
+#[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
 fn get_foreground_window_info() -> Option<(String, String, String)> {
     // Linux / other platforms: not supported in MVP
     None

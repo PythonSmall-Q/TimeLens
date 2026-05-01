@@ -29,6 +29,23 @@ export interface DailyUsage {
   total_seconds: number;
 }
 
+export interface AppUsageRow {
+  id?: number;
+  date: string;
+  app_name: string;
+  exe_path: string;
+  window_title: string;
+  active_seconds: number;
+  first_seen_at: string;
+  last_seen_at: string;
+}
+
+export interface AppUsagePage {
+  rows: AppUsageRow[];
+  total: number;
+  next_offset: number | null;
+}
+
 export interface TodoItem {
   id: number;
   content: string;
@@ -77,7 +94,14 @@ export interface AppSettingsPayload {
   launch_at_startup: boolean;
   silent_startup: boolean;
   auto_open_widgets: boolean;
+  ignore_system_processes: boolean;
   shortcuts: ShortcutSettings;
+}
+
+export interface InstallChannelInfo {
+  platform: "windows" | "macos" | "linux" | "unknown";
+  channel: "microsoft-store" | "direct";
+  should_trigger_update: boolean;
 }
 
 export interface AppLimit {

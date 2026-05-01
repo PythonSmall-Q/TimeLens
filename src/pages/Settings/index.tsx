@@ -66,6 +66,8 @@ export default function Settings() {
     debounceMs,
     setDebounce,
     setAutoOpenWidgets: setStoreAutoOpenWidgets,
+    ignoreSystemProcesses,
+    setIgnoreSystemProcesses,
     weekStartDay,
     setWeekStartDay,
     excludeTimelens,
@@ -78,6 +80,7 @@ export default function Settings() {
         setLaunchAtStartup(s.launch_at_startup);
         setSilentStartup(s.silent_startup);
         setAutoOpenWidgets(s.auto_open_widgets);
+        setIgnoreSystemProcesses(s.ignore_system_processes);
         setShortcutState(s.shortcuts);
       })
       .catch(() => {});
@@ -314,6 +317,27 @@ export default function Settings() {
           </button>
         </Row>
         <p className="text-xs text-text-muted text-right">{t("tracking.excludeTimelensHint")}</p>
+        <Row label={t("tracking.ignoreSystemProcesses")}>
+          <button
+            onClick={() => {
+              const next = !ignoreSystemProcesses;
+              setIgnoreSystemProcesses(next);
+            }}
+            title={t("tracking.ignoreSystemProcesses")}
+            className={clsx(
+              "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+              ignoreSystemProcesses ? "bg-accent-blue" : "bg-surface-hover"
+            )}
+          >
+            <span
+              className={clsx(
+                "inline-block h-4 w-4 rounded-full bg-white shadow transition-transform",
+                ignoreSystemProcesses ? "translate-x-6" : "translate-x-1"
+              )}
+            />
+          </button>
+        </Row>
+        <p className="text-xs text-text-muted text-right">{t("tracking.ignoreSystemProcessesHint")}</p>
 
   </Section>
 
@@ -584,7 +608,7 @@ export default function Settings() {
       {/* About */}
       <Section icon={Info} title={t("about.title")}>
         <Row label={t("about.version")}>
-          <span className="text-xs font-mono text-text-secondary">v0.4.0</span>
+          <span className="text-xs font-mono text-text-secondary">v0.5.0</span>
         </Row>
         <Row label="GitHub">
           <a

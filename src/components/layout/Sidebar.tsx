@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { LayoutDashboard, Layers, Settings, Clock, Activity, Bell } from "lucide-react";
 import { useStatsStore } from "@/stores/statsStore";
 import { formatDuration } from "@/utils/format";
+import { todayString } from "@/utils/format";
 import clsx from "clsx";
 
 const NAV_ITEMS = [
@@ -14,7 +15,8 @@ const NAV_ITEMS = [
 
 export default function Sidebar() {
   const { t } = useTranslation(["common", "dashboard", "widgets", "settings"]);
-  const { totalSecondsToday, currentApp, monitorStatus } = useStatsStore();
+  const { sidebarTodaySeconds, currentApp, monitorStatus, selectedDate, periodMode } = useStatsStore();
+  const showCurrentApp = periodMode === "day" && selectedDate === todayString();
 
   return (
     <aside className="flex flex-col h-full w-56 bg-surface-light border-r border-surface-border select-none">
@@ -32,7 +34,7 @@ export default function Sidebar() {
           {t("dashboard:todayTotal")}
         </div>
         <div className="text-2xl font-bold text-gradient">
-          {formatDuration(totalSecondsToday)}
+          {formatDuration(sidebarTodaySeconds)}
         </div>
         <div className="flex items-center gap-1.5 mt-1.5">
           <span
@@ -45,7 +47,7 @@ export default function Sidebar() {
             {monitorStatus.active ? t("common:tracking") : t("common:paused")}
           </span>
         </div>
-        {currentApp && (
+        {showCurrentApp && currentApp && (
           <div className="mt-1 flex items-center gap-1.5 text-xs text-text-secondary">
             <Activity size={11} />
             <span className="truncate max-w-[130px]">{currentApp}</span>

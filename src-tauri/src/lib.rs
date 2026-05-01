@@ -75,6 +75,7 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             // ── Database ──────────────────────────────────────
             let data_dir = app.path().app_data_dir()?;
@@ -176,6 +177,7 @@ pub fn run() {
             commands::get_running_executables,
             commands::get_ignored_apps,
             commands::set_ignored_apps,
+            commands::get_app_usage_page,
             commands::export_data_csv,
             commands::export_data_json,
             commands::import_data_json,
@@ -196,10 +198,13 @@ pub fn run() {
             commands::set_widget_always_on_top,
             // App settings / startup / shortcuts
             commands::get_app_settings,
+            commands::get_install_channel_info,
             commands::set_launch_at_startup,
             commands::set_silent_startup,
             commands::set_auto_open_widgets,
+            commands::set_ignore_system_processes,
             commands::set_shortcuts,
+            commands::send_native_notification,
         ])
         .run(tauri::generate_context!())
         .expect("error while running TimeLens");

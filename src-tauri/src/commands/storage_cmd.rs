@@ -1,6 +1,8 @@
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+#[cfg(target_os = "windows")]
 use std::sync::OnceLock;
+#[cfg(target_os = "windows")]
+use std::time::{Duration, Instant};
 use chrono::Local;
 use rusqlite::params;
 use tauri::State;
@@ -13,6 +15,7 @@ use crate::models::{
 
 pub type DbState = Arc<Mutex<rusqlite::Connection>>;
 
+#[cfg(target_os = "windows")]
 static RUNNING_EXE_CACHE: OnceLock<Mutex<Option<(Instant, Vec<ExecutableOption>)>>> = OnceLock::new();
 
 fn today() -> String {
@@ -209,7 +212,10 @@ pub fn get_all_widgets(db: State<DbState>) -> Result<Vec<WidgetConfig>, String> 
 #[tauri::command]
 pub fn save_widget_config(config: WidgetConfig, db: State<DbState>) -> Result<(), String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
-    db::upsert_widget_config(&conn, &config).map_err(|e| e.to_string())
+    db::upsert_widget_config(&conn, &config).map_err(|e| e.to_string())?;
+    db::set_setting(&conn, "last_widget_x", &config.x.to_string()).map_err(|e| e.to_string())?;
+    db::set_setting(&conn, "last_widget_y", &config.y.to_string()).map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -332,6 +338,13 @@ struct AppUsageRow {
     last_seen_at: String,
 }
 
+#[derive(serde::Serialize)]
+pub struct AppUsagePage {
+    rows: Vec<AppUsageRow>,
+    total: i64,
+    next_offset: Option<i64>,
+}
+
 #[derive(serde::Serialize, serde::Deserialize)]
 struct TodoRow {
     id: Option<i64>,
@@ -350,6 +363,101 @@ struct SettingRow {
 fn escape_csv(value: &str) -> String {
     let escaped = value.replace('"', "\"\"");
     format!("\"{}\"", escaped)
+}
+
+#[tauri::command]
+pub fn get_app_usage_page(
+    start_date: Option<String>,
+    end_date: Option<String>,
+    limit: Option<u32>,
+    offset: Option<u32>,
+    db: State<DbState>,
+) -> Result<AppUsagePage, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    let page_size = limit.unwrap_or(1000).clamp(1, 10_000) as i64;
+    let off = offset.unwrap_or(0) as i64;
+
+    let (where_sql, count, mut stmt) = match (start_date.as_deref(), end_date.as_deref()) {
+        (Some(start), Some(end)) => {
+            let where_sql = "WHERE date >= ?1 AND date <= ?2";
+            let count = conn
+                .query_row(
+                    &format!("SELECT COUNT(1) FROM app_usage {where_sql}"),
+                    params![start, end],
+                    |row| row.get::<_, i64>(0),
+                )
+                .map_err(|e| e.to_string())?;
+            let stmt = conn
+                .prepare(&format!(
+                    "SELECT id, date, app_name, exe_path, window_title, active_seconds, first_seen_at, last_seen_at
+                     FROM app_usage {where_sql}
+                     ORDER BY id ASC
+                     LIMIT ?3 OFFSET ?4"
+                ))
+                .map_err(|e| e.to_string())?;
+            (where_sql.to_string(), count, stmt)
+        }
+        _ => {
+            let where_sql = "";
+            let count = conn
+                .query_row("SELECT COUNT(1) FROM app_usage", [], |row| row.get::<_, i64>(0))
+                .map_err(|e| e.to_string())?;
+            let stmt = conn
+                .prepare(
+                    "SELECT id, date, app_name, exe_path, window_title, active_seconds, first_seen_at, last_seen_at
+                     FROM app_usage
+                     ORDER BY id ASC
+                     LIMIT ?1 OFFSET ?2",
+                )
+                .map_err(|e| e.to_string())?;
+            (where_sql.to_string(), count, stmt)
+        }
+    };
+
+    let rows = if where_sql.is_empty() {
+        stmt.query_map(params![page_size, off], |row| {
+            Ok(AppUsageRow {
+                id: row.get(0)?,
+                date: row.get(1)?,
+                app_name: row.get(2)?,
+                exe_path: row.get(3)?,
+                window_title: row.get(4)?,
+                active_seconds: row.get(5)?,
+                first_seen_at: row.get(6)?,
+                last_seen_at: row.get(7)?,
+            })
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?
+    } else {
+        let start = start_date.unwrap();
+        let end = end_date.unwrap();
+        stmt.query_map(params![start, end, page_size, off], |row| {
+            Ok(AppUsageRow {
+                id: row.get(0)?,
+                date: row.get(1)?,
+                app_name: row.get(2)?,
+                exe_path: row.get(3)?,
+                window_title: row.get(4)?,
+                active_seconds: row.get(5)?,
+                first_seen_at: row.get(6)?,
+                last_seen_at: row.get(7)?,
+            })
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?
+    };
+
+    let consumed = off + rows.len() as i64;
+    let next_offset = if consumed < count { Some(consumed) } else { None };
+
+    Ok(AppUsagePage {
+        rows,
+        total: count,
+        next_offset,
+    })
 }
 
 #[tauri::command]

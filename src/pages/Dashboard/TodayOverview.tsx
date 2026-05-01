@@ -2,13 +2,15 @@ import { useTranslation } from "react-i18next";
 import { useStatsStore } from "@/stores/statsStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { formatDuration } from "@/utils/format";
+import { todayString } from "@/utils/format";
 import { Monitor, Zap, TrendingUp, PauseCircle, Play, Pause } from "lucide-react";
 import clsx from "clsx";
 
 export default function TodayOverview() {
   const { t } = useTranslation(["common", "dashboard"]);
-  const { totalSecondsToday, currentApp, todayTotals, monitorStatus, setMonitorActive } = useStatsStore();
+  const { totalSecondsToday, currentApp, todayTotals, monitorStatus, setMonitorActive, selectedDate, periodMode } = useStatsStore();
   const { setMonitoringActive } = useSettingsStore();
+  const showCurrentApp = periodMode === "day" && selectedDate === todayString();
 
   const topApp = todayTotals[0];
   const toggleMonitoring = () => {
@@ -60,17 +62,19 @@ export default function TodayOverview() {
         </button>
       </div>
 
-      {/* Current app */}
-      <div className="glass-card p-5">
-        <div className="flex items-center gap-2 text-text-muted text-xs mb-3">
-          <Zap size={13} />
-          <span>{t("dashboard:currentApp")}</span>
+      {/* Current app (today only) */}
+      {showCurrentApp && (
+        <div className="glass-card p-5">
+          <div className="flex items-center gap-2 text-text-muted text-xs mb-3">
+            <Zap size={13} />
+            <span>{t("dashboard:currentApp")}</span>
+          </div>
+          <div className="text-xl font-semibold text-text-primary truncate">
+            {currentApp || "—"}
+          </div>
+          <div className="text-xs text-text-muted mt-1">{t("dashboard:screenTime")}</div>
         </div>
-        <div className="text-xl font-semibold text-text-primary truncate">
-          {currentApp || "—"}
-        </div>
-        <div className="text-xs text-text-muted mt-1">{t("dashboard:screenTime")}</div>
-      </div>
+      )}
 
       {/* Most used */}
       <div className="glass-card p-5">

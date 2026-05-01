@@ -1,6 +1,7 @@
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 use uuid::Uuid;
 
+use crate::commands::storage_cmd::DbState;
 use crate::models::WidgetConfig;
 
 fn short_id() -> String {
@@ -18,20 +19,145 @@ fn default_size(widget_type: &str) -> (f64, f64) {
     }
 }
 
+#[derive(Clone, Copy)]
+struct Rect {
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+}
+
+fn overlaps(a: Rect, b: Rect) -> bool {
+    a.x < b.x + b.width
+        && a.x + a.width > b.x
+        && a.y < b.y + b.height
+        && a.y + a.height > b.y
+}
+
+fn clamp_to_bounds(mut rect: Rect, bounds: Rect) -> Rect {
+    if rect.x < bounds.x {
+        rect.x = bounds.x;
+    }
+    if rect.y < bounds.y {
+        rect.y = bounds.y;
+    }
+    if rect.x + rect.width > bounds.x + bounds.width {
+        rect.x = (bounds.x + bounds.width - rect.width).max(bounds.x);
+    }
+    if rect.y + rect.height > bounds.y + bounds.height {
+        rect.y = (bounds.y + bounds.height - rect.height).max(bounds.y);
+    }
+    rect
+}
+
+fn widget_window_label(label: &str) -> bool {
+    ["clock-", "todo-", "timer-", "note-", "status-"]
+        .iter()
+        .any(|p| label.starts_with(p))
+}
+
+fn infer_monitor_bounds(app: &AppHandle) -> Option<Rect> {
+    let main = app.get_webview_window("main")?;
+    let monitor = main.current_monitor().ok()??;
+    let pos = monitor.position();
+    let size = monitor.size();
+    Some(Rect {
+        x: pos.x as f64,
+        y: pos.y as f64,
+        width: size.width as f64,
+        height: size.height as f64,
+    })
+}
+
+fn collect_open_widget_rects(app: &AppHandle) -> Vec<Rect> {
+    let mut out = Vec::new();
+    for (label, win) in app.webview_windows() {
+        if !widget_window_label(label.as_str()) {
+            continue;
+        }
+        let Ok(pos) = win.outer_position() else {
+            continue;
+        };
+        let Ok(size) = win.outer_size() else {
+            continue;
+        };
+        out.push(Rect {
+            x: pos.x as f64,
+            y: pos.y as f64,
+            width: size.width as f64,
+            height: size.height as f64,
+        });
+    }
+    out
+}
+
+fn compute_spawn_position(app: &AppHandle, preferred_x: f64, preferred_y: f64, width: f64, height: f64) -> (f64, f64) {
+    let bounds = infer_monitor_bounds(app).unwrap_or(Rect {
+        x: 0.0,
+        y: 0.0,
+        width: 2560.0,
+        height: 1440.0,
+    });
+    let occupied = collect_open_widget_rects(app);
+    let step = 36.0;
+
+    let mut candidate = clamp_to_bounds(
+        Rect {
+            x: preferred_x,
+            y: preferred_y,
+            width,
+            height,
+        },
+        bounds,
+    );
+
+    for _ in 0..200 {
+        if occupied.iter().all(|r| !overlaps(candidate, *r)) {
+            return (candidate.x, candidate.y);
+        }
+
+        // Move down first, then right.
+        candidate.y += step;
+        if candidate.y + candidate.height > bounds.y + bounds.height {
+            candidate.y = bounds.y;
+            candidate.x += step;
+        }
+        candidate = clamp_to_bounds(candidate, bounds);
+    }
+
+    (candidate.x, candidate.y)
+}
+
 /// Create a floating widget window and return its config id.
 #[tauri::command]
 pub async fn create_widget(
     widget_type: String,
     app: AppHandle,
+    db: tauri::State<'_, DbState>,
 ) -> Result<WidgetConfig, String> {
     let id = format!("{}-{}", widget_type, short_id());
     let (width, height) = default_size(&widget_type);
 
+    let (preferred_x, preferred_y) = {
+        let conn = db.lock().map_err(|e| e.to_string())?;
+        let x = crate::db::get_setting(&conn, "last_widget_x")
+            .map_err(|e| e.to_string())?
+            .and_then(|v| v.parse::<f64>().ok())
+            .unwrap_or(100.0);
+        let y = crate::db::get_setting(&conn, "last_widget_y")
+            .map_err(|e| e.to_string())?
+            .and_then(|v| v.parse::<f64>().ok())
+            .unwrap_or(100.0);
+        (x, y)
+    };
+
+    let (x, y) = compute_spawn_position(&app, preferred_x, preferred_y, width, height);
+
     let config = WidgetConfig {
         id: id.clone(),
         widget_type: widget_type.clone(),
-        x: 100.0,
-        y: 100.0,
+        x,
+        y,
         width,
         height,
         opacity: 0.88,

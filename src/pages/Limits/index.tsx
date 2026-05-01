@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Bell, Plus, Trash2, AlertTriangle } from "lucide-react";
 import * as api from "@/services/tauriApi";
-import type { AppLimit, ExecutableOption } from "@/types";
+import type { AppLimit, AppUsageSummary, ExecutableOption } from "@/types";
 import { formatDuration } from "@/utils/format";
 import clsx from "clsx";
 
@@ -31,6 +31,22 @@ export default function Limits() {
   const [limitHours, setLimitHours] = useState(2);
   const [limitMinutes, setLimitMinutes] = useState(0);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [todayUsage, setTodayUsage] = useState<AppUsageSummary[]>([]);
+
+  const usageMap = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const row of todayUsage) {
+      const key = row.exe_path.toLowerCase().replace(/\//g, "\\");
+      m.set(key, (m.get(key) ?? 0) + row.total_seconds);
+    }
+    return m;
+  }, [todayUsage]);
+
+  useEffect(() => {
+    api.getTodayAppTotals()
+      .then(setTodayUsage)
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const mergeOptions = (incoming: ExecutableOption[]) => {
@@ -318,10 +334,40 @@ export default function Limits() {
                     <span className="text-text-muted text-xs">m</span>
                   </div>
 
-                  {/* Usage bar */}
-                  <div className="hidden sm:block w-20 text-right text-xs text-text-muted flex-shrink-0">
-                    {formatDuration(limit.dailyLimitSeconds)}
-                  </div>
+                  {/* Usage progress */}
+                  {(() => {
+                    const key = limit.exePath.toLowerCase().replace(/\//g, "\\");
+                    const used = usageMap.get(key) ?? 0;
+                    const pct = Math.min(100, Math.round((used / limit.dailyLimitSeconds) * 100));
+                    const barColor =
+                      pct >= 100 ? "bg-accent-red" :
+                      pct >= 90  ? "bg-orange-400" :
+                      pct >= 80  ? "bg-yellow-400" :
+                      "bg-accent-blue";
+                    return (
+                      <div className="hidden sm:flex flex-col items-end gap-1 flex-shrink-0 w-28">
+                        <div className="flex items-center gap-1 text-xs">
+                          <span className={clsx(
+                            "font-semibold",
+                            pct >= 100 ? "text-accent-red" :
+                            pct >= 80  ? "text-yellow-400" :
+                            "text-text-secondary"
+                          )}>
+                            {pct}%
+                          </span>
+                          <span className="text-text-muted">
+                            {formatDuration(used)} / {formatDuration(limit.dailyLimitSeconds)}
+                          </span>
+                        </div>
+                        <div className="w-full h-1.5 rounded-full bg-surface-hover overflow-hidden">
+                          <div
+                            className={clsx("h-full rounded-full transition-all", barColor)}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   {/* Delete */}
                   <button

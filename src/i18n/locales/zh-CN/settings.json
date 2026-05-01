@@ -19,7 +19,9 @@
     "weekStartMonday": "周一",
     "weekStartSunday": "周日",
     "excludeTimelens": "从统计中排除 TimeLens",
-    "excludeTimelensHint": "在屏幕时间记录中隐藏 TimeLens 自身的使用时长"
+    "excludeTimelensHint": "在屏幕时间记录中隐藏 TimeLens 自身的使用时长",
+    "ignoreSystemProcesses": "忽略系统进程",
+    "ignoreSystemProcessesHint": "排除 System32/SysWOW64 下非交互系统进程（保留 explorer、taskmgr 等交互程序）"
   },
   "startup": {
     "title": "启动",

@@ -32,6 +32,7 @@
   "version": "Version",
   "updateAvailableTitle": "New Version Available",
   "updateAvailableBody": "TimeLens v{{version}} is now available. You are on v{{current}}.",
+  "updateInstallReady": "TimeLens v{{version}} has been installed. Restart the app to apply updates.",
   "viewOnGitHub": "View on GitHub",
   "whatsNew": "What\u2019s new",
   "remindLater": "Remind me later"

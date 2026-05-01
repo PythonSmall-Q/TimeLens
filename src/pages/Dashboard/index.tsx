@@ -66,6 +66,7 @@ export default function Dashboard() {
     selectedDate,
     setSelectedDate,
     fetchToday,
+    fetchForDate,
     fetchForRange,
     fetchWeekComparison,
     loading,
@@ -102,8 +103,13 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
-    fetchToday();
-  }, []);
+    if (periodMode !== "day") return;
+    if (selectedDate === todayString()) {
+      fetchToday();
+      return;
+    }
+    fetchForDate(selectedDate);
+  }, [fetchForDate, fetchToday, periodMode, selectedDate]);
 
   const isToday = selectedDate === todayString();
 
@@ -141,10 +147,7 @@ export default function Dashboard() {
   }, [periodMode, weekValue, monthValue, weekStartDay]);
 
   useEffect(() => {
-    if (periodMode === "day") {
-      setSelectedDate(selectedDate);
-      return;
-    }
+    if (periodMode === "day") return;
 
     if (!rangeDays) return;
     fetchForRange(rangeDays.start, rangeDays.end);
@@ -156,7 +159,7 @@ export default function Dashboard() {
       prevStart.setDate(prevEnd.getDate() - 6);
       fetchWeekComparison(rangeDays.start, rangeDays.end, fmt(prevStart), fmt(prevEnd));
     }
-  }, [periodMode, rangeDays, selectedDate, fetchForRange, fetchWeekComparison, setSelectedDate]);
+  }, [periodMode, rangeDays, fetchForRange, fetchWeekComparison]);
 
   return (
     <div className="p-6 space-y-5 animate-fade-in">

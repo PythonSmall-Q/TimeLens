@@ -3,6 +3,7 @@ import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import type {
   AppUsageSummary,
   AppUsageComparison,
+  AppUsagePage,
   ExecutableOption,
   HourlyDistribution,
   DailyUsage,
@@ -11,6 +12,7 @@ import type {
   MonitorStatus,
   ActiveWindowInfo,
   AppSettingsPayload,
+  InstallChannelInfo,
   ShortcutSettings,
 } from "@/types";
 
@@ -63,6 +65,14 @@ export const getRecentExecutables = (limit = 200): Promise<ExecutableOption[]> =
 
 export const getRunningExecutables = (): Promise<ExecutableOption[]> =>
   invoke("get_running_executables");
+
+export const getAppUsagePage = (
+  startDate?: string,
+  endDate?: string,
+  limit = 1000,
+  offset = 0
+): Promise<AppUsagePage> =>
+  invoke("get_app_usage_page", { startDate, endDate, limit, offset });
 
 export const getIgnoredApps = (): Promise<string[]> =>
   invoke("get_ignored_apps");
@@ -132,3 +142,16 @@ export const setShortcuts = (shortcuts: ShortcutSettings): Promise<void> =>
 
 export const setAutoOpenWidgets = (enabled: boolean): Promise<void> =>
   invoke("set_auto_open_widgets", { enabled });
+
+export const setIgnoreSystemProcesses = (enabled: boolean): Promise<void> =>
+  invoke("set_ignore_system_processes", { enabled });
+
+export const getInstallChannelInfo = (): Promise<InstallChannelInfo> =>
+  invoke("get_install_channel_info");
+
+export const sendNativeNotification = (
+  title: string,
+  body: string,
+  alarm = false
+): Promise<void> =>
+  invoke("send_native_notification", { title, body, alarm });

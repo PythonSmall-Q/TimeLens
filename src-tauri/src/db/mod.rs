@@ -1,6 +1,38 @@
 use rusqlite::{params, Connection, Result};
 use std::path::Path;
 
+const SYSTEM_INTERACTIVE_EXE_WHITELIST_SQL: &str = "
+    lower(COALESCE(exe_path, '')) LIKE '%\\explorer.exe'
+    OR lower(COALESCE(exe_path, '')) LIKE '%\\taskmgr.exe'
+    OR lower(COALESCE(exe_path, '')) LIKE '%\\notepad.exe'
+    OR lower(COALESCE(exe_path, '')) LIKE '%\\mspaint.exe'
+    OR lower(COALESCE(exe_path, '')) LIKE '%\\calc.exe'
+    OR lower(COALESCE(exe_path, '')) LIKE '%\\cmd.exe'
+    OR lower(COALESCE(exe_path, '')) LIKE '%\\powershell.exe'
+";
+
+const SYSTEM_PROCESS_FILTER_SQL: &str = "
+    (?X = 0 OR NOT (
+        (
+            lower(replace(COALESCE(exe_path, ''), '/', '\\')) LIKE '%\\windows\\system32\\%'
+            OR lower(replace(COALESCE(exe_path, ''), '/', '\\')) LIKE '%\\windows\\syswow64\\%'
+        )
+        AND NOT (
+            __WHITELIST__
+        )
+    ))
+";
+
+fn system_process_filter_sql_with_param(param_index: i32) -> String {
+    SYSTEM_PROCESS_FILTER_SQL
+        .replace("?X", &format!("?{param_index}"))
+        .replace("__WHITELIST__", SYSTEM_INTERACTIVE_EXE_WHITELIST_SQL)
+}
+
+fn normalized_exe_path(input: &str) -> String {
+    input.trim().replace('/', "\\").to_ascii_lowercase()
+}
+
 /// Create all tables if they don't exist yet.
 pub fn initialize(conn: &Connection) -> Result<()> {
     conn.execute_batch("PRAGMA journal_mode=WAL;")?;
@@ -21,6 +53,18 @@ pub fn initialize(conn: &Connection) -> Result<()> {
 
         CREATE INDEX IF NOT EXISTS idx_app_usage_date     ON app_usage(date);
         CREATE INDEX IF NOT EXISTS idx_app_usage_app_date ON app_usage(app_name, date);
+
+        CREATE TABLE IF NOT EXISTS daily_app_usage (
+            date            TEXT    NOT NULL,
+            app_name        TEXT    NOT NULL,
+            exe_path        TEXT    NOT NULL DEFAULT '',
+            total_seconds   INTEGER NOT NULL DEFAULT 0,
+            first_seen_at   TEXT    NOT NULL,
+            last_seen_at    TEXT    NOT NULL,
+            PRIMARY KEY (date, app_name, exe_path)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_daily_app_usage_date ON daily_app_usage(date);
 
         CREATE TABLE IF NOT EXISTS todos (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -71,6 +115,24 @@ pub fn initialize(conn: &Connection) -> Result<()> {
         )?;
     }
 
+    // Backfill daily aggregates for existing records.
+    conn.execute(
+        "INSERT INTO daily_app_usage (date, app_name, exe_path, total_seconds, first_seen_at, last_seen_at)
+         SELECT date,
+                app_name,
+                COALESCE(exe_path, '') as exe_path,
+                SUM(active_seconds) as total_seconds,
+                MIN(first_seen_at) as first_seen_at,
+                MAX(last_seen_at) as last_seen_at
+         FROM app_usage
+         GROUP BY date, app_name, COALESCE(exe_path, '')
+         ON CONFLICT(date, app_name, exe_path) DO UPDATE SET
+            total_seconds = excluded.total_seconds,
+            first_seen_at = excluded.first_seen_at,
+            last_seen_at = excluded.last_seen_at",
+        [],
+    )?;
+
     Ok(())
 }
 
@@ -112,6 +174,15 @@ pub fn upsert_app_usage(
         ",
         params![date, app_name, exe_path, window_title, seconds, first_seen, last_seen],
     )?;
+    conn.execute(
+        "INSERT INTO daily_app_usage (date, app_name, exe_path, total_seconds, first_seen_at, last_seen_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+         ON CONFLICT(date, app_name, exe_path) DO UPDATE SET
+            total_seconds = total_seconds + excluded.total_seconds,
+            first_seen_at = MIN(first_seen_at, excluded.first_seen_at),
+            last_seen_at = MAX(last_seen_at, excluded.last_seen_at)",
+        params![date, app_name, exe_path, seconds, first_seen, last_seen],
+    )?;
     Ok(())
 }
 
@@ -132,22 +203,35 @@ pub fn insert_app_usage(
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
         params![date, app_name, exe_path, window_title, seconds, first_seen, last_seen],
     )?;
+    conn.execute(
+        "INSERT INTO daily_app_usage (date, app_name, exe_path, total_seconds, first_seen_at, last_seen_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+         ON CONFLICT(date, app_name, exe_path) DO UPDATE SET
+            total_seconds = total_seconds + excluded.total_seconds,
+            first_seen_at = MIN(first_seen_at, excluded.first_seen_at),
+            last_seen_at = MAX(last_seen_at, excluded.last_seen_at)",
+        params![date, app_name, exe_path, seconds, first_seen, last_seen],
+    )?;
     Ok(conn.last_insert_rowid())
 }
 
 /// Get per-app totals for a given date, sorted descending.
 pub fn get_daily_app_totals(conn: &Connection, date: &str) -> Result<Vec<(String, String, i64)>> {
-    let mut stmt = conn.prepare(
-        "SELECT app_name,
-                COALESCE(MAX(exe_path), '') as exe_path,
-                SUM(active_seconds) as total
-         FROM app_usage
-         WHERE date = ?1
-           AND COALESCE(exe_path, '') NOT IN (SELECT exe_path FROM ignored_apps)
-         GROUP BY app_name
-         ORDER BY total DESC",
-    )?;
-    let rows = stmt.query_map(params![date], |row| {
+        let ignore_system = get_bool_setting(conn, "ignore_system_processes", false)? as i32;
+        let sql = format!(
+                "SELECT app_name,
+                                COALESCE(MAX(exe_path), '') as exe_path,
+                                SUM(total_seconds) as total
+                 FROM daily_app_usage
+                 WHERE date = ?1
+                     AND lower(COALESCE(exe_path, '')) NOT IN (SELECT exe_path FROM ignored_apps)
+                     AND {}
+                 GROUP BY app_name
+                 ORDER BY total DESC",
+                system_process_filter_sql_with_param(2)
+        );
+        let mut stmt = conn.prepare(&sql)?;
+        let rows = stmt.query_map(params![date, ignore_system], |row| {
         Ok((
             row.get::<_, String>(0)?,
             row.get::<_, String>(1)?,
@@ -162,17 +246,21 @@ pub fn get_app_totals_in_range(
     start_date: &str,
     end_date: &str,
 ) -> Result<Vec<(String, String, i64)>> {
-    let mut stmt = conn.prepare(
-        "SELECT app_name,
-                COALESCE(MAX(exe_path), '') as exe_path,
-                SUM(active_seconds) as total
-         FROM app_usage
-         WHERE date >= ?1 AND date <= ?2
-           AND COALESCE(exe_path, '') NOT IN (SELECT exe_path FROM ignored_apps)
-         GROUP BY app_name
-         ORDER BY total DESC",
-    )?;
-    let rows = stmt.query_map(params![start_date, end_date], |row| {
+        let ignore_system = get_bool_setting(conn, "ignore_system_processes", false)? as i32;
+        let sql = format!(
+                "SELECT app_name,
+                                COALESCE(MAX(exe_path), '') as exe_path,
+                                SUM(total_seconds) as total
+                 FROM daily_app_usage
+                 WHERE date >= ?1 AND date <= ?2
+                     AND lower(COALESCE(exe_path, '')) NOT IN (SELECT exe_path FROM ignored_apps)
+                     AND {}
+                 GROUP BY app_name
+                 ORDER BY total DESC",
+                system_process_filter_sql_with_param(3)
+        );
+        let mut stmt = conn.prepare(&sql)?;
+        let rows = stmt.query_map(params![start_date, end_date, ignore_system], |row| {
         Ok((
             row.get::<_, String>(0)?,
             row.get::<_, String>(1)?,
@@ -184,16 +272,20 @@ pub fn get_app_totals_in_range(
 
 /// Get hourly distribution (hour 0-23, seconds) for a given date.
 pub fn get_hourly_distribution(conn: &Connection, date: &str) -> Result<Vec<(i32, i64)>> {
-    let mut stmt = conn.prepare(
+    let ignore_system = get_bool_setting(conn, "ignore_system_processes", false)? as i32;
+    let sql = format!(
         "SELECT CAST(strftime('%H', first_seen_at) AS INTEGER) as hour,
                 SUM(active_seconds) as seconds
          FROM app_usage
          WHERE date = ?1
-           AND COALESCE(exe_path, '') NOT IN (SELECT exe_path FROM ignored_apps)
+           AND lower(COALESCE(exe_path, '')) NOT IN (SELECT exe_path FROM ignored_apps)
+           AND {}
          GROUP BY hour
          ORDER BY hour",
-    )?;
-    let rows = stmt.query_map(params![date], |row| {
+        system_process_filter_sql_with_param(2)
+    );
+    let mut stmt = conn.prepare(&sql)?;
+    let rows = stmt.query_map(params![date, ignore_system], |row| {
         Ok((row.get::<_, i32>(0)?, row.get::<_, i64>(1)?))
     })?;
     rows.collect()
@@ -201,30 +293,38 @@ pub fn get_hourly_distribution(conn: &Connection, date: &str) -> Result<Vec<(i32
 
 /// Get total seconds for each of the past N days.
 pub fn get_daily_totals(conn: &Connection, since_date: &str) -> Result<Vec<(String, i64)>> {
-    let mut stmt = conn.prepare(
-        "SELECT date, SUM(active_seconds) as total
-         FROM app_usage
+    let ignore_system = get_bool_setting(conn, "ignore_system_processes", false)? as i32;
+    let sql = format!(
+        "SELECT date, SUM(total_seconds) as total
+         FROM daily_app_usage
          WHERE date >= ?1
-           AND COALESCE(exe_path, '') NOT IN (SELECT exe_path FROM ignored_apps)
+           AND lower(COALESCE(exe_path, '')) NOT IN (SELECT exe_path FROM ignored_apps)
+           AND {}
          GROUP BY date
          ORDER BY date",
-    )?;
-    let rows = stmt.query_map(params![since_date], |row| {
+        system_process_filter_sql_with_param(2)
+    );
+    let mut stmt = conn.prepare(&sql)?;
+    let rows = stmt.query_map(params![since_date, ignore_system], |row| {
         Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
     })?;
     rows.collect()
 }
 
 pub fn get_recent_executables(conn: &Connection, limit: i64) -> Result<Vec<(String, String)>> {
-    let mut stmt = conn.prepare(
+    let ignore_system = get_bool_setting(conn, "ignore_system_processes", false)? as i32;
+    let sql = format!(
         "SELECT app_name, exe_path
          FROM app_usage
          WHERE COALESCE(exe_path, '') <> ''
+           AND {}
          GROUP BY exe_path
          ORDER BY MAX(last_seen_at) DESC
          LIMIT ?1",
-    )?;
-    let rows = stmt.query_map(params![limit], |row| {
+        system_process_filter_sql_with_param(2)
+    );
+    let mut stmt = conn.prepare(&sql)?;
+    let rows = stmt.query_map(params![limit, ignore_system], |row| {
         Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
     })?;
     rows.collect()
@@ -373,12 +473,13 @@ pub fn set_ignored_apps(conn: &Connection, exe_paths: &[String]) -> Result<()> {
     let tx = conn.unchecked_transaction()?;
     tx.execute("DELETE FROM ignored_apps", [])?;
     for p in exe_paths {
-        if p.trim().is_empty() {
+        let normalized = normalized_exe_path(p);
+        if normalized.is_empty() {
             continue;
         }
         tx.execute(
             "INSERT OR IGNORE INTO ignored_apps(exe_path) VALUES(?1)",
-            params![p],
+            params![normalized],
         )?;
     }
     tx.commit()?;

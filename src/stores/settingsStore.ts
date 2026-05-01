@@ -10,6 +10,7 @@ interface SettingsState {
   samplingIntervalMs: number;
   debounceMs: number;
   autoOpenWidgets: boolean;
+  ignoreSystemProcesses: boolean;
   weekStartDay: 0 | 1; // 0 = Sunday, 1 = Monday
   excludeTimelens: boolean;
   setLanguage: (lang: string) => void;
@@ -18,6 +19,7 @@ interface SettingsState {
   setSamplingInterval: (ms: number) => void;
   setDebounce: (ms: number) => void;
   setAutoOpenWidgets: (active: boolean) => void;
+  setIgnoreSystemProcesses: (active: boolean) => void;
   setWeekStartDay: (day: 0 | 1) => void;
   setExcludeTimelens: (val: boolean) => void;
 }
@@ -31,6 +33,7 @@ export const useSettingsStore = create<SettingsState>()(
       samplingIntervalMs: 1000,
       debounceMs: 500,
       autoOpenWidgets: true,
+      ignoreSystemProcesses: false,
       weekStartDay: 1,
       excludeTimelens: true,
 
@@ -57,6 +60,13 @@ export const useSettingsStore = create<SettingsState>()(
         set({ autoOpenWidgets });
         api.setAutoOpenWidgets(autoOpenWidgets).catch((e) => {
           console.error("setAutoOpenWidgets failed", e);
+        });
+      },
+
+      setIgnoreSystemProcesses: (ignoreSystemProcesses) => {
+        set({ ignoreSystemProcesses });
+        api.setIgnoreSystemProcesses(ignoreSystemProcesses).catch((e) => {
+          console.error("setIgnoreSystemProcesses failed", e);
         });
       },
 
