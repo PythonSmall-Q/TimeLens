@@ -758,7 +758,7 @@ export default function Settings() {
       {/* About */}
       <Section icon={Info} title={t("about.title")}>
         <Row label={t("about.version")}>
-          <span className="text-xs font-mono text-text-secondary">v1.0.0</span>
+          <span className="text-xs font-mono text-text-secondary">v1.1.0</span>
         </Row>
         <Row label="GitHub">
           <a

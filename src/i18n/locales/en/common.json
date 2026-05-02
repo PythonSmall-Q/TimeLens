@@ -35,5 +35,14 @@
   "updateInstallReady": "TimeLens v{{version}} has been installed. Restart the app to apply updates.",
   "viewOnGitHub": "View on GitHub",
   "whatsNew": "What\u2019s new",
-  "remindLater": "Remind me later"
+  "remindLater": "Remind me later",
+  "search": "Search",
+  "searchPlaceholder": "Search pages, apps, todos, goals…",
+  "searchPages": "Pages",
+  "searchApps": "Apps",
+  "searchCategories": "Categories",
+  "searchTodos": "Todos",
+  "searchGoals": "Goals",
+  "searchNoResult": "No results found",
+  "searchHint": "⌘K"
 }

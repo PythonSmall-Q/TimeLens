@@ -6,11 +6,11 @@ import TodoWidget from "./TodoWidget";
 import TimerWidget from "./TimerWidget";
 import NoteWidget from "./NoteWidget";
 import StatusWidget from "./StatusWidget";
+import ExternalWidgetHost from "./ExternalWidgetHost";
 import * as api from "@/services/tauriApi";
 
 interface Props {
   widgetId: string;
-  widgetType: "clock" | "todo" | "timer" | "note" | "status";
 }
 
 /**
@@ -18,11 +18,16 @@ interface Props {
  * - Registers focus/blur handlers for "focus" always-on-top mode.
  * - Saves window position to DB on move.
  */
-export default function WidgetWindow({ widgetId, widgetType }: Props) {
+export default function WidgetWindow({ widgetId }: Props) {
   const win = getCurrentWebviewWindow();
   const positionSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const topModeRef = useRef<"always" | "focus" | "never">("focus");
   const [isBlurred, setIsBlurred] = useState(false);
+  const [idle, setIdle] = useState(false);
+  const idleTimer = useRef<ReturnType<typeof setTimeout>>();
+  const [widgetType, setWidgetType] = useState<string>(
+    widgetId.includes("-") ? widgetId.substring(0, widgetId.lastIndexOf("-")) : ""
+  );
 
   const getMonitorIndexForRect = async (x: number, y: number, width: number, height: number) => {
     try {
@@ -46,6 +51,7 @@ export default function WidgetWindow({ widgetId, widgetType }: Props) {
       .then((ws) => {
         const cfg = ws.find((w) => w.id === widgetId);
         if (cfg) {
+          setWidgetType(cfg.widget_type);
           topModeRef.current = cfg.always_on_top_mode;
           setIsBlurred(false);
           if (cfg.always_on_top_mode === "always") {
@@ -119,15 +125,37 @@ export default function WidgetWindow({ widgetId, widgetType }: Props) {
     };
   }, [widgetId]);
 
+  const handleMouseEnter = () => {
+    clearTimeout(idleTimer.current);
+    setIdle(false);
+  };
+
+  const handleMouseLeave = () => {
+    idleTimer.current = setTimeout(() => setIdle(true), 2000);
+  };
+
+  // Cleanup idle timer on unmount
+  useEffect(() => {
+    return () => clearTimeout(idleTimer.current);
+  }, []);
+
   return (
     <div
-      className={`widget-root ${isBlurred && widgetType !== "clock" ? "widget-root--faded" : ""}`}
+      className={`widget-root ${isBlurred && widgetType !== "clock" ? "widget-root--faded" : ""} ${idle ? "widget-idle" : ""}`}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
       {widgetType === "clock" && <ClockWidget widgetId={widgetId} isBlurred={isBlurred} />}
       {widgetType === "todo" && <TodoWidget widgetId={widgetId} />}
       {widgetType === "timer" && <TimerWidget widgetId={widgetId} />}
       {widgetType === "note" && <NoteWidget widgetId={widgetId} />}
       {widgetType === "status" && <StatusWidget widgetId={widgetId} />}
+      {widgetType !== "clock"
+        && widgetType !== "todo"
+        && widgetType !== "timer"
+        && widgetType !== "note"
+        && widgetType !== "status"
+        && <ExternalWidgetHost widgetId={widgetId} widgetType={widgetType} />}
     </div>
   );
 }

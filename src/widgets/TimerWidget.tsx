@@ -224,7 +224,7 @@ export default function TimerWidget({ widgetId: _widgetId }: Props) {
           </div>
         )}
         {progress === null && (
-          <span className="text-3xl font-bold font-mono text-text-primary mb-2">{timeStr}</span>
+          <span className="text-3xl font-bold font-mono text-text-primary mb-2 widget-prominent">{timeStr}</span>
         )}
 
         {notification && (

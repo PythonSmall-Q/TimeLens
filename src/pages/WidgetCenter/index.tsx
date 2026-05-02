@@ -1,9 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Clock, List, Timer, ExternalLink, Trash2, Plus, StickyNote, Activity, Layers } from "lucide-react";
+import {
+  Clock, List, Timer, ExternalLink, Trash2, Plus, StickyNote, Activity,
+  Layers, Puzzle, FolderOpen, ShieldCheck,
+} from "lucide-react";
 import { useWidgetStore } from "@/stores/widgetStore";
-import type { WidgetConfig } from "@/types";
+import type { WidgetConfig, WidgetRegistryItem, WidgetRegistryLoadError } from "@/types";
+import * as api from "@/services/tauriApi";
 import clsx from "clsx";
+import WidgetPermissionDialog from "./WidgetPermissionDialog";
 
 const ICONS = {
   clock: Clock,
@@ -76,32 +81,29 @@ function WidgetCard({ config }: { config: WidgetConfig }) {
   );
 }
 
-// ── Self-add catalog (based on official widgets) ─────────────
+// ── Self-add catalog (official widgets) ──────────────────────
 
-type WidgetType = "clock" | "todo" | "timer" | "note" | "status";
-
-const CATALOG: { type: WidgetType; icon: typeof Clock; descKey: string }[] = [
-  { type: "clock",  icon: Clock,     descKey: "clockDesc"  },
-  { type: "todo",   icon: List,      descKey: "todoDesc"   },
-  { type: "timer",  icon: Timer,     descKey: "timerDesc"  },
-  { type: "note",   icon: StickyNote, descKey: "noteDesc"  },
-  { type: "status", icon: Activity,  descKey: "statusDesc" },
+const OFFICIAL_CATALOG: { type: string; icon: typeof Clock; descKey: string }[] = [
+  { type: "clock", icon: Clock, descKey: "clockDesc" },
+  { type: "todo", icon: List, descKey: "todoDesc" },
+  { type: "timer", icon: Timer, descKey: "timerDesc" },
+  { type: "note", icon: StickyNote, descKey: "noteDesc" },
+  { type: "status", icon: Activity, descKey: "statusDesc" },
 ];
 
 interface MarketplaceCardProps {
-  type: WidgetType;
+  type: string;
+  title: string;
   icon: typeof Clock;
-  descKey: string;
+  description: string;
+  source: "official" | "third-party";
   installedCount: number;
-  onAdd: (type: WidgetType) => void;
+  permissions?: string[];
+  onAdd: (type: string, perms: string[]) => void;
 }
 
-function MarketplaceCard({ type, icon: Icon, descKey, installedCount, onAdd }: MarketplaceCardProps) {
+function MarketplaceCard({ type, title, icon: Icon, description, source, installedCount, permissions = [], onAdd }: MarketplaceCardProps) {
   const { t } = useTranslation("widgets");
-  const TYPE_LABEL_KEY: Record<WidgetType, string> = {
-    clock: "clock.title", todo: "todo.title", timer: "timer.title",
-    note: "note.title", status: "status.title",
-  };
 
   return (
     <div className="glass-card p-4 flex flex-col gap-3 hover:border-accent-blue/30 transition-colors">
@@ -111,23 +113,33 @@ function MarketplaceCard({ type, icon: Icon, descKey, installedCount, onAdd }: M
             <Icon size={18} />
           </span>
           <div>
-            <p className="text-sm font-semibold text-text-primary">{t(TYPE_LABEL_KEY[type])}</p>
-            {installedCount > 0 && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-accent-green/15 text-accent-green">
-                {t("installed")} ×{installedCount}
+            <p className="text-sm font-semibold text-text-primary">{title}</p>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-surface-hover text-text-secondary">
+                {source === "official" ? t("official") : t("thirdParty.source")}
               </span>
-            )}
+              {installedCount > 0 && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-accent-green/15 text-accent-green">
+                  {t("installed")} ×{installedCount}
+                </span>
+              )}
+              {source === "third-party" && permissions.length > 0 && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-yellow-500/15 text-yellow-600 flex items-center gap-0.5">
+                  <ShieldCheck size={10} /> {permissions.length}
+                </span>
+              )}
+            </div>
           </div>
         </div>
         <button
-          onClick={() => onAdd(type)}
+          onClick={() => onAdd(type, permissions)}
           className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-accent-blue/15 text-accent-blue
                      text-xs font-medium hover:bg-accent-blue/25 transition-colors flex-shrink-0"
         >
           <Plus size={12} /> {t("addFromTemplate")}
         </button>
       </div>
-      <p className="text-xs text-text-muted leading-relaxed">{t(descKey)}</p>
+      <p className="text-xs text-text-muted leading-relaxed">{description}</p>
     </div>
   );
 }
@@ -139,18 +151,116 @@ export default function WidgetCenter() {
   const { widgets, loading, fetchWidgets, createWidget } = useWidgetStore();
   const loadedRef = useRef(false);
   const [tab, setTab] = useState<"mine" | "selfAdd">("mine");
+  const [registryItems, setRegistryItems] = useState<WidgetRegistryItem[]>([]);
+  const [registryErrors, setRegistryErrors] = useState<WidgetRegistryLoadError[]>([]);
+
+  // Permission dialog state
+  const [permDialog, setPermDialog] = useState<{
+    open: boolean;
+    widgetType: string;
+    permissions: string[];
+  }>({ open: false, widgetType: "", permissions: [] });
+
+  // Import feedback
+  const [importMsg, setImportMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+
+  const refreshRegistry = () => {
+    api.getWidgetRegistry()
+      .then((res) => {
+        setRegistryItems(res.items);
+        setRegistryErrors(res.errors ?? []);
+      })
+      .catch(() => {
+        setRegistryItems([]);
+        setRegistryErrors([]);
+      });
+  };
 
   useEffect(() => {
     if (loadedRef.current) return;
     loadedRef.current = true;
     fetchWidgets();
+    refreshRegistry();
   }, [fetchWidgets]);
 
-  const countByType = (type: WidgetType) =>
+  const countByType = (type: string) =>
     widgets.filter((w) => w.widget_type === type).length;
+
+  // Build official entries list
+  const officialEntries = OFFICIAL_CATALOG.map((item) => ({
+    type: item.type,
+    icon: item.icon,
+    source: "official" as const,
+    title: t(`${item.type}.title`),
+    description: t(item.descKey),
+    permissions: [] as string[],
+  }));
+
+  // Build third-party entries from registry
+  const thirdPartyEntries = registryItems
+    .filter((item) => item.source === "third-party")
+    .map((item) => ({
+      type: item.widget_type,
+      icon: Puzzle,
+      source: "third-party" as const,
+      title: item.display_name,
+      description: item.description ?? t("thirdParty.noDescription"),
+      permissions: item.permissions ?? [],
+    }));
+
+  const handleAdd = (type: string, perms: string[]) => {
+    const isThirdParty = thirdPartyEntries.some((e) => e.type === type);
+    if (isThirdParty && perms.length > 0) {
+      setPermDialog({ open: true, widgetType: type, permissions: perms });
+    } else {
+      createWidget(type);
+      setTab("mine");
+    }
+  };
+
+  const handlePermConfirm = async (granted: string[]) => {
+    const { widgetType } = permDialog;
+    setPermDialog({ open: false, widgetType: "", permissions: [] });
+    await createWidget(widgetType);
+    // After creation, find the newest widget of this type and set its permissions
+    const state = useWidgetStore.getState();
+    const newest = [...state.widgets]
+      .filter((w) => w.widget_type === widgetType)
+      .sort((a, b) => b.id.localeCompare(a.id))[0];
+    if (newest && granted.length > 0) {
+      try {
+        await api.setWidgetPermissions(newest.id, granted);
+      } catch (_) { /* non-fatal */ }
+    }
+    setTab("mine");
+  };
+
+  const handleImportLocalWidget = async () => {
+    try {
+      const { open } = await import("@tauri-apps/plugin-dialog");
+      const selected = await open({ directory: true, multiple: false, title: t("importLocalWidget") });
+      if (!selected || typeof selected !== "string") return;
+      await api.importLocalWidget(selected);
+      setImportMsg({ kind: "ok", text: t("importSuccess") });
+      refreshRegistry();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setImportMsg({ kind: "err", text: t("importError") + ": " + msg });
+    }
+    setTimeout(() => setImportMsg(null), 4000);
+  };
 
   return (
     <div className="p-6 space-y-5 animate-fade-in">
+      {/* Permission dialog */}
+      <WidgetPermissionDialog
+        open={permDialog.open}
+        onClose={() => setPermDialog((p) => ({ ...p, open: false }))}
+        widgetType={permDialog.widgetType}
+        requestedPermissions={permDialog.permissions}
+        onConfirm={handlePermConfirm}
+      />
+
       {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
@@ -227,23 +337,90 @@ export default function WidgetCenter() {
         </>
       )}
 
-      {/* ── Self-add tab ── */}
+      {/* ── Add Widget tab — split columns ── */}
       {tab === "selfAdd" && (
-        <>
-          <p className="text-xs text-text-muted">{t("selfAddDesc")}</p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {CATALOG.map(({ type, icon, descKey }) => (
-              <MarketplaceCard
-                key={type}
-                type={type}
-                icon={icon}
-                descKey={descKey}
-                installedCount={countByType(type)}
-                onAdd={(tp) => { createWidget(tp); setTab("mine"); }}
-              />
-            ))}
+        <div className="flex gap-6">
+          {/* Left column: official */}
+          <div className="flex-1 min-w-0 space-y-3">
+            <p className="text-xs font-semibold text-text-secondary uppercase tracking-wider">
+              {t("officialWidgets")}
+            </p>
+            <div className="space-y-3">
+              {officialEntries.map(({ type, icon, description, title, source, permissions }) => (
+                <MarketplaceCard
+                  key={type}
+                  type={type}
+                  title={title}
+                  icon={icon}
+                  source={source}
+                  description={description}
+                  permissions={permissions}
+                  installedCount={countByType(type)}
+                  onAdd={handleAdd}
+                />
+              ))}
+            </div>
           </div>
-        </>
+
+          {/* Right column: third-party */}
+          <div className="flex-1 min-w-0 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold text-text-secondary uppercase tracking-wider">
+                {t("thirdPartyWidgets")}
+              </p>
+              <button
+                onClick={handleImportLocalWidget}
+                className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs border border-surface-border
+                           text-text-secondary hover:text-text-primary transition-colors"
+              >
+                <FolderOpen size={12} /> {t("importLocalWidget")}
+              </button>
+            </div>
+
+            {importMsg && (
+              <p className={clsx(
+                "text-xs px-3 py-2 rounded-lg",
+                importMsg.kind === "ok" ? "bg-accent-green/10 text-accent-green" : "bg-accent-red/10 text-accent-red"
+              )}>
+                {importMsg.text}
+              </p>
+            )}
+
+            {thirdPartyEntries.length === 0 && (
+              <div className="glass-card p-6 text-center text-text-muted text-xs space-y-1">
+                <Puzzle size={24} className="mx-auto opacity-30" />
+                <p>{t("thirdParty.noWidgets")}</p>
+              </div>
+            )}
+            <div className="space-y-3">
+              {thirdPartyEntries.map(({ type, icon, description, title, source, permissions }) => (
+                <MarketplaceCard
+                  key={type}
+                  type={type}
+                  title={title}
+                  icon={icon}
+                  source={source}
+                  description={description}
+                  permissions={permissions}
+                  installedCount={countByType(type)}
+                  onAdd={handleAdd}
+                />
+              ))}
+            </div>
+
+            {/* Registry errors */}
+            {registryErrors.length > 0 && (
+              <div className="space-y-1.5 mt-2">
+                {registryErrors.map((err, i) => (
+                  <div key={i} className="flex items-start gap-2 p-2 rounded-lg bg-accent-red/10 text-accent-red text-xs">
+                    <span className="font-mono opacity-70 truncate">{err.path}</span>
+                    <span>{err.message}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

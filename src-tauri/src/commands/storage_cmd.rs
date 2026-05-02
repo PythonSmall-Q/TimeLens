@@ -933,3 +933,49 @@ pub fn import_data_json(payload: String, db: State<DbState>) -> Result<(), Strin
     tx.commit().map_err(|e| e.to_string())?;
     Ok(())
 }
+
+// ── Phase C: extra data channel commands ──────────────────────
+
+/// Hourly distribution for any date (Phase C — widget channel).
+#[tauri::command]
+pub fn get_hourly_distribution_for_date(
+    date: String,
+    db: State<DbState>,
+) -> Result<Vec<HourlyDistribution>, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    let rows = db::get_hourly_distribution(&conn, &date).map_err(|e| e.to_string())?;
+    Ok(rows
+        .into_iter()
+        .map(|(hour, seconds)| HourlyDistribution { hour, seconds })
+        .collect())
+}
+
+/// Daily totals for an arbitrary date range (Phase C — widget channel).
+#[tauri::command]
+pub fn get_recent_daily_totals_range(
+    start_date: String,
+    end_date: String,
+    db: State<DbState>,
+) -> Result<Vec<DailyUsage>, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    let rows = db::get_daily_totals_in_range(&conn, &start_date, &end_date)
+        .map_err(|e| e.to_string())?;
+    Ok(rows
+        .into_iter()
+        .map(|(date, total_seconds)| DailyUsage { date, total_seconds })
+        .collect())
+}
+
+/// Full exe_path → category map (Phase C — widget channel).
+#[tauri::command]
+pub fn get_app_category_map(
+    db: State<DbState>,
+) -> Result<std::collections::HashMap<String, String>, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    let rules = db::get_all_app_categories(&conn).map_err(|e| e.to_string())?;
+    let map: std::collections::HashMap<String, String> = rules
+        .into_iter()
+        .map(|r| (r.exe_path, r.category))
+        .collect();
+    Ok(map)
+}

@@ -1,23 +1,17 @@
 import { NavLink } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { LayoutDashboard, Layers, Settings, Clock, Activity, Bell, Tag, Target, Focus, Globe } from "lucide-react";
+import { Clock, Activity, Search } from "lucide-react";
 import { useStatsStore } from "@/stores/statsStore";
 import { formatDuration } from "@/utils/format";
 import { todayString } from "@/utils/format";
 import clsx from "clsx";
+import { NAV_ITEMS } from "./navItems";
 
-const NAV_ITEMS = [
-  { to: "/dashboard", icon: LayoutDashboard, labelKey: "dashboard:title" },
-  { to: "/widgets", icon: Layers, labelKey: "widgets:widgetCenter" },
-  { to: "/limits", icon: Bell, labelKey: "limits:title" },
-  { to: "/browser", icon: Globe, labelKey: "browserUsage:title" },
-  { to: "/categories", icon: Tag, labelKey: "categories:title" },
-  { to: "/goals", icon: Target, labelKey: "goals:title" },
-  { to: "/focus", icon: Focus, labelKey: "focus:title" },
-  { to: "/settings", icon: Settings, labelKey: "settings:title" },
-];
+interface Props {
+  onOpenSearch: () => void;
+}
 
-export default function Sidebar() {
+export default function Sidebar({ onOpenSearch }: Props) {
   const { t } = useTranslation(["common", "dashboard", "widgets", "settings", "limits", "browserUsage", "categories", "goals", "focus"]);
   const { sidebarTodaySeconds, currentApp, monitorStatus, selectedDate, periodMode } = useStatsStore();
   const showCurrentApp = periodMode === "day" && selectedDate === todayString();
@@ -57,6 +51,19 @@ export default function Sidebar() {
             <span className="truncate max-w-[130px]">{currentApp}</span>
           </div>
         )}
+      </div>
+
+      {/* Search button */}
+      <div className="px-3 pt-3">
+        <button
+          onClick={onOpenSearch}
+          className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-text-muted
+                     border border-surface-border hover:bg-surface-hover hover:text-text-secondary transition-colors"
+        >
+          <Search size={13} />
+          <span className="flex-1 text-left">{t("common:search")}</span>
+          <kbd className="text-[10px] px-1 py-0.5 rounded bg-surface-hover">Ctrl K</kbd>
+        </button>
       </div>
 
       {/* Navigation */}

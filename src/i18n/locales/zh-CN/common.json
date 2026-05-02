@@ -35,5 +35,14 @@
   "updateInstallReady": "TimeLens v{{version}} 已安装，请重启应用以应用更新。",
   "viewOnGitHub": "在 GitHub 查看",
   "whatsNew": "更新内容",
-  "remindLater": "稍后提醒"
+  "remindLater": "稍后提醒",
+  "search": "搜索",
+  "searchPlaceholder": "搜索页面、应用、待办、目标…",
+  "searchPages": "页面",
+  "searchApps": "应用",
+  "searchCategories": "分类",
+  "searchTodos": "待办",
+  "searchGoals": "目标",
+  "searchNoResult": "未找到结果",
+  "searchHint": "⌘K"
 }

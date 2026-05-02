@@ -126,6 +126,13 @@ TimeLens/
 
 ---
 
+## 🧩 Widget Development
+
+- [Widget Development Guide](docs/WIDGETS_DEV_GUIDE.md)
+- [Third-party Widget Template](examples/third-party-widget-template/README.md)
+
+---
+
 ## 🌐 Adding a Language
 
 See [docs/ADD_LANGUAGE.md](docs/ADD_LANGUAGE.md) for a step-by-step guide.

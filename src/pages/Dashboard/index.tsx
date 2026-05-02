@@ -1,7 +1,11 @@
 import { useTranslation } from "react-i18next";
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { DndContext, DragOverlay, type DragEndEvent, type DragStartEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { useStatsStore } from "@/stores/statsStore";
 import { useSettingsStore } from "@/stores/settingsStore";
+import { type DashboardWindowId, useDashboardLayoutStore } from "@/stores/dashboardLayoutStore";
 import TodayOverview from "./TodayOverview";
 import AppRankingChart from "./AppRankingChart";
 import HourlyTimeline from "./HourlyTimeline";
@@ -10,7 +14,9 @@ import GoalProgressBar from "./GoalProgressBar";
 import CategoryInsights from "./CategoryInsights";
 import UsageHeatmap from "./UsageHeatmap";
 import TrendComparePanel from "./TrendComparePanel";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import ProductivityScoreCard from "./ProductivityScoreCard";
+import ProductivityTrendChart from "./ProductivityTrendChart";
+import { ChevronLeft, ChevronRight, GripVertical } from "lucide-react";
 import { todayString, daysAgo } from "@/utils/format";
 import { formatDuration } from "@/utils/format";
 
@@ -64,8 +70,10 @@ function getMonthRange(monthValue: string): { start: string; end: string } {
 }
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const { t } = useTranslation(["common", "dashboard"]);
   const { weekStartDay } = useSettingsStore();
+  const { layout, moveWindow } = useDashboardLayoutStore();
   const {
     selectedDate,
     setSelectedDate,
@@ -80,9 +88,14 @@ export default function Dashboard() {
     setPeriodMode,
     todayTotals,
     weekComparison,
+    productivityScores,
+    interruptionPeriods,
+    fetchProductivityRange,
+    fetchInterruptionPeriods,
   } = useStatsStore();
   const [weekValue, setWeekValue] = useState(currentIsoWeek());
   const [monthValue, setMonthValue] = useState(todayString().slice(0, 7));
+  const [activeDragId, setActiveDragId] = useState<DashboardWindowId | null>(null);
   const weekOptions = useMemo(() => {
     const rows: string[] = [];
     const base = new Date();
@@ -178,7 +191,133 @@ export default function Dashboard() {
   useEffect(() => {
     if (periodMode !== "day") return;
     fetchCategoryForRange(selectedDate, selectedDate);
-  }, [periodMode, selectedDate, fetchCategoryForRange]);
+    fetchInterruptionPeriods(selectedDate);
+  }, [periodMode, selectedDate, fetchCategoryForRange, fetchInterruptionPeriods]);
+
+  // Productivity scores
+  useEffect(() => {
+    if (periodMode === "day") {
+      const start = new Date(`${selectedDate}T00:00:00`);
+      start.setDate(start.getDate() - 6);
+      fetchProductivityRange(start.toISOString().slice(0, 10), selectedDate);
+    } else if (rangeDays) {
+      fetchProductivityRange(rangeDays.start, rangeDays.end);
+    }
+  }, [periodMode, selectedDate, rangeDays, fetchProductivityRange]);
+
+  const visibleWindowIds = useMemo(
+    () => layout.filter((item) => item.visible).map((item) => item.id),
+    [layout]
+  );
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+
+  const windowColSpan: Record<DashboardWindowId, "col-span-1" | "col-span-2"> = {
+    goalProgress: "col-span-2",
+    todayOverview: "col-span-2",
+    productivity: "col-span-2",
+    appRanking: "col-span-1",
+    hourlyTimeline: "col-span-1",
+    categoryInsights: "col-span-2",
+    usageHeatmap: "col-span-2",
+    trendCompare: "col-span-2",
+    appList: "col-span-2",
+    avgDailyUsage: "col-span-2",
+    weeklyCompare: "col-span-2",
+  };
+
+  const renderWindow = (id: DashboardWindowId) => {
+    switch (id) {
+      case "goalProgress":
+        return <GoalProgressBar />;
+      case "todayOverview":
+        return <TodayOverview />;
+      case "productivity":
+        if (periodMode === "day") {
+          const todayScore = productivityScores.find((s) => s.date === selectedDate);
+          return todayScore ? <ProductivityScoreCard score={todayScore} /> : null;
+        }
+        return productivityScores.length > 0 ? <ProductivityTrendChart scores={productivityScores} /> : null;
+      case "appRanking":
+        return <AppRankingChart />;
+      case "hourlyTimeline":
+        return <HourlyTimeline />;
+      case "categoryInsights":
+        return <CategoryInsights />;
+      case "usageHeatmap":
+        return <UsageHeatmap />;
+      case "trendCompare":
+        return <TrendComparePanel />;
+      case "appList":
+        return <AppList />;
+      case "avgDailyUsage":
+        if (periodMode === "day" || !rangeDays) return null;
+        return (
+          <div className="glass-card p-5">
+            <h3 className="text-sm font-medium text-text-secondary mb-3">
+              {t("dashboard:avgDailyUsage", { mode: t(`dashboard:period${periodMode[0].toUpperCase()}${periodMode.slice(1)}`) })}
+            </h3>
+            <div className="space-y-2">
+              {todayTotals.slice(0, 8).map((row) => (
+                <div key={row.app_name} className="flex items-center justify-between text-sm">
+                  <span className="text-text-primary truncate" title={row.exe_path || row.app_name}>
+                    {row.app_name}
+                  </span>
+                  <span className="text-text-secondary">
+                    {formatDuration(Math.round(row.total_seconds / rangeDays.days))}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      case "weeklyCompare":
+        if (periodMode !== "week" || weekComparison.length === 0) return null;
+        return (
+          <div className="glass-card p-5">
+            <h3 className="text-sm font-medium text-text-secondary mb-3">{t("dashboard:weeklyCompare")}</h3>
+            <div className="space-y-2">
+              {weekComparison.slice(0, 8).map((row) => {
+                const sign = row.delta_seconds >= 0 ? "+" : "";
+                return (
+                  <div key={row.app_name} className="flex items-center justify-between text-sm">
+                    <span className="text-text-primary truncate" title={row.exe_path || row.app_name}>
+                      {row.app_name}
+                    </span>
+                    <span className={row.delta_seconds >= 0 ? "text-accent-red" : "text-accent-green"}>
+                      {sign}{formatDuration(Math.abs(row.delta_seconds))}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
+  const renderedWindowIds = useMemo(
+    () => visibleWindowIds.filter((id) => renderWindow(id) !== null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [visibleWindowIds, periodMode, selectedDate, productivityScores, todayTotals, weekComparison, rangeDays]
+  );
+
+  const onDragEnd = (event: DragEndEvent) => {
+    const activeId = String(event.active.id) as DashboardWindowId;
+    const overId = event.over?.id ? (String(event.over.id) as DashboardWindowId) : null;
+    setActiveDragId(null);
+    if (!overId || activeId === overId) return;
+    moveWindow(activeId, overId);
+  };
+
+  const onDragStart = (event: DragStartEvent) => {
+    setActiveDragId(String(event.active.id) as DashboardWindowId);
+  };
+
+  const onDragCancel = () => {
+    setActiveDragId(null);
+  };
 
   return (
     <div className="p-6 space-y-5 animate-fade-in">
@@ -188,8 +327,15 @@ export default function Dashboard() {
           <h1 className="text-xl font-bold text-text-primary">{t("dashboard:title")}</h1>
           <p className="text-text-muted text-xs mt-0.5">{t("dashboard:screenTime")}</p>
         </div>
-        {/* Date / Period navigator */}
-        <div className="flex items-center gap-2 bg-surface-card rounded-xl px-2.5 py-1.5 border border-surface-border">
+        <div className="flex items-center gap-2">
+          <button
+            className="ui-btn-secondary !text-xs !px-3 !py-2"
+            onClick={() => navigate("/dashboard-customize")}
+          >
+            {t("dashboard:customizeEntry")}
+          </button>
+          {/* Date / Period navigator */}
+          <div className="flex items-center gap-2 bg-surface-card rounded-xl px-2.5 py-1.5 border border-surface-border">
           <select
             className="ui-select !w-24 !py-1.5 !text-xs"
             value={periodMode}
@@ -261,6 +407,7 @@ export default function Dashboard() {
               ))}
             </select>
           )}
+          </div>
         </div>
       </div>
 
@@ -268,66 +415,75 @@ export default function Dashboard() {
         <div className="text-center py-4 text-text-muted text-sm">{t("common:loading")}</div>
       )}
 
-      <GoalProgressBar />
-
-      {/* Overview cards */}
-      <TodayOverview />
-
-      {/* Charts */}
-      <div className="grid grid-cols-2 gap-4">
-        <AppRankingChart />
-        <HourlyTimeline />
-      </div>
-
-      <CategoryInsights />
-
-      <UsageHeatmap />
-
-      <TrendComparePanel />
-
-      {/* Full list */}
-      <AppList />
-
-      {periodMode !== "day" && rangeDays && (
-        <div className="glass-card p-5">
-          <h3 className="text-sm font-medium text-text-secondary mb-3">
-            {t("dashboard:avgDailyUsage", { mode: t(`dashboard:period${periodMode[0].toUpperCase()}${periodMode.slice(1)}`) })}
-          </h3>
-          <div className="space-y-2">
-            {todayTotals.slice(0, 8).map((row) => (
-              <div key={row.app_name} className="flex items-center justify-between text-sm">
-                <span className="text-text-primary truncate" title={row.exe_path || row.app_name}>
-                  {row.app_name}
-                </span>
-                <span className="text-text-secondary">
-                  {formatDuration(Math.round(row.total_seconds / rangeDays.days))}
-                </span>
-              </div>
-            ))}
-          </div>
+      {visibleWindowIds.length === 0 && (
+        <div className="glass-card p-6 text-sm text-text-muted">
+          {t("dashboard:noVisibleWindows")}
         </div>
       )}
 
-      {periodMode === "week" && weekComparison.length > 0 && (
-        <div className="glass-card p-5">
-          <h3 className="text-sm font-medium text-text-secondary mb-3">{t("dashboard:weeklyCompare")}</h3>
-          <div className="space-y-2">
-            {weekComparison.slice(0, 8).map((row) => {
-              const sign = row.delta_seconds >= 0 ? "+" : "";
+      <DndContext sensors={sensors} onDragStart={onDragStart} onDragCancel={onDragCancel} onDragEnd={onDragEnd}>
+        <SortableContext items={renderedWindowIds} strategy={verticalListSortingStrategy}>
+          <div className="grid grid-cols-2 gap-4">
+            {renderedWindowIds.map((id) => {
+              const content = renderWindow(id);
+              if (!content) return null;
               return (
-                <div key={row.app_name} className="flex items-center justify-between text-sm">
-                  <span className="text-text-primary truncate" title={row.exe_path || row.app_name}>
-                    {row.app_name}
-                  </span>
-                  <span className={row.delta_seconds >= 0 ? "text-accent-red" : "text-accent-green"}>
-                    {sign}{formatDuration(Math.abs(row.delta_seconds))}
-                  </span>
-                </div>
+                <SortableDashboardCard key={id} id={id} colSpanClass={windowColSpan[id]}>
+                  {content}
+                </SortableDashboardCard>
               );
             })}
           </div>
-        </div>
-      )}
+        </SortableContext>
+        <DragOverlay>
+          {activeDragId ? (
+            <div className="w-[32rem] max-w-[90vw] opacity-95 rounded-2xl pointer-events-none scale-[1.01] drop-shadow-[0_20px_50px_rgba(0,0,0,0.45)] ring-2 ring-accent-blue/45">
+              {renderWindow(activeDragId)}
+            </div>
+          ) : null}
+        </DragOverlay>
+      </DndContext>
+    </div>
+  );
+}
+
+function SortableDashboardCard({
+  id,
+  colSpanClass,
+  children,
+}: {
+  id: DashboardWindowId;
+  colSpanClass: "col-span-1" | "col-span-2";
+  children: React.ReactNode;
+}) {
+  const { attributes, listeners, setNodeRef, isDragging, isOver } = useSortable({ id });
+
+  const cardStateClass = isDragging
+    ? "opacity-55 scale-[0.985]"
+    : isOver
+    ? "ring-2 ring-accent-blue/50 bg-accent-blue/5 shadow-[0_0_0_1px_rgba(59,130,246,0.35),0_16px_30px_rgba(59,130,246,0.16)]"
+    : "";
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={[
+        colSpanClass,
+        "transition-all duration-150",
+        cardStateClass,
+      ].join(" ")}
+    >
+      <div className="relative rounded-2xl transition-all duration-150">
+        <button
+          className="absolute right-2 top-2 z-10 ui-btn-ghost !text-xs !px-2 !py-1 cursor-grab active:cursor-grabbing hover:bg-accent-blue/20"
+          title="Drag"
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical size={14} />
+        </button>
+        {children}
+      </div>
     </div>
   );
 }

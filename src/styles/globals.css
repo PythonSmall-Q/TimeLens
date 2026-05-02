@@ -248,6 +248,19 @@ body {
   opacity: 0.16;
 }
 
+/* Phase F: mouse-leave idle blur */
+.widget-idle > * {
+  opacity: 0.25;
+  transition: opacity 0.7s;
+}
+.widget-idle .widget-prominent {
+  opacity: 1 !important;
+}
+.widget-idle {
+  background: rgba(0, 0, 0, 0.15);
+  transition: background 0.7s;
+}
+
 .clock-widget--blurred .clock-widget__chrome {
   opacity: 0.16;
   filter: blur(1px);

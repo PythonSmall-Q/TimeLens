@@ -5,6 +5,94 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [1.1.0] - 2026-05-02
+
+### Added
+
+#### Widget Permission System
+
+- New **third-party widget permission system** — official and third-party widgets now have separate trust tiers
+- **WidgetPermissionDialog** component (`src/pages/WidgetCenter/WidgetPermissionDialog.tsx`) — modal for reviewing and granting individual data-access permissions before a third-party widget loads
+- **Import local widget** support in WidgetCenter — browse filesystem to load external widget packages
+- Permission persistence and management backend (`src-tauri/src/commands/widget_permissions.rs`) — stores granted permissions per widget in the database
+- Widget **signature verification** — SHA-256 hash validation of the manifest entry file to ensure package integrity
+
+#### Widget Data Channels
+
+- Expanded widget channel data interfaces — additional query endpoints exposed to widgets via IPC
+- Fine-grained permission control — widgets must request explicit permission for each data category they access
+- `ExternalWidgetHost` updated with permission filtering and expanded channel capabilities
+
+#### Productivity Score
+
+- New **Productivity Score** algorithm — calculates daily and date-range scores from focus time, app switch count, and usage patterns
+- **ProductivityScoreCard** component — new dashboard card displaying the current period's productivity score
+- **ProductivityTrendChart** component — line chart visualizing productivity score trends across days
+
+#### Interruption Detection
+
+- New **interruption detection** engine — identifies high-frequency app switching via a sliding window algorithm
+- Dashboard **fragmentation indicator** — red dot badge on the dashboard header when frequent context switches are detected
+
+#### Global Search
+
+- New **Global Search** (`Ctrl+K`) — system-wide quick search and navigation
+  - Search scope covers pages, apps, categories, todos, and goals
+  - Grouped results with highlighted matches
+  - Full keyboard navigation (arrow keys to move, Enter to select)
+- **GlobalSearch** component (`src/components/GlobalSearch.tsx`) — overlay search panel with fuzzy matching and category grouping
+
+#### Widget UX
+
+- Widget **auto-blur on mouse leave** — floating widgets fade out 2 seconds after the mouse leaves, reducing visual distraction
+- Widget idle state — widgets enter a low-attention mode when not actively interacted with
+
+#### Dashboard Customization
+
+- New **Home Customize** page (`src/pages/HomeCustomize/index.tsx`) — manage visibility and reorder of individual dashboard cards; each card can be shown or hidden independently
+- **Dashboard layout store** (`src/stores/dashboardLayoutStore.ts`) — Zustand store with `localStorage` persistence for card visibility and ordering preferences
+- Dashboard index refactored with modular conditional card rendering based on layout configuration
+
+#### App Detail Modal
+
+- New **AppDetailModal** component (`src/components/AppDetailModal.tsx`) — detailed usage view accessible by clicking any app in the dashboard ranking
+  - Displays today's usage, 7-day total, and assigned category
+  - 7-day bar chart with daily breakdown
+  - Quick navigation to the Categories page for re-categorization
+
+#### Developer Resources
+
+- New **Widget Development Guide** (`docs/WIDGETS_DEV_GUIDE.md` and `docs/WIDGETS_DEV_GUIDE.zh-CN.md`) — comprehensive documentation for building third-party widgets including manifest format, render contract, and permission system
+- New **third-party widget template** (`examples/third-party-widget-template/`) — minimal starter template with `manifest.json`, `index.js`, and bilingual README
+
+#### Backend
+
+- New **`productivity_cmd.rs`** module (`src-tauri/src/commands/productivity_cmd.rs`) — Rust commands for productivity score calculation and interruption detection metrics
+- **Database schema expanded** — new tables and indexes for productivity tracking, widget permissions, and signature verification storage
+- **`storage_cmd.rs`** expanded with additional aggregate query endpoints for range statistics and category insights
+
+#### Internationalization
+
+- **`dashboard`** namespace significantly expanded — productivity score, interruption detection, dashboard customization, and app detail labels
+- **`widgets`** namespace expanded — permission dialog, signature verification, and third-party widget management labels
+- **`common`** namespace expanded — global search and app detail action labels
+
+### Changed
+
+- **WidgetCenter** page refactored — official and third-party widgets are now displayed in separate sections with distinct visual treatment
+- **Dashboard** heavily refactored — modular card system with conditional rendering, AppDetailModal integration, and layout store support
+- **Dashboard** enhanced — new productivity score card, productivity trend chart, and interruption fragmentation indicator added
+- **ExternalWidgetHost** — updated with permission filtering and expanded data channel interfaces
+- Code structure optimization — Rust and TypeScript types aligned, API surfaces unified
+- Various bug fixes and stability improvements
+
+### Fixed
+
+- Fixed `WidgetRegistryLoadError` error type not convertible to `String` (compilation failure)
+- Removed unused `chrono::Local` import
+
+---
+
 ## [1.0.0] - 2026-05-01
 
 ### Added

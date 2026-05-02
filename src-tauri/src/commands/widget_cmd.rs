@@ -3,20 +3,17 @@ use uuid::Uuid;
 
 use crate::commands::storage_cmd::DbState;
 use crate::models::WidgetConfig;
+use crate::widget_registry::{get_widget_by_type, load_widget_registry, WidgetRegistryResponse};
 
 fn short_id() -> String {
     Uuid::new_v4().to_string()[..8].to_string()
 }
 
-fn default_size(widget_type: &str) -> (f64, f64) {
-    match widget_type {
-        "clock" => (300.0, 180.0),
-        "todo" => (320.0, 420.0),
-        "timer" => (360.0, 320.0),
-        "note" => (560.0, 340.0),
-        "status" => (520.0, 330.0),
-        _ => (320.0, 240.0),
-    }
+fn default_size(app: &AppHandle, widget_type: &str) -> Result<(f64, f64), String> {
+    let Some(item) = get_widget_by_type(app, widget_type) else {
+        return Err(format!("unregistered widget type: {widget_type}"));
+    };
+    Ok((item.default_width, item.default_height))
 }
 
 #[derive(Clone, Copy)]
@@ -51,9 +48,12 @@ fn clamp_to_bounds(mut rect: Rect, bounds: Rect) -> Rect {
 }
 
 fn widget_window_label(label: &str) -> bool {
-    ["clock-", "todo-", "timer-", "note-", "status-"]
-        .iter()
-        .any(|p| label.starts_with(p))
+    label != "main"
+}
+
+#[tauri::command]
+pub async fn get_widget_registry(app: AppHandle) -> Result<WidgetRegistryResponse, String> {
+    Ok(load_widget_registry(&app))
 }
 
 fn infer_monitor_bounds(app: &AppHandle) -> Option<Rect> {
@@ -155,7 +155,7 @@ pub async fn create_widget(
     db: tauri::State<'_, DbState>,
 ) -> Result<WidgetConfig, String> {
     let id = format!("{}-{}", widget_type, short_id());
-    let (width, height) = default_size(&widget_type);
+    let (width, height) = default_size(&app, &widget_type)?;
 
     let (preferred_x, preferred_y) = {
         let conn = db.lock().map_err(|e| e.to_string())?;

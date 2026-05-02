@@ -24,6 +24,10 @@ import type {
   BrowserDomainLimit,
   InstallChannelInfo,
   ShortcutSettings,
+  WidgetRegistryResponse,
+  WidgetRegistryItem,
+  ProductivityScore,
+  InterruptionPeriod,
 } from "@/types";
 
 // ── Monitor ───────────────────────────────────────────────────
@@ -198,6 +202,9 @@ export const closeWidget = (id: string): Promise<void> =>
 export const setWidgetAlwaysOnTop = (id: string, mode: string): Promise<void> =>
   invoke("set_widget_always_on_top", { id, mode });
 
+export const getWidgetRegistry = (): Promise<WidgetRegistryResponse> =>
+  invoke("get_widget_registry");
+
 // ── Widget DB config ──────────────────────────────────────────
 export const getAllWidgets = (): Promise<WidgetConfig[]> =>
   invoke("get_all_widgets");
@@ -275,3 +282,39 @@ export const saveBrowserDomainLimit = (
 
 export const removeBrowserDomainLimit = (host: string): Promise<void> =>
   invoke("remove_browser_domain_limit", { host });
+
+// ── Phase C: extra data channel ───────────────────────────────
+
+export const getHourlyDistributionForDate = (date: string): Promise<HourlyDistribution[]> =>
+  invoke("get_hourly_distribution_for_date", { date });
+
+export const getRecentDailyTotalsRange = (startDate: string, endDate: string): Promise<DailyUsage[]> =>
+  invoke("get_recent_daily_totals_range", { startDate, endDate });
+
+export const getAppCategoryMap = (): Promise<Record<string, string>> =>
+  invoke("get_app_category_map");
+
+// ── Phase A: widget permissions ───────────────────────────────
+
+export const getWidgetPermissions = (widgetId: string): Promise<string[]> =>
+  invoke("get_widget_permissions", { widgetId });
+
+export const setWidgetPermissions = (widgetId: string, permissions: string[]): Promise<void> =>
+  invoke("set_widget_permissions", { widgetId, permissions });
+
+export const revokeAllWidgetPermissions = (widgetId: string): Promise<void> =>
+  invoke("revoke_all_widget_permissions", { widgetId });
+
+export const importLocalWidget = (srcDir: string): Promise<WidgetRegistryItem> =>
+  invoke("import_local_widget", { srcDir });
+
+// ── Phase D+E: productivity + interruption ────────────────────
+
+export const getProductivityScore = (date: string): Promise<ProductivityScore> =>
+  invoke("get_productivity_score", { date });
+
+export const getProductivityScoreRange = (startDate: string, endDate: string): Promise<ProductivityScore[]> =>
+  invoke("get_productivity_score_range", { startDate, endDate });
+
+export const getInterruptionPeriods = (date: string): Promise<InterruptionPeriod[]> =>
+  invoke("get_interruption_periods", { date });

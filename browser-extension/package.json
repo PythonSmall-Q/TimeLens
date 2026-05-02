@@ -1,6 +1,6 @@
 {
   "name": "timelens-browser-extension",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Browser companion for TimeLens — tracks tab sessions and syncs screen-time data with the desktop app.",
   "scripts": {
     "lint": "web-ext lint --source-dir .",

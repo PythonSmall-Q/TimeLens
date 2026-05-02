@@ -3,6 +3,7 @@ pub mod commands;
 pub mod db;
 pub mod models;
 pub mod monitor;
+pub mod widget_registry;
 
 use std::sync::{Arc, Mutex};
 
@@ -325,6 +326,7 @@ pub fn run() {
             commands::open_widget,
             commands::close_widget,
             commands::set_widget_always_on_top,
+            commands::get_widget_registry,
             // App settings / startup / shortcuts
             commands::get_app_settings,
             commands::get_browser_extension_status,
@@ -345,6 +347,19 @@ pub fn run() {
             commands::get_browser_domain_limits,
             commands::save_browser_domain_limit,
             commands::remove_browser_domain_limit,
+            // Phase C: extra data channel commands
+            commands::get_hourly_distribution_for_date,
+            commands::get_recent_daily_totals_range,
+            commands::get_app_category_map,
+            // Phase D+E: productivity + interruption
+            commands::get_productivity_score,
+            commands::get_productivity_score_range,
+            commands::get_interruption_periods,
+            // Phase A: widget permissions
+            commands::get_widget_permissions,
+            commands::set_widget_permissions,
+            commands::revoke_all_widget_permissions,
+            commands::import_local_widget,
         ])
         .run(tauri::generate_context!())
         .expect("error while running TimeLens");

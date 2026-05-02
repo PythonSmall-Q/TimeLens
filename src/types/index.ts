@@ -106,7 +106,7 @@ export interface TodoItem {
 
 export interface WidgetConfig {
   id: string;
-  widget_type: "clock" | "todo" | "timer" | "note" | "status";
+  widget_type: string;
   monitor_index: number;
   x: number;
   y: number;
@@ -116,6 +116,28 @@ export interface WidgetConfig {
   always_on_top_mode: "always" | "focus" | "never";
   pinned: boolean;
   start_on_launch: boolean;
+}
+
+export interface WidgetRegistryItem {
+  widget_type: string;
+  display_name: string;
+  source: "official" | "third-party";
+  description: string | null;
+  entry: string | null;
+  icon: string | null;
+  default_width: number;
+  default_height: number;
+  permissions: string[];
+}
+
+export interface WidgetRegistryLoadError {
+  path: string;
+  message: string;
+}
+
+export interface WidgetRegistryResponse {
+  items: WidgetRegistryItem[];
+  errors: WidgetRegistryLoadError[];
 }
 
 export interface MonitorStatus {
@@ -132,7 +154,7 @@ export interface ActiveWindowInfo {
   timestamp: string;
 }
 
-export type WidgetType = "clock" | "todo" | "timer" | "note" | "status";
+export type WidgetType = string;
 
 export interface ShortcutSettings {
   open_widget_center: string;
@@ -209,4 +231,18 @@ export interface BrowserDomainLimit {
   daily_limit_seconds: number;
   enabled: boolean;
   updated_at: string;
+}
+
+export interface ProductivityScore {
+  date: string;
+  total_seconds: number;
+  focus_seconds: number;
+  switch_count: number;
+  score: number;
+}
+
+export interface InterruptionPeriod {
+  hour: number;
+  switch_count: number;
+  fragment_score: number;
 }

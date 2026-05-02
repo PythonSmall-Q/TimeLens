@@ -1,0 +1,14 @@
+{
+  "widget_type": "sample_hello",
+  "name": "Sample Hello Widget",
+  "description": "A minimal third-party widget template for TimeLens",
+  "entry": "index.js",
+  "default_size": {
+    "width": 360,
+    "height": 240
+  },
+  "permissions": [
+    "screen-time:read",
+    "active-window:subscribe"
+  ]
+}

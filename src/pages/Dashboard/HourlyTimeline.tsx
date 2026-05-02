@@ -6,6 +6,7 @@ import {
   YAxis,
   Tooltip,
   ResponsiveContainer,
+  ReferenceDot,
 } from "recharts";
 import { useStatsStore } from "@/stores/statsStore";
 
@@ -33,9 +34,14 @@ function buildHourlyData(raw: { hour: number; seconds: number }[]) {
 
 export default function HourlyTimeline() {
   const { t } = useTranslation("dashboard");
-  const { todayHourly } = useStatsStore();
+  const { todayHourly, interruptionPeriods } = useStatsStore();
   const data = buildHourlyData(todayHourly);
   const currentHour = new Date().getHours();
+
+  // Hours with heavy fragmentation (fragment_score > 0.6)
+  const fragmentedHours = new Set(
+    interruptionPeriods.filter((p) => p.fragment_score > 0.6).map((p) => p.hour)
+  );
 
   return (
     <div className="glass-card p-5">
@@ -82,6 +88,23 @@ export default function HourlyTimeline() {
               return <></>;
             }}
           />
+          {/* Interruption dots for fragmented hours */}
+          {Array.from(fragmentedHours).map((h) => {
+            const row = data[h];
+            const period = interruptionPeriods.find((p) => p.hour === h);
+            return (
+              <ReferenceDot
+                key={`frag-${h}`}
+                x={h}
+                y={row.seconds}
+                r={5}
+                fill="#ef4444"
+                stroke="#1a1b2e"
+                strokeWidth={1.5}
+                label={{ value: `⚠ ${period?.switch_count ?? ""}`, position: "top", fontSize: 9, fill: "#ef4444" }}
+              />
+            );
+          })}
         </AreaChart>
       </ResponsiveContainer>
     </div>

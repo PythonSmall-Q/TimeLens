@@ -124,6 +124,13 @@ TimeLens/
 
 ---
 
+## 🧩 小组件开发
+
+- [小组件开发指南](docs/WIDGETS_DEV_GUIDE.zh-CN.md)
+- [第三方小组件模板](examples/third-party-widget-template/README.zh-CN.md)
+
+---
+
 ## 🌐 添加语言
 
 请参阅 [docs/ADD_LANGUAGE.md](docs/ADD_LANGUAGE.md) 获取分步指南。

@@ -121,7 +121,7 @@ export default function ClockWidget({ widgetId, isBlurred = false }: Props) {
       ) : (
         /* Digital clock */
         <div className="flex flex-col items-center">
-          <div className="text-5xl font-bold text-text-primary tracking-tight font-mono clock-widget__time">
+          <div className="text-5xl font-bold text-text-primary tracking-tight font-mono clock-widget__time widget-prominent">
             {timeStr}
             {ampm && <span className="text-xl text-text-secondary ml-1">{ampm}</span>}
           </div>

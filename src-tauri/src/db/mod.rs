@@ -164,6 +164,13 @@ pub fn initialize(conn: &Connection) -> Result<()> {
             enabled             INTEGER NOT NULL DEFAULT 1,
             updated_at          TEXT    NOT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS widget_permissions (
+            widget_id       TEXT    NOT NULL,
+            permission      TEXT    NOT NULL,
+            granted_at      TEXT    NOT NULL,
+            PRIMARY KEY (widget_id, permission)
+        );
         ",
     )?;
 
@@ -1116,4 +1123,44 @@ pub fn get_browser_domain_today_seconds(conn: &Connection, host: &str, date: &st
         |row| row.get(0),
     )?;
     Ok(res)
+}
+
+// ── Widget permissions ─────────────────────────────────────────
+
+pub fn get_widget_permissions(conn: &Connection, widget_id: &str) -> Result<Vec<String>> {
+    let mut stmt = conn.prepare(
+        "SELECT permission FROM widget_permissions WHERE widget_id = ?1 ORDER BY permission",
+    )?;
+    let rows = stmt.query_map(params![widget_id], |row| row.get::<_, String>(0))?;
+    rows.collect()
+}
+
+pub fn set_widget_permissions(
+    conn: &Connection,
+    widget_id: &str,
+    permissions: &[String],
+) -> Result<()> {
+    let tx = conn.unchecked_transaction()?;
+    tx.execute(
+        "DELETE FROM widget_permissions WHERE widget_id = ?1",
+        params![widget_id],
+    )?;
+    let now = chrono::Local::now().format("%Y-%m-%dT%H:%M:%S").to_string();
+    for perm in permissions {
+        tx.execute(
+            "INSERT OR IGNORE INTO widget_permissions (widget_id, permission, granted_at)
+             VALUES (?1, ?2, ?3)",
+            params![widget_id, perm, now],
+        )?;
+    }
+    tx.commit()?;
+    Ok(())
+}
+
+pub fn revoke_all_widget_permissions(conn: &Connection, widget_id: &str) -> Result<()> {
+    conn.execute(
+        "DELETE FROM widget_permissions WHERE widget_id = ?1",
+        params![widget_id],
+    )?;
+    Ok(())
 }

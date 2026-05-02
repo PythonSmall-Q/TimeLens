@@ -1,6 +1,6 @@
 [package]
 name = "timelens"
-version = "1.0.0"
+version = "1.1.0"
 description = "A screen time tracker and desktop widget manager"
 authors = ["Shan Wenxiao"]
 license = "MIT"
@@ -35,6 +35,7 @@ chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1", features = ["v4"] }
 log = "0.4"
 env_logger = "0.11"
+sha2 = "0.10"
 axum = { version = "0.7", features = ["ws"] }
 tower-http = { version = "0.5", features = ["cors"] }
 tokio-tungstenite = { version = "0.21", optional = true }

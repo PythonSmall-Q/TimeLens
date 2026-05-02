@@ -1,7 +1,7 @@
 use tauri::State;
 
 use crate::commands::storage_cmd::DbState;
-use crate::models::{BrowserExtensionStatus, BrowserSession};
+use crate::models::BrowserExtensionStatus;
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct ShortcutSettings {

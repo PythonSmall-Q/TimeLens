@@ -9,8 +9,8 @@ import { useSettingsStore } from "./stores/settingsStore";
  * Root component. Decides whether to render the main dashboard or a widget,
  * based on the Tauri window label.
  *
- * Widget windows have labels like:  clock-abc12345 | todo-abc12345 | timer-abc12345 | note-abc12345 | status-abc12345
- * Main window label:                main
+ * Main window label: main
+ * Other labels are treated as widget windows.
  */
 export default function App() {
   const [windowLabel, setWindowLabel] = useState<string | null>(null);
@@ -56,16 +56,8 @@ export default function App() {
 
   if (windowLabel === null) return null;
 
-  const isWidget =
-    windowLabel.startsWith("clock-") ||
-    windowLabel.startsWith("todo-") ||
-    windowLabel.startsWith("timer-") ||
-    windowLabel.startsWith("note-") ||
-    windowLabel.startsWith("status-");
-
-  if (isWidget) {
-    const widgetType = windowLabel.split("-")[0] as "clock" | "todo" | "timer" | "note" | "status";
-    return <WidgetWindow widgetId={windowLabel} widgetType={widgetType} />;
+  if (windowLabel !== "main") {
+    return <WidgetWindow widgetId={windowLabel} />;
   }
 
   return <MainApp />;

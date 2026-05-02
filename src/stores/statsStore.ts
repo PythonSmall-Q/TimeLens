@@ -7,6 +7,8 @@ import type {
   DailyUsage,
   HourlyDistribution,
   MonitorStatus,
+  ProductivityScore,
+  InterruptionPeriod,
 } from "@/types";
 import * as api from "@/services/tauriApi";
 
@@ -53,6 +55,11 @@ interface StatsState {
   setCurrentApp: (app: string) => void;
   setSelectedDate: (date: string) => void;
   setPeriodMode: (mode: PeriodMode) => void;
+  // Phase D+E
+  productivityScores: ProductivityScore[];
+  interruptionPeriods: InterruptionPeriod[];
+  fetchProductivityRange: (startDate: string, endDate: string) => Promise<void>;
+  fetchInterruptionPeriods: (date: string) => Promise<void>;
 }
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
@@ -73,6 +80,8 @@ export const useStatsStore = create<StatsState>((set, get) => ({
   categoryDailyTotals: [],
   heatmapDailyTotals: [],
   comparisonResults: [],
+  productivityScores: [],
+  interruptionPeriods: [],
 
   fetchToday: async () => {
     set({ loading: true });
@@ -233,4 +242,18 @@ export const useStatsStore = create<StatsState>((set, get) => ({
     fetchForDate(date);
   },
   setPeriodMode: (periodMode) => set({ periodMode }),
+
+  fetchProductivityRange: async (startDate: string, endDate: string) => {
+    try {
+      const scores = await api.getProductivityScoreRange(startDate, endDate);
+      set({ productivityScores: scores });
+    } catch (_) {}
+  },
+
+  fetchInterruptionPeriods: async (date: string) => {
+    try {
+      const periods = await api.getInterruptionPeriods(date);
+      set({ interruptionPeriods: periods });
+    } catch (_) {}
+  },
 }));
