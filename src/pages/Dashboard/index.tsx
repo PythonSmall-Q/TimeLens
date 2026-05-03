@@ -92,6 +92,7 @@ export default function Dashboard() {
     interruptionPeriods,
     fetchProductivityRange,
     fetchInterruptionPeriods,
+    fetchVsCodeStatsForRange,
   } = useStatsStore();
   const [weekValue, setWeekValue] = useState(currentIsoWeek());
   const [monthValue, setMonthValue] = useState(todayString().slice(0, 7));
@@ -187,6 +188,15 @@ export default function Dashboard() {
       fetchWeekComparison(rangeDays.start, rangeDays.end, fmt(prevStart), fmt(prevEnd));
     }
   }, [periodMode, rangeDays, fetchForRange, fetchWeekComparison]);
+
+  useEffect(() => {
+    if (periodMode === "day") {
+      fetchVsCodeStatsForRange(selectedDate, selectedDate);
+      return;
+    }
+    if (!rangeDays) return;
+    fetchVsCodeStatsForRange(rangeDays.start, rangeDays.end);
+  }, [periodMode, selectedDate, rangeDays, fetchVsCodeStatsForRange]);
 
   useEffect(() => {
     if (periodMode !== "day") return;

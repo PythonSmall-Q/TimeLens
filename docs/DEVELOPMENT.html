@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>开发指南 · TimeLens 文档</title>
+  <link rel="icon" type="image/png" href="assets/icon.png" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- Navbar -->
+  <nav class="navbar">
+    <div class="nav-container">
+      <a href="index.html" class="nav-brand">
+        <img src="assets/icon.svg" alt="TimeLens" class="nav-icon" />
+        <span class="nav-title">TimeLens</span>
+      </a>
+      <div class="nav-links">
+        <a href="index.html#features" class="nav-link">功能</a>
+        <a href="index.html#quickstart" class="nav-link">快速开始</a>
+        <a href="index.html#docs" class="nav-link">文档</a>
+        <a href="https://github.com/PythonSmall-Q/TimeLens" class="nav-link" target="_blank" rel="noopener">
+          <svg class="github-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+          GitHub
+        </a>
+      </div>
+      <button class="nav-toggle" id="navToggle" aria-label="切换导航">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </nav>
+
+  <div class="content-wrapper">
+    <aside class="sidebar">
+      <ul class="sidebar-nav">
+        <li><a href="index.html">← 返回首页</a></li>
+        <li><a href="ARCHITECTURE.html">架构文档</a></li>
+        <li><a href="API_REFERENCE.html">API 参考</a></li>
+        <li><a href="WIDGETS_DEV_GUIDE.html">小组件开发</a></li>
+        <li><a href="ADD_LANGUAGE.html">添加语言</a></li>
+        <li><a href="WIDGETS_DEV_GUIDE.zh-CN.html">中文小组件指南</a></li>
+      </ul>
+    </aside>
+
+    <main class="content-main">
+      <nav class="breadcrumb">
+        <a href="index.html">文档首页</a>
+        <span>/</span>
+        <span>开发指南</span>
+      </nav>
+
+      <h1>开发指南</h1>
+      <p>本文档涵盖 TimeLens 完整开发环境搭建、项目架构理解、日常调试技巧及脚本参考。无论你是初次接触 Tauri 还是经验丰富的 Rust 开发者，都能在这里找到所需信息。</p>
+
+      <hr />
+
+      <h2 id="prerequisites">前置条件</h2>
+      <table>
+        <thead>
+          <tr><th>工具</th><th>最低版本</th><th>安装方式</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Node.js</td><td>18</td><td><a href="https://nodejs.org" target="_blank">nodejs.org</a></td></tr>
+          <tr><td>Rust</td><td>1.77</td><td><a href="https://rustup.rs" target="_blank">rustup.rs</a></td></tr>
+          <tr><td>Tauri CLI</td><td>2.x</td><td><code>cargo install tauri-cli --version "^2"</code></td></tr>
+          <tr><td>WebView2 (Windows)</td><td>任意</td><td>Windows 11 已内置；<a href="https://developer.microsoft.com/en-us/microsoft-edge/webview2/" target="_blank">Win10 独立安装包</a></td></tr>
+          <tr><td>Xcode CLI Tools (macOS)</td><td>最新稳定版</td><td><code>xcode-select --install</code></td></tr>
+        </tbody>
+      </table>
+
+      <h3>验证安装</h3>
+      <pre><code>node --version   # v18.x.x
+npm --version    # 9.x.x
+rustc --version  # 1.77.x
+cargo --version  # 1.77.x</code></pre>
+
+      <h2 id="setup">项目初始化</h2>
+      <pre><code><span class="code-comment"># 1. 克隆仓库</span>
+git clone https://github.com/PythonSmall-Q/TimeLens.git
+cd TimeLens
+
+<span class="code-comment"># 2. 安装前端依赖（package.json）</span>
+npm install
+
+<span class="code-comment"># 3. 安装浏览器扩展依赖（可选）</span>
+cd browser-extension && npm install && cd ..</code></pre>
+
+      <h2 id="dev-mode">开发模式</h2>
+      <p>TimeLens 使用 Tauri 开发模式，该模式会同时启动 Vite 开发服务器和 Tauri 桌面窗口。</p>
+
+      <pre><code><span class="code-comment"># 启动完整开发环境（推荐）</span>
+npm run tauri:dev
+
+<span class="code-comment"># 仅启动 Vite 前端服务器（用于纯 UI 调试，无后端）</span>
+npm run dev</code></pre>
+
+      <p>开发服务器默认运行在 <code>http://localhost:1420</code>。热模块替换（HMR）对所有前端代码生效；Rust 代码修改需要完整重启。</p>
+
+      <h3>开发时常见问题</h3>
+      <ul>
+        <li><strong>窗口白屏：</strong>检查 WebView2 是否已安装，或尝试刷新页面（F5 或 Ctrl+R）。</li>
+        <li><strong>Rust 编译错误：</strong>确保已安装 <code>cargo install tauri-cli --version "^2"</code>。</li>
+        <li><strong>端口被占用：</strong>Vite 会自动寻找下一个可用端口，Tauri 配置中的 URL 需同步更新。</li>
+      </ul>
+
+      <h2 id="architecture">架构概览</h2>
+      <p>TimeLens 采用经典的双层架构：Rust 后端负责系统级操作和数据持久化，React 前端负责用户界面和状态管理。</p>
+
+      <pre><code>┌─────────────────────────────────────────────────┐
+│  Tauri Process (Rust)                            │
+│                                                  │
+│  ┌──────────────┐  ┌──────────────────────────┐  │
+│  │  monitor/    │  │  db/ (SQLite)            │  │
+│  │  (tokio task)│  │  app_usage               │  │
+│  │  Win32/      │  │  todos                   │  │
+│  │  AppleScript │  │  widget_configs          │  │
+│  └──────┬───────┘  └──────────┬───────────────┘  │
+│         │  emit events        │ queries          │
+│  ┌──────▼───────────────────┐ │                  │
+│  │  commands/ (invoke)      ◄─┘                  │
+│  │  monitor_cmd.rs          │                    │
+│  │  storage_cmd.rs          │                    │
+│  │  widget_cmd.rs           │                    │
+│  └──────┬───────────────────┘                    │
+└─────────│───────────────────────────────────────┘
+          │ IPC (invoke / emit)
+┌─────────▼────────────────────────────────────────┐
+│  React Frontend (WebView)                         │
+│                                                   │
+│  App.tsx → 窗口标签检测                            │
+│    "main"    → MainApp (HashRouter)               │
+│    "clock-*" → WidgetWindow<Clock>                │
+│    "todo-*"  → WidgetWindow<Todo>                 │
+│    "timer-*" → WidgetWindow<Timer>                │
+│                                                   │
+│  stores/  → Zustand (statsStore, widgetStore,     │
+│             settingsStore)                        │
+│  services/ → tauriApi.ts wrappers                │
+└───────────────────────────────────────────────────┘</code></pre>
+
+      <h2 id="key-files">关键文件速查</h2>
+      <table>
+        <thead>
+          <tr><th>文件</th><th>职责</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>src-tauri/src/lib.rs</code></td><td>应用初始化、数据库初始化、系统托盘、监控启动、窗口恢复</td></tr>
+          <tr><td><code>src-tauri/src/monitor/mod.rs</code></td><td>后台窗口轮询 + 数据库写入</td></tr>
+          <tr><td><code>src-tauri/src/db/mod.rs</code></td><td>SQLite 表结构定义与所有查询</td></tr>
+          <tr><td><code>src/App.tsx</code></td><td>窗口标签路由（main vs widget）</td></tr>
+          <tr><td><code>src/MainApp.tsx</code></td><td>主仪表盘壳 + 全局事件监听</td></tr>
+          <tr><td><code>src/services/tauriApi.ts</code></td><td>所有 invoke 调用的前端封装</td></tr>
+          <tr><td><code>src/i18n/config.ts</code></td><td>i18next 初始化配置、语言列表</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="debugging">调试技巧</h2>
+
+      <h3>Rust 日志</h3>
+      <p>设置 <code>RUST_LOG</code> 环境变量以查看详细日志：</p>
+      <pre><code><span class="code-comment"># Windows PowerShell</span>
+$env:RUST_LOG = "debug"; npm run tauri:dev
+
+<span class="code-comment"># macOS / bash / zsh</span>
+RUST_LOG=debug npm run tauri:dev</code></pre>
+
+      <h3>前端 DevTools</h3>
+      <p>在任意 Tauri 窗口中按 <kbd>F12</kbd> 即可打开 Chromium DevTools（仅开发构建）。</p>
+
+      <h3>SQLite 数据库检查</h3>
+      <p>数据库文件位置：</p>
+      <ul>
+        <li><strong>Windows:</strong> <code>%APPDATA%\com.timelens.app\timelens.db</code></li>
+        <li><strong>macOS:</strong> <code>~/Library/Application Support/com.timelens.app/timelens.db</code></li>
+      </ul>
+      <p>可使用 <a href="https://sqlitebrowser.org/" target="_blank">DB Browser for SQLite</a> 等工具直接打开查看。</p>
+
+      <h3>小组件窗口不显示</h3>
+      <p>检查 <code>capabilities/default.json</code> 中窗口标签模式是否匹配（<code>clock-*</code>、<code>todo-*</code>、<code>timer-*</code>）。</p>
+
+      <h2 id="scripts">脚本速查</h2>
+      <table>
+        <thead>
+          <tr><th>命令</th><th>说明</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>npm run dev</code></td><td>仅启动 Vite 前端开发服务器</td></tr>
+          <tr><td><code>npm run build</code></td><td>前端生产构建</td></tr>
+          <tr><td><code>npm run tauri:dev</code></td><td>完整 Tauri 开发模式（推荐）</td></tr>
+          <tr><td><code>npm run tauri:build</code></td><td>完整生产构建（输出安装包）</td></tr>
+          <tr><td><code>npm run lint</code></td><td>ESLint 检查</td></tr>
+          <tr><td><code>npm run typecheck</code></td><td>TypeScript 类型检查（不输出文件）</td></tr>
+          <tr><td><code>npm run format</code></td><td>Prettier 格式化</td></tr>
+          <tr><td><code>npm run test</code></td><td>Vitest 单元测试</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="testing">添加测试</h2>
+      <p>前端测试放置于 <code>src/__tests__/</code>，使用 Vitest + @testing-library/react。</p>
+      <p>Rust 单元测试与模块并存：</p>
+      <pre><code><span class="code-comment">// Rust 测试示例</span>
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_format_seconds() {
+        assert_eq!(format_seconds(3661), "1h 1m");
+        assert_eq!(format_seconds(59), "0m");
+    }
+}</code></pre>
+
+      <h2 id="release">发布流程</h2>
+      <pre><code><span class="code-comment"># 1. 先推送 master（仓库约定）</span>
+git push origin refs/heads/master:refs/heads/master
+
+<span class="code-comment"># 2. 创建并推送版本标签</span>
+git tag -a v1.1.0 -m "release: v1.1.0"
+git push origin v1.1.0</code></pre>
+      <p>推送 <code>v*</code> 标签会自动触发 <code>.github/workflows/release.yml</code> 工作流，构建并发布各平台安装包。</p>
+
+      <h2 id="contributing">贡献代码</h2>
+      <p>我们欢迎所有形式的贡献！在提交 PR 前，请：</p>
+      <ol>
+        <li>阅读 <a href="../CONTRIBUTING.md">CONTRIBUTING.md</a></li>
+        <li>确保代码通过 <code>npm run lint</code> 和 <code>npm run typecheck</code></li>
+        <li>保持提交信息简洁清晰（推荐遵循 Conventional Commits）</li>
+        <li>为重大变更更新相关文档</li>
+      </ol>
+
+      <hr />
+      <p style="color: var(--text-muted); font-size: 0.85rem;">最后更新：2025-05-03 · TimeLens v1.1.0</p>
+    </main>
+  </div>
+
+  <script>
+    const navToggle = document.getElementById('navToggle');
+    const navLinks = document.querySelector('.nav-links');
+    navToggle.addEventListener('click', () => navLinks.classList.toggle('open'));
+  </script>
+</body>
+</html>

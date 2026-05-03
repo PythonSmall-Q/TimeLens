@@ -1,0 +1,136 @@
+{
+  "name": "timelens-vscode-extension",
+  "displayName": "TimeLens",
+  "description": "Track VS Code session time and send local analytics to TimeLens desktop app.",
+  "icon": "icons/icon.png",
+  "version": "0.1.0",
+  "publisher": "timelens",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/PythonSmall-Q/TimeLens.git"
+  },
+  "homepage": "https://github.com/PythonSmall-Q/TimeLens",
+  "bugs": {
+    "url": "https://github.com/PythonSmall-Q/TimeLens/issues"
+  },
+  "keywords": [
+    "timetracking",
+    "productivity",
+    "focus",
+    "analytics"
+  ],
+  "engines": {
+    "vscode": "^1.100.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "timelens",
+          "title": "TimeLens",
+          "icon": "icons/activitybar.svg"
+        }
+      ]
+    },
+    "views": {
+      "timelens": [
+        {
+          "id": "timelens.homeView",
+          "name": "主页",
+          "type": "webview"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "timelens.enableTracking",
+        "title": "TimeLens: Enable Tracking"
+      },
+      {
+        "command": "timelens.disableTracking",
+        "title": "TimeLens: Disable Tracking"
+      },
+      {
+        "command": "timelens.showStatus",
+        "title": "TimeLens: Show Tracking Status"
+      },
+      {
+        "command": "timelens.setTrackingLevel",
+        "title": "TimeLens: Set Detail Level"
+      },
+      {
+        "command": "timelens.openDashboard",
+        "title": "TimeLens: Open Dashboard",
+        "icon": "$(graph)"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "timelens.openDashboard",
+          "group": "navigation"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "TimeLens",
+      "properties": {
+        "timelens.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable local VS Code usage tracking for TimeLens."
+        },
+        "timelens.apiBaseUrl": {
+          "type": "string",
+          "default": "http://127.0.0.1:49152",
+          "description": "Local TimeLens API base URL."
+        },
+        "timelens.flushIntervalSeconds": {
+          "type": "number",
+          "default": 30,
+          "minimum": 5,
+          "maximum": 600,
+          "description": "How often to flush queued sessions to TimeLens API."
+        },
+        "timelens.idleThresholdSeconds": {
+          "type": "number",
+          "default": 120,
+          "minimum": 30,
+          "maximum": 1800,
+          "description": "Split a session when editor activity is idle for this many seconds."
+        },
+        "timelens.trackingLevel": {
+          "type": "string",
+          "enum": ["basic", "standard", "detailed"],
+          "enumDescriptions": [
+            "Only record session duration (no language or project info).",
+            "Record session duration and language distribution (recommended).",
+            "Record session duration, language distribution, and project path."
+          ],
+          "default": "standard",
+          "description": "Controls how much detail is recorded per coding session."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsc -p ./tsconfig.json",
+    "watch": "tsc -w -p ./tsconfig.json",
+    "package": "npm run build && npx @vscode/vsce package",
+    "package:pre": "npx @vscode/vsce package --pre-release"
+  },
+  "devDependencies": {
+    "@vscode/vsce": "^3.6.2",
+    "@types/node": "^20.17.47",
+    "@types/vscode": "^1.100.0",
+    "typescript": "^5.8.3"
+  }
+}

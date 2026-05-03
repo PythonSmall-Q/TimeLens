@@ -233,6 +233,43 @@ export interface BrowserDomainLimit {
   updated_at: string;
 }
 
+export interface VsCodeStatsSummary {
+  total_seconds: number;
+  session_count: number;
+}
+
+export interface VsCodeTrackingStatus {
+  enabled: boolean;
+  tracking_level?: string;
+}
+
+export interface VsCodeLanguageStats {
+  language: string;
+  total_seconds: number;
+}
+
+export interface VsCodeProjectStats {
+  project_name: string;
+  project_path: string;
+  total_seconds: number;
+  session_count: number;
+}
+
+export interface VsCodeLanguageDuration {
+  language: string;
+  seconds: number;
+}
+
+export interface VsCodeSessionPayload {
+  session_id: string;
+  started_at: string;
+  ended_at: string;
+  duration_seconds: number;
+  project_name?: string;
+  project_path?: string;
+  language_durations?: VsCodeLanguageDuration[];
+}
+
 export interface ProductivityScore {
   date: string;
   total_seconds: number;

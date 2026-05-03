@@ -21,7 +21,14 @@ const WINDOW_LABEL_KEY: Record<DashboardWindowId, string> = {
 export default function HomeCustomize() {
   const navigate = useNavigate();
   const { t } = useTranslation(["common", "dashboard"]);
-  const { layout, hideWindow, restoreWindow, restoreDefault } = useDashboardLayoutStore();
+  const {
+    layout,
+    hideWindow,
+    restoreWindow,
+    restoreDefault,
+    todayOverviewCards,
+    setTodayOverviewCardVisibility,
+  } = useDashboardLayoutStore();
 
   const hiddenCount = useMemo(() => layout.filter((item) => !item.visible).length, [layout]);
 
@@ -69,6 +76,30 @@ export default function HomeCustomize() {
               onRestore={() => restoreWindow(item.id)}
             />
           ))}
+        </div>
+      </div>
+
+      <div className="glass-card p-5">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-semibold text-text-primary">{t("dashboard:todayOverviewCardControls")}</h2>
+          <span className="text-xs text-text-muted">{t("dashboard:windowTodayOverview")}</span>
+        </div>
+
+        <div className="space-y-2">
+          <VisibilityRow
+            idx={1}
+            label={t("dashboard:todayOverviewMostUsed")}
+            visible={todayOverviewCards.mostUsed}
+            onHide={() => setTodayOverviewCardVisibility("mostUsed", false)}
+            onRestore={() => setTodayOverviewCardVisibility("mostUsed", true)}
+          />
+          <VisibilityRow
+            idx={2}
+            label={t("dashboard:todayOverviewVsCode")}
+            visible={todayOverviewCards.vscode}
+            onHide={() => setTodayOverviewCardVisibility("vscode", false)}
+            onRestore={() => setTodayOverviewCardVisibility("vscode", true)}
+          />
         </div>
       </div>
     </div>

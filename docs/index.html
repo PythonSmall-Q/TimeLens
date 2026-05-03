@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TimeLens · 文档</title>
+  <link rel="icon" type="image/png" href="assets/icon.png" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- Navbar -->
+  <nav class="navbar">
+    <div class="nav-container">
+      <a href="index.html" class="nav-brand">
+        <img src="assets/icon.svg" alt="TimeLens" class="nav-icon" />
+        <span class="nav-title">TimeLens</span>
+      </a>
+      <div class="nav-links">
+        <a href="#features" class="nav-link">功能</a>
+        <a href="#quickstart" class="nav-link">快速开始</a>
+        <a href="#docs" class="nav-link">文档</a>
+        <a href="https://github.com/PythonSmall-Q/TimeLens" class="nav-link" target="_blank" rel="noopener">
+          <svg class="github-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+          GitHub
+        </a>
+      </div>
+      <button class="nav-toggle" id="navToggle" aria-label="切换导航">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- Hero Section -->
+  <header class="hero">
+    <div class="hero-bg"></div>
+    <div class="hero-particles" id="particles"></div>
+    <div class="hero-content">
+      <div class="hero-badge">
+        <img src="assets/icon.svg" alt="TimeLens" class="hero-icon" />
+        <span>TimeLens v1.1.0</span>
+      </div>
+      <h1 class="hero-title">
+        <span class="gradient-text">轻量级</span>
+        桌面屏幕时间追踪器
+        <br />
+        <span class="gradient-text">&</span>
+        浮动小组件管理器
+      </h1>
+      <p class="hero-subtitle">
+        自动记录前台应用使用时长，透明毛玻璃悬浮窗，多语言支持
+        <br class="hide-mobile" />
+        基于 Tauri + React 构建，SQLite 持久化，Windows 原生体验
+      </p>
+      <div class="hero-badges">
+        <span class="badge"><span class="badge-dot green"></span>MIT 许可证</span>
+        <span class="badge"><span class="badge-dot blue"></span>Windows 支持</span>
+        <span class="badge"><span class="badge-dot purple"></span>v1.1.0</span>
+      </div>
+      <div class="hero-actions">
+        <a href="https://apps.microsoft.com/detail/9mvt208csf6p?referrer=appbadge&mode=full" class="btn btn-primary" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+          Microsoft Store
+        </a>
+        <a href="https://github.com/PythonSmall-Q/TimeLens/releases" class="btn btn-secondary" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          GitHub Releases
+        </a>
+        <a href="#quickstart" class="btn btn-ghost">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          快速开始
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Stats Bar -->
+  <section class="stats-bar">
+    <div class="stats-container">
+      <div class="stat-item">
+        <span class="stat-value">8+</span>
+        <span class="stat-label">核心页面</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-value">5</span>
+        <span class="stat-label">内置小组件</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-value">2</span>
+        <span class="stat-label">语言支持</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-value">0</span>
+        <span class="stat-label">外部依赖（运行时）</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features Section -->
+  <section id="features" class="features">
+    <div class="section-container">
+      <div class="section-header">
+        <span class="section-tag">功能特性</span>
+        <h2 class="section-title"> everything you need</h2>
+        <p class="section-desc">TimeLens 提供完整的屏幕时间追踪和桌面小组件解决方案</p>
+      </div>
+      <div class="feature-grid">
+        <div class="feature-card">
+          <div class="feature-icon-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </div>
+          <h3>屏幕时间追踪</h3>
+          <p>自动记录前台应用使用时长，支持每日总览、小时分布图表及 7 日趋势对比。</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          </div>
+          <h3>浮动小组件</h3>
+          <p>透明无边框、始终置顶的悬浮窗：模拟/数字时钟、可拖拽排序的待办列表、多模式计时器。</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>
+          </div>
+          <h3>毛玻璃 UI</h3>
+          <p>深色优先设计，全局使用背景模糊与微透明效果，打造原生级视觉体验。</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </div>
+          <h3>应用限制 & 目标</h3>
+          <p>为特定应用或分类设置每日使用限额，配置生产力目标并追踪达成进度。</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+          </div>
+          <h3>浏览器使用统计</h3>
+          <p>通过浏览器扩展采集网页访问数据，分析各域名使用时长，与桌面应用数据合并展示。</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </div>
+          <h3>专注模式</h3>
+          <p>一键开启专注时段，屏蔽干扰并记录深度工作时间，提升工作效率。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Quick Start Section -->
+  <section id="quickstart" class="quickstart">
+    <div class="section-container">
+      <div class="section-header">
+        <span class="section-tag">快速开始</span>
+        <h2 class="section-title">5 分钟上手 TimeLens</h2>
+      </div>
+      <div class="code-block">
+        <div class="code-header">
+          <div class="code-dots">
+            <span></span><span></span><span></span>
+          </div>
+          <span class="code-filename">Terminal</span>
+          <button class="code-copy" data-clipboard="# 1. 克隆仓库
+git clone https://github.com/PythonSmall-Q/TimeLens.git
+cd TimeLens
+
+# 2. 安装前端依赖
+npm install
+
+# 3. 启动开发服务器 + Tauri 窗口
+npm run tauri:dev">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            复制
+          </button>
+        </div>
+        <pre><code><span class="code-comment"># 1. 克隆仓库</span>
+<span class="code-keyword">git</span> clone https://github.com/PythonSmall-Q/TimeLens.git
+<span class="code-keyword">cd</span> TimeLens
+
+<span class="code-comment"># 2. 安装前端依赖</span>
+npm install
+
+<span class="code-comment"># 3. 启动开发服务器 + Tauri 窗口</span>
+npm run tauri:dev</code></pre>
+      </div>
+      <div class="quickstart-grid">
+        <div class="quickstart-item">
+          <div class="quickstart-num">1</div>
+          <h4>环境准备</h4>
+          <p>Node.js ≥ 18、Rust ≥ 1.77、Tauri CLI 2.x</p>
+        </div>
+        <div class="quickstart-item">
+          <div class="quickstart-num">2</div>
+          <h4>安装依赖</h4>
+          <p>运行 <code>npm install</code> 安装前端依赖</p>
+        </div>
+        <div class="quickstart-item">
+          <div class="quickstart-num">3</div>
+          <h4>启动开发</h4>
+          <p>运行 <code>npm run tauri:dev</code> 启动</p>
+        </div>
+        <div class="quickstart-item">
+          <div class="quickstart-num">4</div>
+          <h4>生产构建</h4>
+          <p>运行 <code>npm run tauri:build</code> 打包</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Tech Stack Section -->
+  <section class="tech-stack">
+    <div class="section-container">
+      <div class="section-header">
+        <span class="section-tag">技术栈</span>
+        <h2 class="section-title">现代化的桌面应用架构</h2>
+      </div>
+      <div class="tech-grid">
+        <div class="tech-card">
+          <img src="https://tauri.app/img/index/header_dark.svg" alt="Tauri" class="tech-logo" />
+          <h4>Tauri 2.x</h4>
+          <p>Rust 驱动的轻量级桌面壳</p>
+        </div>
+        <div class="tech-card">
+          <svg class="tech-logo" viewBox="0 0 24 24" fill="none"><path fill="#61DAFB" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/></svg>
+          <h4>React 18</h4>
+          <p>TypeScript 5 + Vite 5 构建</p>
+        </div>
+        <div class="tech-card">
+          <svg class="tech-logo" viewBox="0 0 24 24" fill="none"><path fill="#38BDF8" d="M12 6c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6z"/></svg>
+          <h4>Tailwind CSS</h4>
+          <p>毛玻璃效果 + 响应式设计</p>
+        </div>
+        <div class="tech-card">
+          <svg class="tech-logo" viewBox="0 0 24 24" fill="none"><path fill="#F43F5E" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/></svg>
+          <h4>SQLite</h4>
+          <p>rusqlite 嵌入式数据库</p>
+        </div>
+        <div class="tech-card">
+          <svg class="tech-logo" viewBox="0 0 24 24" fill="none"><path fill="#8B5CF6" d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          <h4>Zustand</h4>
+          <p>轻量级状态管理</p>
+        </div>
+        <div class="tech-card">
+          <svg class="tech-logo" viewBox="0 0 24 24" fill="none"><path fill="#22C55E" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/></svg>
+          <h4>Recharts</h4>
+          <p>数据可视化图表库</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Documentation Section -->
+  <section id="docs" class="documentation">
+    <div class="section-container">
+      <div class="section-header">
+        <span class="section-tag">文档中心</span>
+        <h2 class="section-title">深入了解 TimeLens</h2>
+      </div>
+      <div class="doc-grid">
+        <a href="DEVELOPMENT.html" class="doc-card">
+          <div class="doc-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+          </div>
+          <h3>开发指南</h3>
+          <p>完整的环境搭建、架构说明与调试技巧。涵盖前后端开发流程、数据库结构、脚本参考等。</p>
+          <span class="doc-link">阅读更多 →</span>
+        </a>
+        <a href="ARCHITECTURE.html" class="doc-card">
+          <div class="doc-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+          </div>
+          <h3>架构文档</h3>
+          <p>系统整体架构图、模块划分、数据流说明。了解 Monitor 模块、Command 层、前端状态管理等核心设计。</p>
+          <span class="doc-link">阅读更多 →</span>
+        </a>
+        <a href="API_REFERENCE.html" class="doc-card">
+          <div class="doc-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+          </div>
+          <h3>API 参考</h3>
+          <p>Rust Command 接口完整列表、前端服务层封装、类型定义与使用示例。快速查找可用 API。</p>
+          <span class="doc-link">阅读更多 →</span>
+        </a>
+        <a href="WIDGETS_DEV_GUIDE.html" class="doc-card">
+          <div class="doc-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          </div>
+          <h3>小组件开发</h3>
+          <p>第三方小组件开发完整指南。Manifest 格式、渲染接口、权限系统与示例代码。</p>
+          <span class="doc-link">阅读更多 →</span>
+        </a>
+        <a href="ADD_LANGUAGE.html" class="doc-card">
+          <div class="doc-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          </div>
+          <h3>添加语言</h3>
+          <p>为 TimeLens 添加新 UI 语言的详细步骤。涵盖 JSON 翻译、配置注册与测试验证。</p>
+          <span class="doc-link">阅读更多 →</span>
+        </a>
+        <a href="WIDGETS_DEV_GUIDE.zh-CN.html" class="doc-card">
+          <div class="doc-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          </div>
+          <h3>中文小组件指南</h3>
+          <p>小组件开发指南的中文版本，方便国内开发者阅读。包含完整的中文示例与说明。</p>
+          <span class="doc-link">阅读更多 →</span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="footer-container">
+      <div class="footer-brand">
+        <img src="assets/icon.svg" alt="TimeLens" class="footer-icon" />
+        <span>TimeLens</span>
+      </div>
+      <p class="footer-copy">MIT License · Built with Tauri & React</p>
+      <div class="footer-links">
+        <a href="https://github.com/PythonSmall-Q/TimeLens" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/PythonSmall-Q/TimeLens/releases" target="_blank" rel="noopener">Releases</a>
+        <a href="../README.md">README</a>
+        <a href="../CHANGELOG.md">Changelog</a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // Mobile nav toggle
+    const navToggle = document.getElementById('navToggle');
+    const navLinks = document.querySelector('.nav-links');
+    navToggle.addEventListener('click', () => {
+      navLinks.classList.toggle('open');
+    });
+
+    // Smooth scroll for anchor links
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+      anchor.addEventListener('click', function (e) {
+        e.preventDefault();
+        const target = document.querySelector(this.getAttribute('href'));
+        if (target) {
+          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      });
+    });
+
+    // Copy to clipboard
+    document.querySelectorAll('.code-copy').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const text = btn.dataset.clipboard;
+        navigator.clipboard.writeText(text).then(() => {
+          const original = btn.innerHTML;
+          btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>已复制';
+          setTimeout(() => btn.innerHTML = original, 2000);
+        });
+      });
+    });
+
+    // Particle effect (simple stars)
+    const particlesContainer = document.getElementById('particles');
+    for (let i = 0; i < 30; i++) {
+      const p = document.createElement('div');
+      p.className = 'particle';
+      p.style.left = Math.random() * 100 + '%';
+      p.style.top = Math.random() * 100 + '%';
+      p.style.animationDelay = Math.random() * 5 + 's';
+      p.style.animationDuration = (3 + Math.random() * 4) + 's';
+      particlesContainer.appendChild(p);
+    }
+  </script>
+</body>
+</html>

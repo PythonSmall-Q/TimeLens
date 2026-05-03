@@ -171,6 +171,30 @@ pub fn initialize(conn: &Connection) -> Result<()> {
             granted_at      TEXT    NOT NULL,
             PRIMARY KEY (widget_id, permission)
         );
+
+        CREATE TABLE IF NOT EXISTS vscode_sessions (
+            session_id       TEXT PRIMARY KEY,
+            date             TEXT    NOT NULL,
+            started_at       TEXT    NOT NULL,
+            ended_at         TEXT    NOT NULL,
+            duration_seconds INTEGER NOT NULL DEFAULT 0,
+            project_name     TEXT    NOT NULL DEFAULT '',
+            project_path     TEXT    NOT NULL DEFAULT '',
+            synced_at        TEXT    NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_vscode_sessions_date ON vscode_sessions(date);
+        CREATE INDEX IF NOT EXISTS idx_vscode_sessions_project_path ON vscode_sessions(project_path);
+
+        CREATE TABLE IF NOT EXISTS vscode_session_languages (
+            session_id       TEXT    NOT NULL,
+            language         TEXT    NOT NULL,
+            duration_seconds INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (session_id, language),
+            FOREIGN KEY (session_id) REFERENCES vscode_sessions(session_id) ON DELETE CASCADE
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_vscode_session_languages_language ON vscode_session_languages(language);
         ",
     )?;
 
@@ -215,7 +239,7 @@ pub fn initialize(conn: &Connection) -> Result<()> {
         [],
     )?;
 
-    set_setting(conn, "schema_version", "2")?;
+    set_setting(conn, "schema_version", "3")?;
 
     Ok(())
 }
@@ -1017,6 +1041,116 @@ pub fn get_recent_browser_sessions(
 
 pub fn count_browser_sessions(conn: &Connection) -> Result<i64> {
     conn.query_row("SELECT COUNT(1) FROM browser_sessions", [], |row| row.get(0))
+}
+
+pub fn upsert_vscode_session(conn: &Connection, session: &crate::models::VsCodeSession) -> Result<()> {
+    let tx = conn.unchecked_transaction()?;
+    tx.execute(
+        "INSERT INTO vscode_sessions
+         (session_id, date, started_at, ended_at, duration_seconds, project_name, project_path, synced_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+         ON CONFLICT(session_id) DO UPDATE SET
+            date = excluded.date,
+            started_at = excluded.started_at,
+            ended_at = excluded.ended_at,
+            duration_seconds = excluded.duration_seconds,
+            project_name = excluded.project_name,
+            project_path = excluded.project_path,
+            synced_at = excluded.synced_at",
+        params![
+            session.session_id,
+            session.date,
+            session.started_at,
+            session.ended_at,
+            session.duration_seconds,
+            session.project_name,
+            session.project_path,
+            session.synced_at,
+        ],
+    )?;
+
+    tx.execute(
+        "DELETE FROM vscode_session_languages WHERE session_id = ?1",
+        params![session.session_id],
+    )?;
+
+    for item in &session.language_durations {
+        tx.execute(
+            "INSERT INTO vscode_session_languages (session_id, language, duration_seconds)
+             VALUES (?1, ?2, ?3)",
+            params![session.session_id, item.language, item.seconds.max(0)],
+        )?;
+    }
+
+    tx.commit()?;
+    Ok(())
+}
+
+pub fn get_vscode_stats_in_range(
+    conn: &Connection,
+    start_date: &str,
+    end_date: &str,
+) -> Result<crate::models::VsCodeStatsSummary> {
+    let (total_seconds, session_count): (i64, i64) = conn.query_row(
+        "SELECT COALESCE(SUM(duration_seconds), 0), COUNT(1)
+         FROM vscode_sessions
+         WHERE date >= ?1 AND date <= ?2",
+        params![start_date, end_date],
+        |row| Ok((row.get(0)?, row.get(1)?)),
+    )?;
+
+    Ok(crate::models::VsCodeStatsSummary {
+        total_seconds,
+        session_count,
+    })
+}
+
+pub fn get_vscode_language_stats_in_range(
+    conn: &Connection,
+    start_date: &str,
+    end_date: &str,
+) -> Result<Vec<crate::models::VsCodeLanguageStats>> {
+    let mut stmt = conn.prepare(
+        "SELECT l.language, COALESCE(SUM(l.duration_seconds), 0) as total_seconds
+         FROM vscode_session_languages l
+         INNER JOIN vscode_sessions s ON s.session_id = l.session_id
+         WHERE s.date >= ?1 AND s.date <= ?2
+         GROUP BY l.language
+         ORDER BY total_seconds DESC",
+    )?;
+    let rows = stmt.query_map(params![start_date, end_date], |row| {
+        Ok(crate::models::VsCodeLanguageStats {
+            language: row.get(0)?,
+            total_seconds: row.get(1)?,
+        })
+    })?;
+    rows.collect()
+}
+
+pub fn get_vscode_project_stats_in_range(
+    conn: &Connection,
+    start_date: &str,
+    end_date: &str,
+) -> Result<Vec<crate::models::VsCodeProjectStats>> {
+    let mut stmt = conn.prepare(
+        "SELECT project_name,
+                project_path,
+                COALESCE(SUM(duration_seconds), 0) as total_seconds,
+                COUNT(1) as session_count
+         FROM vscode_sessions
+         WHERE date >= ?1 AND date <= ?2
+         GROUP BY project_name, project_path
+         ORDER BY total_seconds DESC",
+    )?;
+    let rows = stmt.query_map(params![start_date, end_date], |row| {
+        Ok(crate::models::VsCodeProjectStats {
+            project_name: row.get(0)?,
+            project_path: row.get(1)?,
+            total_seconds: row.get(2)?,
+            session_count: row.get(3)?,
+        })
+    })?;
+    rows.collect()
 }
 
 /// Aggregate per-domain statistics for a date range, excluding ignored domains.

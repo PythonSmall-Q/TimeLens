@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>API 参考 · TimeLens 文档</title>
+  <link rel="icon" type="image/png" href="assets/icon.png" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="nav-container">
+      <a href="index.html" class="nav-brand">
+        <img src="assets/icon.svg" alt="TimeLens" class="nav-icon" />
+        <span class="nav-title">TimeLens</span>
+      </a>
+      <div class="nav-links">
+        <a href="index.html#features" class="nav-link">功能</a>
+        <a href="index.html#quickstart" class="nav-link">快速开始</a>
+        <a href="index.html#docs" class="nav-link">文档</a>
+        <a href="https://github.com/PythonSmall-Q/TimeLens" class="nav-link" target="_blank" rel="noopener">
+          <svg class="github-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+          GitHub
+        </a>
+      </div>
+      <button class="nav-toggle" id="navToggle" aria-label="切换导航"><span></span><span></span><span></span></button>
+    </div>
+  </nav>
+
+  <div class="content-wrapper">
+    <aside class="sidebar">
+      <ul class="sidebar-nav">
+        <li><a href="index.html">← 返回首页</a></li>
+        <li><a href="DEVELOPMENT.html">开发指南</a></li>
+        <li><a href="ARCHITECTURE.html">架构文档</a></li>
+        <li><a href="WIDGETS_DEV_GUIDE.html">小组件开发</a></li>
+        <li><a href="ADD_LANGUAGE.html">添加语言</a></li>
+        <li><a href="WIDGETS_DEV_GUIDE.zh-CN.html">中文小组件指南</a></li>
+      </ul>
+    </aside>
+
+    <main class="content-main">
+      <nav class="breadcrumb">
+        <a href="index.html">文档首页</a>
+        <span>/</span>
+        <span>API 参考</span>
+      </nav>
+
+      <h1>API 参考</h1>
+      <p>TimeLens 前后端通过 Tauri IPC 通信。本文档列出所有可用的 Rust Command 接口，以及前端 <code>tauriApi.ts</code> 中的对应封装。</p>
+
+      <hr />
+
+      <h2 id="monitor">监控 (Monitor)</h2>
+      <table>
+        <thead>
+          <tr><th>Command</th><th>参数</th><th>返回</th><th>说明</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>get_monitor_status</code></td>
+            <td>—</td>
+            <td><code>MonitorStatus</code></td>
+            <td>获取当前监控状态（是否活跃、当前应用名）</td>
+          </tr>
+          <tr>
+            <td><code>set_monitoring_active</code></td>
+            <td><code>active: boolean</code></td>
+            <td><code>void</code></td>
+            <td>暂停或恢复屏幕时间追踪</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>事件监听</h3>
+      <pre><code>import { listen } from "@tauri-apps/api/event";
+
+const unlisten = await listen("active-window-changed", (event) => {
+  console.log("前台窗口变更:", event.payload);
+});
+
+<span class="code-comment">// 组件卸载时取消监听</span>
+unlisten();</code></pre>
+
+      <h2 id="screen-time">屏幕时间统计</h2>
+      <table>
+        <thead>
+          <tr><th>Command</th><th>参数</th><th>返回</th><th>说明</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>get_today_app_totals</code></td><td>—</td><td><code>AppUsageSummary[]</code></td><td>今日各应用总使用时长</td></tr>
+          <tr><td><code>get_app_totals_for_date</code></td><td><code>date: string</code></td><td><code>AppUsageSummary[]</code></td><td>指定日期各应用总时长</td></tr>
+          <tr><td><code>get_app_totals_in_range</code></td><td><code>startDate, endDate</code></td><td><code>AppUsageSummary[]</code></td><td>日期范围内各应用总时长</td></tr>
+          <tr><td><code>get_app_comparison_in_ranges</code></td><td><code>currentStart, currentEnd, previousStart, previousEnd</code></td><td><code>AppUsageComparison[]</code></td><td>两段时间范围对比数据</td></tr>
+          <tr><td><code>get_today_hourly</code></td><td>—</td><td><code>HourlyDistribution[]</code></td><td>今日 0-23 点每小时使用时长</td></tr>
+          <tr><td><code>get_hourly_distribution_for_date</code></td><td><code>date: string</code></td><td><code>HourlyDistribution[]</code></td><td>指定日期的小时分布</td></tr>
+          <tr><td><code>get_recent_daily_totals</code></td><td><code>days: number</code></td><td><code>DailyUsage[]</code></td><td>最近 N 天每日总时长</td></tr>
+          <tr><td><code>get_recent_daily_totals_range</code></td><td><code>startDate, endDate</code></td><td><code>DailyUsage[]</code></td><td>指定日期范围每日总时长</td></tr>
+          <tr><td><code>get_app_usage_page</code></td><td><code>startDate?, endDate?, limit, offset</code></td><td><code>AppUsagePage</code></td><td>分页查询原始使用记录</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="category">分类管理</h2>
+      <table>
+        <thead>
+          <tr><th>Command</th><th>参数</th><th>返回</th><th>说明</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>get_app_categories</code></td><td>—</td><td><code>AppCategoryRule[]</code></td><td>所有应用分类规则</td></tr>
+          <tr><td><code>upsert_app_category</code></td><td><code>appName, exePath, category, source</code></td><td><code>void</code></td><td>添加或更新分类规则</td></tr>
+          <tr><td><code>remove_app_category</code></td><td><code>exePath: string</code></td><td><code>void</code></td><td>删除某应用的分类规则</td></tr>
+          <tr><td><code>suggest_category_for_app</code></td><td><code>appName, exePath</code></td><td><code>CategorySuggestion</code></td><td>AI 智能推荐应用分类</td></tr>
+          <tr><td><code>get_category_totals_in_range</code></td><td><code>startDate, endDate</code></td><td><code>CategoryUsageSummary[]</code></td><td>日期范围内各分类总时长</td></tr>
+          <tr><td><code>get_category_daily_totals_in_range</code></td><td><code>startDate, endDate</code></td><td><code>CategoryDailyUsage[]</code></td><td>日期范围内每日各分类时长</td></tr>
+          <tr><td><code>get_app_category_map</code></td><td>—</td><td><code>Record<string, string></code></td><td>exe_path → category 映射表</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="goals">目标与限额</h2>
+      <table>
+        <thead>
+          <tr><th>Command</th><th>参数</th><th>返回</th><th>说明</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>get_usage_goals</code></td><td>—</td><td><code>UsageGoal[]</code></td><td>所有使用目标</td></tr>
+          <tr><td><code>save_usage_goal</code></td><td><code>goal: UsageGoal</code></td><td><code>UsageGoal</code></td><td>保存目标（新增或更新）</td></tr>
+          <tr><td><code>remove_usage_goal</code></td><td><code>id: number</code></td><td><code>void</code></td><td>删除目标</td></tr>
+          <tr><td><code>get_goal_progress</code></td><td><code>weekStartDay?: number</code></td><td><code>GoalProgress[]</code></td><td>各目标当前进度</td></tr>
+          <tr><td><code>get_ignored_apps</code></td><td>—</td><td><code>string[]</code></td><td>被忽略的应用列表</td></tr>
+          <tr><td><code>set_ignored_apps</code></td><td><code>exePaths: string[]</code></td><td><code>void</code></td><td>设置忽略应用列表</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="focus">专注模式</h2>
+      <table>
+        <thead>
+          <tr><th>Command</th><th>参数</th><th>返回</th><th>说明</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>set_focus_mode_active</code></td><td><code>active: boolean</code></td><td><code>void</code></td><td>开启/关闭专注模式</td></tr>
+          <tr><td><code>get_focus_mode_active</code></td><td>—</td><td><code>boolean</code></td><td>专注模式是否开启</td></tr>
+          <tr><td><code>start_focus_session</code></td><td><code>reason?: string, triggerType?: "manual" | "rule"</code></td><td><code>number</code></td><td>开始专注会话，返回 session ID</td></tr>
+          <tr><td><code>stop_focus_session</code></td><td><code>id: number</code></td><td><code>void</code></td><td>结束指定专注会话</td></tr>
+          <tr><td><code>list_focus_sessions</code></td><td><code>startAt?, endAt?</code></td><td><code>FocusSession[]</code></td><td>查询专注会话历史</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="widgets">小组件管理</h2>
+      <table>
+        <thead>
+          <tr><th>Command</th><th>参数</th><th>返回</th><th>说明</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>get_widget_registry</code></td><td>—</td><td><code>WidgetRegistryResponse</code></td><td>获取所有可用小组件列表</td></tr>
+          <tr><td><code>create_widget</code></td><td><code>widgetType: string</code></td><td><code>WidgetConfig</code></td><td>创建小组件窗口</td></tr>
+          <tr><td><code>open_widget</code></td><td><code>config: WidgetConfig</code></td><td><code>void</code></td><td>根据配置打开已有小组件</td></tr>
+          <tr><td><code>close_widget</code></td><td><code>id: string</code></td><td><code>void</code></td><td>关闭小组件窗口</td></tr>
+          <tr><td><code>set_widget_always_on_top</code></td><td><code>id: string, mode: string</code></td><td><code>void</code></td><td>设置置顶模式</td></tr>
+          <tr><td><code>get_all_widgets</code></td><td>—</td><td><code>WidgetConfig[]</code></td><td>获取所有已保存的小组件配置</td></tr>
+          <tr><td><code>save_widget_config</code></td><td><code>config: WidgetConfig</code></td><td><code>void</code></td><td>保存小组件配置到数据库</td></tr>
+          <tr><td><code>remove_widget_config</code></td><td><code>id: string</code></td><td><code>void</code></td><td>删除小组件配置</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="todos">待办事项</h2>
+      <table>
+        <thead>
+          <tr><th>Command</th><th>参数</th><th>返回</th><th>说明</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>get_todos</code></td><td>—</td><td><code>TodoItem[]</code></td><td>所有待办事项</td></tr>
+          <tr><td><code>add_todo</code></td><td><code>content: string</code></td><td><code>TodoItem</code></td><td>添加待办</td></tr>
+          <tr><td><code>toggle_todo</code></td><td><code>id: number</code></td><td><code>void</code></td><td>切换完成状态</td></tr>
+          <tr><td><code>delete_todo</code></td><td><code>id: number</code></td><td><code>void</code></td><td>删除待办</td></tr>
+          <tr><td><code>reorder_todos</code></td><td><code>orderedIds: number[]</code></td><td><code>void</code></td><td>批量排序</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="browser">浏览器扩展</h2>
+      <table>
+        <thead>
+          <tr><th>Command</th><th>参数</th><th>返回</th><th>说明</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>get_browser_extension_status</code></td><td>—</td><td><code>BrowserExtensionStatus</code></td><td>扩展连接状态</td></tr>
+          <tr><td><code>set_browser_extension_enabled</code></td><td><code>enabled: boolean</code></td><td><code>void</code></td><td>启用/禁用扩展</td></tr>
+          <tr><td><code>get_browser_domain_stats</code></td><td><code>startDate?, endDate?</code></td><td><code>BrowserDomainStats[]</code></td><td>域名使用统计</td></tr>
+          <tr><td><code>get_browser_ignored_domains</code></td><td>—</td><td><code>string[]</code></td><td>忽略的域名列表</td></tr>
+          <tr><td><code>set_browser_ignored_domains</code></td><td><code>hosts: string[]</code></td><td><code>void</code></td><td>设置忽略域名</td></tr>
+          <tr><td><code>get_browser_domain_limits</code></td><td>—</td><td><code>BrowserDomainLimit[]</code></td><td>域名限额列表</td></tr>
+          <tr><td><code>save_browser_domain_limit</code></td><td><code>host, dailyLimitSeconds, enabled</code></td><td><code>void</code></td><td>保存域名限额</td></tr>
+          <tr><td><code>remove_browser_domain_limit</code></td><td><code>host: string</code></td><td><code>void</code></td><td>删除域名限额</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="settings">应用设置</h2>
+      <table>
+        <thead>
+          <tr><th>Command</th><th>参数</th><th>返回</th><th>说明</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>get_app_settings</code></td><td>—</td><td><code>AppSettingsPayload</code></td><td>所有应用设置</td></tr>
+          <tr><td><code>set_launch_at_startup</code></td><td><code>enabled: boolean</code></td><td><code>void</code></td><td>开机自启动</td></tr>
+          <tr><td><code>set_silent_startup</code></td><td><code>enabled: boolean</code></td><td><code>void</code></td><td>静默启动（最小化到托盘）</td></tr>
+          <tr><td><code>set_auto_open_widgets</code></td><td><code>enabled: boolean</code></td><td><code>void</code></td><td>启动时自动打开小组件</td></tr>
+          <tr><td><code>set_ignore_system_processes</code></td><td><code>enabled: boolean</code></td><td><code>void</code></td><td>忽略系统进程</td></tr>
+          <tr><td><code>set_idle_time_policy</code></td><td><code>policy: "count" | "exclude"</code></td><td><code>void</code></td><td>空闲时间处理策略</td></tr>
+          <tr><td><code>set_track_window_titles</code></td><td><code>enabled: boolean</code></td><td><code>void</code></td><td>是否记录窗口标题</td></tr>
+          <tr><td><code>set_shortcuts</code></td><td><code>shortcuts: ShortcutSettings</code></td><td><code>void</code></td><td>全局快捷键设置</td></tr>
+          <tr><td><code>get_install_channel_info</code></td><td>—</td><td><code>InstallChannelInfo</code></td><td>安装渠道信息</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="productivity">生产力分析</h2>
+      <table>
+        <thead>
+          <tr><th>Command</th><th>参数</th><th>返回</th><th>说明</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>get_productivity_score</code></td><td><code>date: string</code></td><td><code>ProductivityScore</code></td><td>指定日期的生产力评分</td></tr>
+          <tr><td><code>get_productivity_score_range</code></td><td><code>startDate, endDate</code></td><td><code>ProductivityScore[]</code></td><td>日期范围内的评分列表</td></tr>
+          <tr><td><code>get_interruption_periods</code></td><td><code>date: string</code></td><td><code>InterruptionPeriod[]</code></td><td>每小时的中断次数和碎片化评分</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="data-export">数据导入导出</h2>
+      <table>
+        <thead>
+          <tr><th>Command</th><th>参数</th><th>返回</th><th>说明</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>export_data_csv</code></td><td>—</td><td><code>string</code></td><td>导出所有数据为 CSV 字符串</td></tr>
+          <tr><td><code>export_data_json</code></td><td>—</td><td><code>string</code></td><td>导出所有数据为 JSON 字符串</td></tr>
+          <tr><td><code>import_data_json</code></td><td><code>payload: string</code></td><td><code>void</code></td><td>导入 JSON 数据</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="notifications">系统通知</h2>
+      <table>
+        <thead>
+          <tr><th>Command</th><th>参数</th><th>返回</th><th>说明</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>send_native_notification</code></td><td><code>title: string, body: string, alarm?: boolean</code></td><td><code>void</code></td><td>发送系统原生通知</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="types">核心类型定义</h2>
+      <p>所有类型定义位于 <code>src/types/index.ts</code>，以下是常用类型：</p>
+
+      <h3>MonitorStatus</h3>
+      <pre><code>interface MonitorStatus {
+  active: boolean;           // 监控是否运行中
+  current_app: string;       // 当前前台应用名
+  current_exe_path: string;  // 当前应用可执行文件路径
+  current_title: string;     // 当前窗口标题
+}</code></pre>
+
+      <h3>AppUsageSummary</h3>
+      <pre><code>interface AppUsageSummary {
+  app_name: string;      // 应用名称
+  exe_path: string;      // 可执行文件路径
+  total_seconds: number; // 总使用秒数
+}</code></pre>
+
+      <h3>WidgetConfig</h3>
+      <pre><code>interface WidgetConfig {
+  id: string;
+  widget_type: string;
+  monitor_index: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  opacity: number;
+  always_on_top_mode: "always" | "focus" | "never";
+  pinned: boolean;
+  start_on_launch: boolean;
+}</code></pre>
+
+      <h3>UsageGoal</h3>
+      <pre><code>interface UsageGoal {
+  id?: number;
+  scope_type: "category" | "app";      // 目标范围：分类 或 单个应用
+  scope_value: string;                  // 分类名或应用名
+  period: "daily" | "weekly";           // 统计周期
+  operator: "at_least" | "at_most";     // 约束类型
+  target_seconds: number;               // 目标秒数
+  enabled: boolean;
+}</code></pre>
+
+      <h3>AppSettingsPayload</h3>
+      <pre><code>interface AppSettingsPayload {
+  launch_at_startup: boolean;
+  silent_startup: boolean;
+  auto_open_widgets: boolean;
+  ignore_system_processes: boolean;
+  idle_time_policy: "count" | "exclude";
+  track_window_titles: boolean;
+  browser_extension_enabled: boolean;
+  shortcuts: ShortcutSettings;
+}</code></pre>
+
+      <h2 id="frontend-usage">前端调用示例</h2>
+      <pre><code>import * as api from "@/services/tauriApi";
+
+<span class="code-comment">// 获取今日应用排行</span>
+const todayStats = await api.getTodayAppTotals();
+
+<span class="code-comment">// 暂停监控</span>
+await api.setMonitoringActive(false);
+
+<span class="code-comment">// 创建时钟小组件</span>
+const config = await api.createWidget("clock");
+
+<span class="code-comment">// 监听窗口切换事件</span>
+const unlisten = await api.onActiveWindowChanged((info) => {
+  console.log(info.app_name, info.window_title);
+});
+
+<span class="code-comment">// 保存设置</span>
+await api.setLaunchAtStartup(true);</code></pre>
+
+      <hr />
+      <p style="color: var(--text-muted); font-size: 0.85rem;">最后更新：2025-05-03 · TimeLens v1.1.0</p>
+    </main>
+  </div>
+
+  <script>
+    const navToggle = document.getElementById('navToggle');
+    const navLinks = document.querySelector('.nav-links');
+    navToggle.addEventListener('click', () => navLinks.classList.toggle('open'));
+  </script>
+</body>
+</html>

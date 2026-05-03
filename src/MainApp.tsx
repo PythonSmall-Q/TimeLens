@@ -15,6 +15,7 @@ import Goals from "./pages/Goals";
 import FocusMode from "./pages/FocusMode";
 import BrowserUsage from "./pages/BrowserUsage";
 import HomeCustomize from "./pages/HomeCustomize";
+import VsCodeInsights from "./pages/VsCodeInsights";
 import { useStatsStore } from "./stores/statsStore";
 import { useSettingsStore } from "./stores/settingsStore";
 import type { ActiveWindowInfo, AppLimit } from "./types";
@@ -331,6 +332,7 @@ export default function MainApp() {
         <Routes>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/vscode" element={<VsCodeInsights />} />
           <Route path="/dashboard-customize" element={<HomeCustomize />} />
           <Route path="/widgets" element={<WidgetCenter />} />
           <Route path="/settings" element={<Settings />} />

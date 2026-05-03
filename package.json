@@ -13,7 +13,12 @@
     "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "format": "prettier --write \"src/**/*.{ts,tsx,css}\""
+    "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
+    "ext:install": "npm --prefix vscode-extension install",
+    "ext:build": "npm --prefix vscode-extension run build",
+    "ext:watch": "npm --prefix vscode-extension run watch",
+    "ext:package": "npm --prefix vscode-extension run package",
+    "ext:package:pre": "npm --prefix vscode-extension run package:pre"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.1.0",

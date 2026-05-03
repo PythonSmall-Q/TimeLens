@@ -22,7 +22,7 @@ use tower_http::cors::{Any, CorsLayer};
 
 use crate::db;
 use crate::monitor::SharedMonitorStatus;
-use crate::models::BrowserSession;
+use crate::models::{BrowserSession, VsCodeLanguageDuration, VsCodeSession};
 
 /// Shared state threaded through axum handlers.
 #[derive(Clone)]
@@ -63,6 +63,35 @@ struct BrowserSessionInput {
     ended_at: String,
     duration_seconds: i64,
     locale: String,
+}
+
+#[derive(Deserialize)]
+struct VsCodeLanguageDurationInput {
+    language: String,
+    seconds: i64,
+}
+
+#[derive(Deserialize)]
+struct VsCodeSessionInput {
+    session_id: String,
+    started_at: String,
+    ended_at: String,
+    duration_seconds: i64,
+    project_name: Option<String>,
+    project_path: Option<String>,
+    language_durations: Option<Vec<VsCodeLanguageDurationInput>>,
+}
+
+#[derive(Deserialize)]
+struct TrackingEnabledInput {
+    enabled: bool,
+    tracking_level: Option<String>,
+}
+
+#[derive(Serialize)]
+struct TrackingEnabledResponse {
+    enabled: bool,
+    tracking_level: String,
 }
 
 async fn get_today(State(s): State<ApiState>) -> impl IntoResponse {
@@ -174,6 +203,154 @@ async fn post_browser_session(
     axum::http::StatusCode::NO_CONTENT
 }
 
+async fn post_vscode_session(
+    State(s): State<ApiState>,
+    Json(payload): Json<VsCodeSessionInput>,
+) -> impl IntoResponse {
+    let Ok(conn) = s.db.lock() else {
+        return axum::http::StatusCode::INTERNAL_SERVER_ERROR;
+    };
+
+    let enabled = db::get_bool_setting(&conn, "vscode_tracking_enabled", true).unwrap_or(true);
+    if !enabled {
+        return axum::http::StatusCode::FORBIDDEN;
+    }
+
+    if payload.session_id.trim().is_empty() {
+        return axum::http::StatusCode::BAD_REQUEST;
+    }
+
+    let date = chrono::DateTime::parse_from_rfc3339(&payload.started_at)
+        .map(|dt| dt.format("%Y-%m-%d").to_string())
+        .unwrap_or_else(|_| chrono::Local::now().format("%Y-%m-%d").to_string());
+
+    let session = VsCodeSession {
+        session_id: payload.session_id,
+        date,
+        started_at: payload.started_at,
+        ended_at: payload.ended_at,
+        duration_seconds: payload.duration_seconds.max(0),
+        project_name: payload.project_name.unwrap_or_default(),
+        project_path: payload.project_path.unwrap_or_default(),
+        synced_at: chrono::Local::now().to_rfc3339(),
+        language_durations: payload
+            .language_durations
+            .unwrap_or_default()
+            .into_iter()
+            .map(|item| VsCodeLanguageDuration {
+                language: item.language,
+                seconds: item.seconds.max(0),
+            })
+            .collect(),
+    };
+
+    if db::upsert_vscode_session(&conn, &session).is_err() {
+        return axum::http::StatusCode::INTERNAL_SERVER_ERROR;
+    }
+
+    axum::http::StatusCode::NO_CONTENT
+}
+
+async fn get_vscode_stats_today(State(s): State<ApiState>) -> impl IntoResponse {
+    let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+    match s.db.lock() {
+        Ok(conn) => {
+            let stats = db::get_vscode_stats_in_range(&conn, &today, &today).unwrap_or(crate::models::VsCodeStatsSummary {
+                total_seconds: 0,
+                session_count: 0,
+            });
+            Json(stats).into_response()
+        }
+        Err(_) => axum::http::StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    }
+}
+
+async fn get_vscode_stats_range(
+    State(s): State<ApiState>,
+    Query(p): Query<RangeParams>,
+) -> impl IntoResponse {
+    let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+    let start = p.start.as_deref().unwrap_or(&today).to_string();
+    let end = p.end.as_deref().unwrap_or(&today).to_string();
+    match s.db.lock() {
+        Ok(conn) => {
+            let stats = db::get_vscode_stats_in_range(&conn, &start, &end).unwrap_or(crate::models::VsCodeStatsSummary {
+                total_seconds: 0,
+                session_count: 0,
+            });
+            Json(stats).into_response()
+        }
+        Err(_) => axum::http::StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    }
+}
+
+async fn get_vscode_language_stats_range(
+    State(s): State<ApiState>,
+    Query(p): Query<RangeParams>,
+) -> impl IntoResponse {
+    let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+    let start = p.start.as_deref().unwrap_or(&today).to_string();
+    let end = p.end.as_deref().unwrap_or(&today).to_string();
+    match s.db.lock() {
+        Ok(conn) => {
+            let rows = db::get_vscode_language_stats_in_range(&conn, &start, &end).unwrap_or_default();
+            Json(rows).into_response()
+        }
+        Err(_) => axum::http::StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    }
+}
+
+async fn get_vscode_project_stats_range(
+    State(s): State<ApiState>,
+    Query(p): Query<RangeParams>,
+) -> impl IntoResponse {
+    let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+    let start = p.start.as_deref().unwrap_or(&today).to_string();
+    let end = p.end.as_deref().unwrap_or(&today).to_string();
+    match s.db.lock() {
+        Ok(conn) => {
+            let rows = db::get_vscode_project_stats_in_range(&conn, &start, &end).unwrap_or_default();
+            Json(rows).into_response()
+        }
+        Err(_) => axum::http::StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    }
+}
+
+async fn set_vscode_tracking_enabled(
+    State(s): State<ApiState>,
+    Json(payload): Json<TrackingEnabledInput>,
+) -> impl IntoResponse {
+    let Ok(conn) = s.db.lock() else {
+        return axum::http::StatusCode::INTERNAL_SERVER_ERROR;
+    };
+
+    if db::set_bool_setting(&conn, "vscode_tracking_enabled", payload.enabled).is_err() {
+        return axum::http::StatusCode::INTERNAL_SERVER_ERROR;
+    }
+
+    if let Some(level) = &payload.tracking_level {
+        if matches!(level.as_str(), "basic" | "standard" | "detailed") {
+            let _ = db::set_setting(&conn, "vscode_tracking_level", level);
+        }
+    }
+
+    axum::http::StatusCode::NO_CONTENT
+}
+
+async fn get_vscode_tracking_enabled(State(s): State<ApiState>) -> impl IntoResponse {
+    match s.db.lock() {
+        Ok(conn) => {
+            let enabled = db::get_bool_setting(&conn, "vscode_tracking_enabled", true).unwrap_or(true);
+            let tracking_level = db::get_setting(&conn, "vscode_tracking_level")
+                .ok()
+                .flatten()
+                .unwrap_or_else(|| "standard".to_string());
+            Json(TrackingEnabledResponse { enabled, tracking_level }).into_response()
+        }
+        Err(_) => axum::http::StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    }
+}
+
 async fn ws_handler(
     ws: WebSocketUpgrade,
     State(s): State<ApiState>,
@@ -223,6 +400,13 @@ pub fn start_api_server(
         .route("/api/status", get(get_status))
         .route("/api/browser/link", get(get_browser_link))
         .route("/api/browser/session", post(post_browser_session))
+        .route("/api/vscode/sessions", post(post_vscode_session))
+        .route("/api/vscode/stats/today", get(get_vscode_stats_today))
+        .route("/api/vscode/stats/range", get(get_vscode_stats_range))
+        .route("/api/vscode/languages/range", get(get_vscode_language_stats_range))
+        .route("/api/vscode/projects/range", get(get_vscode_project_stats_range))
+        .route("/api/vscode/enabled", get(get_vscode_tracking_enabled))
+        .route("/api/vscode/enabled", post(set_vscode_tracking_enabled))
         .route("/ws/active-window", get(ws_handler))
         .layer(cors)
         .with_state(state);

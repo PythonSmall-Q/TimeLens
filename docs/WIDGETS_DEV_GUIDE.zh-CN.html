@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>小组件开发指南（中文） · TimeLens 文档</title>
+  <link rel="icon" type="image/png" href="assets/icon.png" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="nav-container">
+      <a href="index.html" class="nav-brand">
+        <img src="assets/icon.svg" alt="TimeLens" class="nav-icon" />
+        <span class="nav-title">TimeLens</span>
+      </a>
+      <div class="nav-links">
+        <a href="index.html#features" class="nav-link">功能</a>
+        <a href="index.html#quickstart" class="nav-link">快速开始</a>
+        <a href="index.html#docs" class="nav-link">文档</a>
+        <a href="https://github.com/PythonSmall-Q/TimeLens" class="nav-link" target="_blank" rel="noopener">
+          <svg class="github-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+          GitHub
+        </a>
+      </div>
+      <button class="nav-toggle" id="navToggle" aria-label="切换导航"><span></span><span></span><span></span></button>
+    </div>
+  </nav>
+
+  <div class="content-wrapper">
+    <aside class="sidebar">
+      <ul class="sidebar-nav">
+        <li><a href="index.html">← 返回首页</a></li>
+        <li><a href="DEVELOPMENT.html">开发指南</a></li>
+        <li><a href="ARCHITECTURE.html">架构文档</a></li>
+        <li><a href="API_REFERENCE.html">API 参考</a></li>
+        <li><a href="WIDGETS_DEV_GUIDE.html">小组件开发（英文）</a></li>
+        <li><a href="ADD_LANGUAGE.html">添加语言</a></li>
+      </ul>
+    </aside>
+
+    <main class="content-main">
+      <nav class="breadcrumb">
+        <a href="index.html">文档首页</a>
+        <span>/</span>
+        <span>小组件开发指南（中文）</span>
+      </nav>
+
+      <h1>TimeLens 第三方小组件开发指南</h1>
+      <p>本文档介绍如何为 TimeLens v1.1.0 开发第三方 JavaScript 小组件。通过简单的 <code>manifest.json</code> + JS 入口文件，即可创建功能丰富的桌面悬浮组件。</p>
+
+      <hr />
+
+      <h2 id="scope">功能范围（v1.1.0）</h2>
+      <p><strong>当前支持：</strong></p>
+      <ul>
+        <li>本地目录加载（<code>manifest.json</code> + JS 入口文件）</li>
+        <li>运行时从应用数据目录 <code>widgets</code> 自动发现</li>
+        <li>渲染契约：<code>createWidget()</code> 工厂函数 或 <code>mount()</code> 直接导出</li>
+        <li>只读数据 API（屏幕时间、活跃窗口、目标进度等）</li>
+        <li>基于权限的访问控制</li>
+      </ul>
+
+      <p><strong>尚未支持：</strong></p>
+      <ul>
+        <li>远程应用商店 / 云端分发</li>
+        <li>代码签名验证</li>
+        <li>自动更新机制</li>
+      </ul>
+
+      <h2 id="directory">目录结构</h2>
+      <p>每个第三方小组件在应用数据目录的 <code>widgets</code> 文件夹下拥有独立目录：</p>
+
+      <pre><code>%APPDATA%\com.timelens.app\widgets\
+  my-widget/
+    manifest.json       <span class="code-comment">← 小组件描述文件</span>
+    index.js            <span class="code-comment">← 入口 JS（ESM 模块）</span>
+    assets/
+      icon.png          <span class="code-comment">← 可选：小组件图标</span>
+      styles.css        <span class="code-comment">← 可选：样式文件</span></code></pre>
+
+      <h2 id="manifest">manifest.json 详解</h2>
+      <p>清单文件向 TimeLens 注册表描述你的小组件。以下是完整示例：</p>
+
+      <pre><code>{
+  "widget_type": "my_awesome_widget",
+  "name": "我的超棒小组件",
+  "description": "这是一个演示用途的第三方小组件",
+  "version": "1.0.0",
+  "author": "你的名字 <email@example.com>",
+  "entry": "index.js",
+  "icon": "assets/icon.png",
+  "default_size": {
+    "width": 360,
+    "height": 240
+  },
+  "permissions": [
+    "screen-time:read",
+    "active-window:subscribe",
+    "goals:read"
+  ]
+}</code></pre>
+
+      <h3>必填字段</h3>
+      <table>
+        <thead>
+          <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>widget_type</code></td><td>string</td><td>唯一标识符，仅允许 <code>a-zA-Z0-9_-</code></td></tr>
+          <tr><td><code>name</code></td><td>string</td><td>在小组件中心显示的名称</td></tr>
+          <tr><td><code>entry</code></td><td>string</td><td>入口 JS 文件路径（相对于 manifest 所在目录）</td></tr>
+        </tbody>
+      </table>
+
+      <h3>可选字段</h3>
+      <table>
+        <thead>
+          <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>description</code></td><td>string</td><td>简短描述</td></tr>
+          <tr><td><code>version</code></td><td>string</td><td>语义化版本号</td></tr>
+          <tr><td><code>author</code></td><td>string</td><td>作者名或邮箱</td></tr>
+          <tr><td><code>icon</code></td><td>string</td><td>图标路径（相对路径）</td></tr>
+          <tr><td><code>default_size.width</code></td><td>number</td><td>默认窗口宽度（像素）</td></tr>
+          <tr><td><code>default_size.height</code></td><td>number</td><td>默认窗口高度（像素）</td></tr>
+          <tr><td><code>permissions</code></td><td>string[]</td><td>所需权限列表</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="permissions">权限系统</h2>
+      <p>第三方小组件在沙箱 iframe 中运行，必须在 manifest 中声明所需权限。用户首次创建小组件时会被提示授权。</p>
+
+      <table>
+        <thead>
+          <tr><th>权限</th><th>访问范围</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>screen-time:read</code></td><td>读取屏幕时间统计数据（今日、小时分布、趋势）</td></tr>
+          <tr><td><code>active-window:subscribe</code></td><td>订阅前台窗口变更事件</td></tr>
+          <tr><td><code>goals:read</code></td><td>读取使用目标和进度</td></tr>
+          <tr><td><code>focus:read</code></td><td>读取专注模式状态</td></tr>
+          <tr><td><code>widgets:read</code></td><td>读取小组件注册表信息</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="render">渲染接口契约</h2>
+      <p>TimeLens 将入口文件作为 ESM 模块加载。支持两种导出模式：</p>
+
+      <h3>模式 A — createWidget() 工厂函数</h3>
+      <p>适合需要在 mount/unmount 之间保持状态的小组件。</p>
+
+      <pre><code>export function createWidget() {
+  let root;
+  let intervalId;
+
+  return {
+    mount(container, context) {
+      root = document.createElement("div");
+      root.style.cssText = `
+        padding: 16px;
+        color: #e6edf3;
+        font-family: Inter, system-ui, sans-serif;
+      `;
+      root.innerHTML = `<h3>${context.displayName}</h3>`;
+      container.appendChild(root);
+
+      intervalId = setInterval(() => {
+        root.querySelector("h3").textContent =
+          new Date().toLocaleTimeString();
+      }, 1000);
+    },
+
+    unmount() {
+      clearInterval(intervalId);
+      if (root && root.parentNode) {
+        root.parentNode.removeChild(root);
+      }
+    },
+  };
+}</code></pre>
+
+      <h3>模式 B — 直接导出 mount()</h3>
+      <p>适合简单的一次性渲染组件。</p>
+
+      <pre><code>let root;
+
+export function mount(container, context) {
+  root = document.createElement("div");
+  root.innerHTML = `
+    <style>
+      .my-widget {
+        padding: 16px;
+        color: #e6edf3;
+        background: rgba(22, 27, 34, 0.8);
+        border-radius: 12px;
+        backdrop-filter: blur(10px);
+      }
+      .my-widget h3 {
+        margin: 0 0 8px;
+        font-size: 16px;
+      }
+    </style>
+    <div class="my-widget">
+      <h3>${context.displayName}</h3>
+      <p>类型: ${context.widgetType}</p>
+      <p>ID: ${context.widgetId}</p>
+    </div>
+  `;
+  container.appendChild(root);
+}
+
+export function unmount() {
+  if (root && root.parentNode) {
+    root.parentNode.removeChild(root);
+  }
+}</code></pre>
+
+      <h3>Context 上下文对象</h3>
+      <table>
+        <thead>
+          <tr><th>属性</th><th>类型</th><th>说明</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>widgetType</code></td><td>string</td><td>小组件类型标识符（同 manifest 中的 widget_type）</td></tr>
+          <tr><td><code>displayName</code></td><td>string</td><td>显示名称（同 manifest 中的 name）</td></tr>
+          <tr><td><code>widgetId</code></td><td>string</td><td>唯一实例 ID</td></tr>
+          <tr><td><code>permissions</code></td><td>string[]</td><td>用户已授予的权限列表</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="data-channel">数据通道 API</h2>
+      <p>小组件通过 <code>window.parent.postMessage</code> 与 TimeLens 核心通信。父窗口提供了请求/响应桥接。</p>
+
+      <h3>请求格式</h3>
+      <pre><code>window.parent.postMessage({
+  type: "timelens:request",
+  id: "req-" + Date.now(),      <span class="code-comment">// 唯一请求 ID</span>
+  method: "getTodayAppTotals",   <span class="code-comment">// 调用的 API 方法名</span>
+  params: {}                     <span class="code-comment">// 参数对象</span>
+}, "*");</code></pre>
+
+      <h3>响应监听</h3>
+      <pre><code>window.addEventListener("message", (e) => {
+  if (e.data.type === "timelens:response") {
+    if (e.data.error) {
+      console.error("API 错误:", e.data.error);
+    } else {
+      console.log("API 结果:", e.data.result);
+    }
+  }
+});</code></pre>
+
+      <h3>常用数据方法</h3>
+      <p>所有来自 <a href="API_REFERENCE.html">API 参考</a> 的只读方法都可通过数据通道调用：</p>
+      <ul>
+        <li><code>getTodayAppTotals</code> — 今日各应用使用时长</li>
+        <li><code>getTodayHourly</code> — 今日小时分布</li>
+        <li><code>getRecentDailyTotals</code> — 最近 N 天每日总时长</li>
+        <li><code>getMonitorStatus</code> — 当前监控状态</li>
+        <li><code>getGoalProgress</code> — 目标进度列表</li>
+        <li><code>getCategoryTotalsInRange</code> — 分类统计</li>
+      </ul>
+
+      <h2 id="styling">样式设计规范</h2>
+      <p>小组件在透明背景的 iframe 中运行。为保证与 TimeLens 视觉风格一致，建议遵循以下规范：</p>
+
+      <table>
+        <thead>
+          <tr><th>属性</th><th>推荐值</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>背景色</td><td><code>rgba(22, 27, 34, 0.75)</code> + <code>backdrop-filter: blur(12px)</code></td></tr>
+          <tr><td>主文字</td><td><code>#e6edf3</code></td></tr>
+          <tr><td>次级文字</td><td><code>#8b949e</code></td></tr>
+          <tr><td>强调色</td><td><code>#58a6ff</code></td></tr>
+          <tr><td>边框</td><td><code>1px solid rgba(48, 54, 61, 0.6)</code></td></tr>
+          <tr><td>圆角</td><td><code>12px</code> 或 <code>8px</code></td></tr>
+          <tr><td>字体</td><td><code>Inter, system-ui, -apple-system, sans-serif</code></td></tr>
+          <tr><td>阴影</td><td><code>0 4px 12px rgba(0, 0, 0, 0.3)</code></td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="example">完整示例：今日应用排行小组件</h2>
+      <pre><code>// index.js
+export function createWidget() {
+  let root;
+  let interval;
+  let unlisten;
+
+  function requestData(method, params = {}) {
+    return new Promise((resolve, reject) => {
+      const reqId = "req-" + Date.now() + "-" + Math.random();
+      const handler = (e) => {
+        if (e.data.type === "timelens:response" && e.data.id === reqId) {
+          window.removeEventListener("message", handler);
+          if (e.data.error) reject(e.data.error);
+          else resolve(e.data.result);
+        }
+      };
+      window.addEventListener("message", handler);
+      window.parent.postMessage({
+        type: "timelens:request",
+        id: reqId,
+        method,
+        params
+      }, "*");
+    });
+  }
+
+  async function renderStats() {
+    try {
+      const stats = await requestData("getTodayAppTotals");
+      const top5 = stats.slice(0, 5);
+      const html = top5.map(s => {
+        const mins = Math.round(s.total_seconds / 60);
+        return `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(48,54,61,0.4)">
+          <span>${s.app_name}</span>
+          <span style="color:#8b949e">${mins} 分钟</span>
+        </div>`;
+      }).join("");
+      const el = root.querySelector("#content");
+      if (el) el.innerHTML = html || "<p style='color:#6e7681'>暂无数据</p>";
+    } catch (err) {
+      console.error("获取数据失败:", err);
+    }
+  }
+
+  return {
+    async mount(container, context) {
+      root = document.createElement("div");
+      root.style.cssText = `
+        padding: 16px;
+        color: #e6edf3;
+        font-family: Inter, system-ui, sans-serif;
+        background: rgba(22, 27, 34, 0.8);
+        backdrop-filter: blur(12px);
+        border-radius: 12px;
+        border: 1px solid rgba(48, 54, 61, 0.5);
+        height: 100%;
+        box-sizing: border-box;
+      `;
+      root.innerHTML = `
+        <h4 style="margin:0 0 12px;font-size:14px;color:#58a6ff">
+          ${context.displayName}
+        </h4>
+        <div id="content">加载中...</div>
+      `;
+      container.appendChild(root);
+
+      await renderStats();
+      interval = setInterval(renderStats, 60000);
+    },
+
+    unmount() {
+      clearInterval(interval);
+      if (root && root.parentNode) {
+        root.parentNode.removeChild(root);
+      }
+    }
+  };
+}</code></pre>
+
+      <h2 id="debug">调试技巧</h2>
+      <ul>
+        <li>在小组件窗口上右键 → <strong>检查</strong>，打开 DevTools 调试 JavaScript。</li>
+        <li>如果数据请求失败，检查 <strong>小组件中心</strong> → 权限标签页，确认已授予相应权限。</li>
+        <li>使用任意 JSON 验证工具检查 <code>manifest.json</code> 语法。</li>
+        <li>小组件中的 <code>console.log</code> 输出会显示在主窗口的 DevTools 控制台中。</li>
+        <li>在 <code>window.parent.postMessage</code> 调用前添加日志，确认请求已发送。</li>
+      </ul>
+
+      <h2 id="template">官方模板</h2>
+      <p>TimeLens 仓库提供了官方示例模板：</p>
+      <pre><code>examples/third-party-widget-template/
+  ├── manifest.json
+  ├── index.js
+  └── README.md</code></pre>
+      <p>建议以此模板为基础开始你的小组件开发。</p>
+
+      <hr />
+      <p style="color: var(--text-muted); font-size: 0.85rem;">最后更新：2025-05-03 · TimeLens v1.1.0</p>
+    </main>
+  </div>
+
+  <script>
+    const navToggle = document.getElementById('navToggle');
+    const navLinks = document.querySelector('.nav-links');
+    navToggle.addEventListener('click', () => navLinks.classList.toggle('open'));
+  </script>
+</body>
+</html>

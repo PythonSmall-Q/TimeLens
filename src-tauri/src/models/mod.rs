@@ -131,6 +131,45 @@ pub struct BrowserExtensionStatus {
     pub recent_sessions: Vec<BrowserSession>,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct VsCodeLanguageDuration {
+    pub language: String,
+    pub seconds: i64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct VsCodeSession {
+    pub session_id: String,
+    pub date: String,
+    pub started_at: String,
+    pub ended_at: String,
+    pub duration_seconds: i64,
+    pub project_name: String,
+    pub project_path: String,
+    pub synced_at: String,
+    pub language_durations: Vec<VsCodeLanguageDuration>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct VsCodeStatsSummary {
+    pub total_seconds: i64,
+    pub session_count: i64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct VsCodeLanguageStats {
+    pub language: String,
+    pub total_seconds: i64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct VsCodeProjectStats {
+    pub project_name: String,
+    pub project_path: String,
+    pub total_seconds: i64,
+    pub session_count: i64,
+}
+
 // ── Todo ───────────────────────────────────────────────────────
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TodoItem {

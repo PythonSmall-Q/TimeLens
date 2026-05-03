@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>架构文档 · TimeLens 文档</title>
+  <link rel="icon" type="image/png" href="assets/icon.png" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="nav-container">
+      <a href="index.html" class="nav-brand">
+        <img src="assets/icon.svg" alt="TimeLens" class="nav-icon" />
+        <span class="nav-title">TimeLens</span>
+      </a>
+      <div class="nav-links">
+        <a href="index.html#features" class="nav-link">功能</a>
+        <a href="index.html#quickstart" class="nav-link">快速开始</a>
+        <a href="index.html#docs" class="nav-link">文档</a>
+        <a href="https://github.com/PythonSmall-Q/TimeLens" class="nav-link" target="_blank" rel="noopener">
+          <svg class="github-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+          GitHub
+        </a>
+      </div>
+      <button class="nav-toggle" id="navToggle" aria-label="切换导航"><span></span><span></span><span></span></button>
+    </div>
+  </nav>
+
+  <div class="content-wrapper">
+    <aside class="sidebar">
+      <ul class="sidebar-nav">
+        <li><a href="index.html">← 返回首页</a></li>
+        <li><a href="DEVELOPMENT.html">开发指南</a></li>
+        <li><a href="API_REFERENCE.html">API 参考</a></li>
+        <li><a href="WIDGETS_DEV_GUIDE.html">小组件开发</a></li>
+        <li><a href="ADD_LANGUAGE.html">添加语言</a></li>
+        <li><a href="WIDGETS_DEV_GUIDE.zh-CN.html">中文小组件指南</a></li>
+      </ul>
+    </aside>
+
+    <main class="content-main">
+      <nav class="breadcrumb">
+        <a href="index.html">文档首页</a>
+        <span>/</span>
+        <span>架构文档</span>
+      </nav>
+
+      <h1>架构文档</h1>
+      <p>深入了解 TimeLens 的系统架构、模块划分、数据流设计及关键技术决策。</p>
+
+      <hr />
+
+      <h2 id="overview">系统概览</h2>
+      <p>TimeLens 是一款基于 <strong>Tauri 2.x</strong> 构建的桌面应用，采用 Rust + React 双层架构。Rust 层负责系统级交互（窗口监控、数据库、系统托盘），React 层负责所有用户界面。</p>
+
+      <h3>核心设计原则</h3>
+      <ul>
+        <li><strong>数据主权：</strong>所有使用数据存储在本地 SQLite，不上传云端。</li>
+        <li><strong>零运行时依赖：</strong>除操作系统自带组件外，不需要额外安装任何服务。</li>
+        <li><strong>模块化 Command：</strong>每个功能域拥有独立的 Rust command 模块，便于维护和扩展。</li>
+        <li><strong>状态集中管理：</strong>前端使用 Zustand 进行全局状态管理，避免 props drilling。</li>
+      </ul>
+
+      <h2 id="rust-layer">Rust 后端层</h2>
+
+      <h3 id="lib-rs">lib.rs — 应用生命周期</h3>
+      <p><code>src-tauri/src/lib.rs</code> 是整个 Rust 层的入口，负责以下初始化流程：</p>
+      <ol>
+        <li>初始化 <code>env_logger</code> 日志系统。</li>
+        <li>注册 Tauri 插件（shell、global-shortcut、notification、updater、dialog）。</li>
+        <li><code>setup</code> 回调中：
+          <ul>
+            <li>打开/创建 SQLite 数据库</li>
+            <li>将数据库连接注册为共享状态（<code>DbState</code>）</li>
+            <li>恢复上次会话的小组件窗口</li>
+            <li>创建系统托盘图标和菜单</li>
+            <li>启动后台监控任务（tokio）</li>
+          </ul>
+        </li>
+      </ol>
+
+      <h3 id="monitor">monitor/ — 前台窗口监控</h3>
+      <p>后台 tokio 任务，以固定间隔（默认 1 秒）轮询当前前台窗口信息。</p>
+      <table>
+        <thead>
+          <tr><th>平台</th><th>实现方式</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Windows</td><td>Win32 API（<code>GetForegroundWindow</code>、<code>GetWindowThreadProcessId</code>、<code>GetModuleBaseName</code>）</td></tr>
+          <tr><td>macOS</td><td>AppleScript / Accessibility API</td></tr>
+        </tbody>
+      </table>
+      <p>监控模块检测到窗口切换时，将旧窗口的使用时长写入数据库，并开始记录新窗口。同时通过 Tauri 事件通道向前端广播 <code>active-window-changed</code> 事件。</p>
+
+      <h3 id="db">db/ — SQLite 数据层</h3>
+      <p>所有数据库操作集中在 <code>db/mod.rs</code>，包含以下核心表：</p>
+      <table>
+        <thead>
+          <tr><th>表名</th><th>用途</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>app_usage</code></td><td>每条记录 = 一个应用在某日的一个使用片段（含窗口标题、活跃秒数）</td></tr>
+          <tr><td><code>app_categories</code></td><td>应用 → 分类映射规则</td></tr>
+          <tr><td><code>usage_goals</code></td><td>用户设置的使用目标（每日/每周、至少/至多）</td></tr>
+          <tr><td><code>focus_sessions</code></td><td>专注模式会话记录</td></tr>
+          <tr><td><code>todos</code></td><td>待办事项数据</td></tr>
+          <tr><td><code>widget_configs</code></td><td>小组件窗口位置、尺寸、透明度等配置</td></tr>
+          <tr><td><code>settings</code></td><td>应用级设置（启动项、快捷键、语言等）</td></tr>
+          <tr><td><code>browser_sessions</code></td><td>浏览器扩展同步的网页访问记录</td></tr>
+          <tr><td><code>browser_domain_limits</code></td><td>网页域名使用限额</td></tr>
+        </tbody>
+      </table>
+
+      <h3 id="commands">commands/ — IPC 接口层</h3>
+      <p>Rust command 模块按功能域拆分：</p>
+      <table>
+        <thead>
+          <tr><th>文件</th><th>职责</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>monitor_cmd.rs</code></td><td>监控状态查询、暂停/恢复追踪</td></tr>
+          <tr><td><code>storage_cmd.rs</code></td><td>所有数据查询、统计计算、导入导出</td></tr>
+          <tr><td><code>widget_cmd.rs</code></td><td>创建/打开/关闭小组件窗口</td></tr>
+          <tr><td><code>app_cmd.rs</code></td><td>应用设置、系统通知、安装渠道检测</td></tr>
+          <tr><td><code>browser_cmd.rs</code></td><td>浏览器扩展数据、域名统计与限额</td></tr>
+          <tr><td><code>productivity_cmd.rs</code></td><td>生产力评分、中断时段分析</td></tr>
+          <tr><td><code>widget_permissions.rs</code></td><td>第三方小组件权限管理</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="frontend">React 前端层</h2>
+
+      <h3 id="routing">窗口路由</h3>
+      <p>TimeLens 不是单页应用，而是多窗口应用。<code>src/App.tsx</code> 根据 Tauri 窗口标签决定渲染内容：</p>
+      <table>
+        <thead>
+          <tr><th>窗口标签</th><th>渲染组件</th><th>说明</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>main</code></td><td><code>MainApp</code></td><td>主仪表盘，包含 HashRouter</td></tr>
+          <tr><td><code>clock-*</code></td><td><code>WidgetWindow<Clock></code></td><td>时钟小组件</td></tr>
+          <tr><td><code>todo-*</code></td><td><code>WidgetWindow<Todo></code></td><td>待办小组件</td></tr>
+          <tr><td><code>timer-*</code></td><td><code>WidgetWindow<Timer></code></td><td>计时器小组件</td></tr>
+          <tr><td><code>note-*</code></td><td><code>WidgetWindow<Note></code></td><td>笔记小组件</td></tr>
+          <tr><td><code>status-*</code></td><td><code>WidgetWindow<Status></code></td><td>状态小组件</td></tr>
+        </tbody>
+      </table>
+
+      <h3 id="pages">页面结构</h3>
+      <p>主应用（<code>MainApp</code>）使用 <code>HashRouter</code>，包含以下页面：</p>
+      <ul>
+        <li><strong>Dashboard</strong> — 今日概览、应用排行、热力图、生产力评分、目标进度</li>
+        <li><strong>HomeCustomize</strong> — 仪表盘布局自定义（拖拽排序卡片）</li>
+        <li><strong>WidgetCenter</strong> — 小组件管理中心（创建、配置、权限）</li>
+        <li><strong>Limits</strong> — 应用使用限额设置</li>
+        <li><strong>BrowserUsage</strong> — 浏览器使用统计（需配合浏览器扩展）</li>
+        <li><strong>Categories</strong> — 应用分类管理与智能推荐</li>
+        <li><strong>Goals</strong> — 使用目标设定与追踪</li>
+        <li><strong>FocusMode</strong> — 专注模式开关与历史</li>
+        <li><strong>Settings</strong> — 全局设置（语言、主题、快捷键等）</li>
+      </ul>
+
+      <h3 id="stores">状态管理</h3>
+      <p>使用 Zustand 创建了 4 个全局 store：</p>
+      <table>
+        <thead>
+          <tr><th>Store</th><th>数据</th><th>持久化</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>statsStore</code></td><td>今日/本周/历史使用数据、监控状态</td><td>否（实时从 Rust 获取）</td></tr>
+          <tr><td><code>widgetStore</code></td><td>小组件配置列表、可见性状态</td><td>Rust DB</td></tr>
+          <tr><td><code>settingsStore</code></td><td>主题、语言、监控设置等</td><td>Rust DB + localStorage 缓存</td></tr>
+          <tr><td><code>dashboardLayoutStore</code></td><td>仪表盘卡片顺序、显隐</td><td>localStorage</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="data-flow">数据流设计</h2>
+
+      <h3>监控数据流</h3>
+      <pre><code>OS 前台窗口
+    ↓ (每秒轮询)
+monitor/mod.rs
+    ↓ (聚合 + 写入)
+SQLite (app_usage 表)
+    ↓ (前端主动查询 / 事件推送)
+React Frontend
+    ↓ (Zustand store)
+Dashboard Charts & Lists</code></pre>
+
+      <h3>事件流</h3>
+      <p>Tauri 提供了两种前后端通信方式：</p>
+      <ul>
+        <li><strong>invoke</strong> — 前端调用 Rust command，同步/异步请求-响应模式。</li>
+        <li><strong>emit / listen</strong> — 事件广播模式，用于监控状态变更、窗口切换通知等实时推送。</li>
+      </ul>
+
+      <h2 id="widget-system">小组件系统</h2>
+      <p>小组件是 TimeLens 的特色功能。每个小组件都是一个独立的 Tauri 窗口，拥有独立的 WebView 实例。</p>
+
+      <h3>官方内置小组件</h3>
+      <table>
+        <thead>
+          <tr><th>类型</th><th>功能</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Clock</td><td>模拟/数字时钟，支持自定义格式</td></tr>
+          <tr><td>Todo</td><td>待办列表，支持拖拽排序、完成标记</td></tr>
+          <tr><td>Timer</td><td>多模式计时器（番茄钟 / 倒计时 / 正计时）</td></tr>
+          <tr><td>Note</td><td>便签小组件，支持文本编辑</td></tr>
+          <tr><td>Status</td><td>系统状态展示（当前应用、今日总时长）</td></tr>
+        </tbody>
+      </table>
+
+      <h3>第三方小组件</h3>
+      <p>TimeLens 支持加载第三方 JavaScript 小组件。详细开发指南参见 <a href="WIDGETS_DEV_GUIDE.html">小组件开发指南</a>。</p>
+
+      <h2 id="i18n">国际化架构</h2>
+      <p>使用 i18next + react-i18next 实现多语言支持。</p>
+      <ul>
+        <li>翻译文件位于 <code>src/i18n/locales/{lang}/</code></li>
+        <li>按功能域拆分 JSON 文件：<code>common.json</code>、<code>dashboard.json</code>、<code>widgets.json</code>、<code>settings.json</code> 等</li>
+        <li>新增语言仅需翻译 JSON 并在 <code>config.ts</code> 注册即可</li>
+      </ul>
+
+      <h2 id="security">安全模型</h2>
+      <p>TimeLens 使用 Tauri v2 的 Capability 系统进行权限控制：</p>
+      <ul>
+        <li><code>capabilities/default.json</code> 定义了主窗口和各类小组件窗口的权限集合。</li>
+        <li>第三方小组件通过权限系统（<code>widget_permissions.rs</code>）进行沙箱隔离，按需授予 <code>screen-time:read</code> 等权限。</li>
+        <li>所有 Rust command 参数均经过类型校验，SQL 查询使用参数化防止注入。</li>
+      </ul>
+
+      <hr />
+      <p style="color: var(--text-muted); font-size: 0.85rem;">最后更新：2025-05-03 · TimeLens v1.1.0</p>
+    </main>
+  </div>
+
+  <script>
+    const navToggle = document.getElementById('navToggle');
+    const navLinks = document.querySelector('.nav-links');
+    navToggle.addEventListener('click', () => navLinks.classList.toggle('open'));
+  </script>
+</body>
+</html>

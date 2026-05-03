@@ -9,6 +9,9 @@ import type {
   MonitorStatus,
   ProductivityScore,
   InterruptionPeriod,
+  VsCodeLanguageStats,
+  VsCodeProjectStats,
+  VsCodeStatsSummary,
 } from "@/types";
 import * as api from "@/services/tauriApi";
 
@@ -60,6 +63,11 @@ interface StatsState {
   interruptionPeriods: InterruptionPeriod[];
   fetchProductivityRange: (startDate: string, endDate: string) => Promise<void>;
   fetchInterruptionPeriods: (date: string) => Promise<void>;
+
+  vscodeStats: VsCodeStatsSummary;
+  vscodeLanguageStats: VsCodeLanguageStats[];
+  vscodeProjectStats: VsCodeProjectStats[];
+  fetchVsCodeStatsForRange: (startDate: string, endDate: string) => Promise<void>;
 }
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
@@ -82,6 +90,9 @@ export const useStatsStore = create<StatsState>((set, get) => ({
   comparisonResults: [],
   productivityScores: [],
   interruptionPeriods: [],
+  vscodeStats: { total_seconds: 0, session_count: 0 },
+  vscodeLanguageStats: [],
+  vscodeProjectStats: [],
 
   fetchToday: async () => {
     set({ loading: true });
@@ -255,5 +266,27 @@ export const useStatsStore = create<StatsState>((set, get) => ({
       const periods = await api.getInterruptionPeriods(date);
       set({ interruptionPeriods: periods });
     } catch (_) {}
+  },
+
+  fetchVsCodeStatsForRange: async (startDate: string, endDate: string) => {
+    try {
+      const [stats, languageRows, projectRows] = await Promise.all([
+        api.getVsCodeStatsInRange(startDate, endDate),
+        api.getVsCodeLanguageStatsInRange(startDate, endDate),
+        api.getVsCodeProjectStatsInRange(startDate, endDate),
+      ]);
+      set({
+        vscodeStats: stats,
+        vscodeLanguageStats: languageRows,
+        vscodeProjectStats: projectRows,
+      });
+    } catch (e) {
+      console.error("fetchVsCodeStatsForRange failed", e);
+      set({
+        vscodeStats: { total_seconds: 0, session_count: 0 },
+        vscodeLanguageStats: [],
+        vscodeProjectStats: [],
+      });
+    }
   },
 }));

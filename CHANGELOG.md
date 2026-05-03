@@ -23,6 +23,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Fine-grained permission control — widgets must request explicit permission for each data category they access
 - `ExternalWidgetHost` updated with permission filtering and expanded channel capabilities
 
+#### VS Code Integration
+
+- New **VS Code Insights** page (`src/pages/VsCodeInsights/index.tsx`) — dedicated page for Visual Studio Code usage analytics
+  - Total coding time, session count, and tracking toggle
+  - Three tracking levels: **basic** (time only), **standard** (+ language stats), **detailed** (+ project stats)
+- **VS Code API endpoints** (`src-tauri/src/api_server/mod.rs`) — REST API for the VS Code extension to push session data
+  - `POST /api/vscode/sessions` — receive coding sessions with per-language durations
+  - `GET /api/vscode/stats/today` / `stats/range` — coding time summaries
+  - `GET /api/vscode/languages/range` — programming language usage ranking
+  - `GET /api/vscode/projects/range` — project-level time breakdown
+  - `GET|POST /api/vscode/enabled` — tracking toggle and level configuration
+- **Database schema** — new `vscode_sessions` and `vscode_session_languages` tables with indexes for fast date/project/language queries
+- **Dashboard TodayOverview** — new VS Code card showing today's coding time, top language, and top project
+- **Dashboard customization** — VS Code card visibility toggle in Home Customize
+- **Sidebar navigation** — new `/vscode` route with `Code2` icon in the main nav
+
 #### Productivity Score
 
 - New **Productivity Score** algorithm — calculates daily and date-range scores from focus time, app switch count, and usage patterns
@@ -68,8 +84,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 #### Backend
 
 - New **`productivity_cmd.rs`** module (`src-tauri/src/commands/productivity_cmd.rs`) — Rust commands for productivity score calculation and interruption detection metrics
+  - `get_productivity_score` — single-day score from focus time, switch count, and usage patterns
+  - `get_productivity_score_range` — daily scores across a date range for trend charts
+  - `get_interruption_periods` — per-hour fragment data (switch count + fragmentation score) for a given date
 - **Database schema expanded** — new tables and indexes for productivity tracking, widget permissions, and signature verification storage
 - **`storage_cmd.rs`** expanded with additional aggregate query endpoints for range statistics and category insights
+  - `get_app_comparison_in_ranges` — period-over-period usage comparison
+  - `get_category_totals_in_range` / `get_category_daily_totals_in_range` — category-level aggregation
+  - `get_hourly_distribution_for_date` / `get_recent_daily_totals_range` / `get_app_category_map` — widget channel data APIs
 
 #### Internationalization
 
@@ -85,6 +107,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **ExternalWidgetHost** — updated with permission filtering and expanded data channel interfaces
 - Code structure optimization — Rust and TypeScript types aligned, API surfaces unified
 - Various bug fixes and stability improvements
+
+#### App Infrastructure
+
+- `get_install_channel_info` command — detects whether the app was installed via Microsoft Store or direct download, determining the appropriate update strategy
 
 ### Fixed
 
@@ -129,6 +155,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   - Supports `en` / `zh_CN` localization
   - Includes `build-chrome.js` script for one-click packaging
 
+#### Browser Domain Limits
+
+- New **per-domain daily usage limits** for browser sessions
+  - `save_browser_domain_limit` / `remove_browser_domain_limit` commands
+  - Domain-level time tracking synced from the browser extension
+  - Ignored-domains list to exclude sites such as `localhost` or corporate SSO pages
+
+#### Data Import / Export
+
+- **Export to CSV** — one-click export of all `app_usage` records as a CSV string
+- **Export to JSON** — full database snapshot export as structured JSON
+- **Import from JSON** — restore data from a previously exported JSON payload
+- Useful for backups, migrating to a new machine, or sharing usage reports
+
 #### API Server
 
 - New local **REST API** module (`src-tauri/src/api_server/`)
@@ -152,6 +192,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 
 - Version bumped to **1.0.0**, marking the first stable release
+- `get_running_executables` and `get_recent_executables` commands added to support the improved app picker
 - `package.json`, `src-tauri/Cargo.toml`, and `src-tauri/tauri.conf.json` synchronized to the new version
 - Settings page refactored with new configuration entries for categories, goals, and browser data
 - Database schema significantly expanded with new tables / indexes for categories, goals, and browser usage
@@ -344,19 +385,3 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - GitHub Actions CI (lint + typecheck + `cargo check`) on push/PR
 - GitHub Actions release workflow: builds Windows `.msi`/`.exe` + macOS universal `.dmg` on `v*` tags
 
----
-
-#### Future Development
-
-
-| 方向                 | 具体想法                                                        |
-| -------------------- | --------------------------------------------------------------- |
-| **数据洞察**   | 生产力分数、专注时段识别、与历史均值的对比趋势图                |
-| **目标系统**   | 每日/每周使用目标（不只是限制，还有"至少用 X 小时"鼓励类）      |
-| **分类管理**   | 将 App 手动分入"工作/娱乐/社交"类别，按类别统计                 |
-| **报告导出**   | 周报/月报 PDF/CSV，可分享                                       |
-| **通知集成**   | Windows 原生通知（目前用内嵌 toast），支持声音提醒              |
-| **跨设备同步** | 可选云同步（S3/本地 NAS），多机汇总统计                         |
-| **专注模式**   | 限额触发时可选择屏蔽某应用窗口（需管理员权限）                  |
-| **API / 插件** | 暴露本地 REST API，让第三方工具（Obsidian、Raycast 等）读取数据 |
-| **移动端伴侣** | 查看统计的手机端 App（只读），Tauri 2.x 支持 Android/iOS        |

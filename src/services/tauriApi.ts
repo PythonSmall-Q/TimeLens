@@ -22,6 +22,11 @@ import type {
   BrowserExtensionStatus,
   BrowserDomainStats,
   BrowserDomainLimit,
+  VsCodeLanguageStats,
+  VsCodeProjectStats,
+  VsCodeSessionPayload,
+  VsCodeStatsSummary,
+  VsCodeTrackingStatus,
   InstallChannelInfo,
   ShortcutSettings,
   WidgetRegistryResponse,
@@ -29,6 +34,28 @@ import type {
   ProductivityScore,
   InterruptionPeriod,
 } from "@/types";
+
+const LOCAL_API_BASE_URL = "http://127.0.0.1:49152";
+
+async function localApiRequest<T>(
+  path: string,
+  init?: RequestInit
+): Promise<T> {
+  const resp = await fetch(`${LOCAL_API_BASE_URL}${path}`, {
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      ...(init?.headers || {}),
+    },
+  });
+  if (!resp.ok) {
+    throw new Error(`Local API request failed: ${resp.status}`);
+  }
+  if (resp.status === 204) {
+    return undefined as T;
+  }
+  return (await resp.json()) as T;
+}
 
 // ── Monitor ───────────────────────────────────────────────────
 export const getMonitorStatus = (): Promise<MonitorStatus> =>
@@ -318,3 +345,47 @@ export const getProductivityScoreRange = (startDate: string, endDate: string): P
 
 export const getInterruptionPeriods = (date: string): Promise<InterruptionPeriod[]> =>
   invoke("get_interruption_periods", { date });
+
+// ── VS Code local API channel ────────────────────────────────
+
+export const postVsCodeSession = (payload: VsCodeSessionPayload): Promise<void> =>
+  localApiRequest<void>("/api/vscode/sessions", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+export const getVsCodeStatsToday = (): Promise<VsCodeStatsSummary> =>
+  localApiRequest<VsCodeStatsSummary>("/api/vscode/stats/today");
+
+export const getVsCodeStatsInRange = (
+  startDate: string,
+  endDate: string
+): Promise<VsCodeStatsSummary> =>
+  localApiRequest<VsCodeStatsSummary>(
+    `/api/vscode/stats/range?start=${encodeURIComponent(startDate)}&end=${encodeURIComponent(endDate)}`
+  );
+
+export const getVsCodeLanguageStatsInRange = (
+  startDate: string,
+  endDate: string
+): Promise<VsCodeLanguageStats[]> =>
+  localApiRequest<VsCodeLanguageStats[]>(
+    `/api/vscode/languages/range?start=${encodeURIComponent(startDate)}&end=${encodeURIComponent(endDate)}`
+  );
+
+export const getVsCodeProjectStatsInRange = (
+  startDate: string,
+  endDate: string
+): Promise<VsCodeProjectStats[]> =>
+  localApiRequest<VsCodeProjectStats[]>(
+    `/api/vscode/projects/range?start=${encodeURIComponent(startDate)}&end=${encodeURIComponent(endDate)}`
+  );
+
+export const setVsCodeTrackingEnabled = (enabled: boolean, trackingLevel?: string): Promise<void> =>
+  localApiRequest<void>("/api/vscode/enabled", {
+    method: "POST",
+    body: JSON.stringify({ enabled, ...(trackingLevel ? { tracking_level: trackingLevel } : {}) }),
+  });
+
+export const getVsCodeTrackingEnabled = (): Promise<VsCodeTrackingStatus> =>
+  localApiRequest<VsCodeTrackingStatus>("/api/vscode/enabled");

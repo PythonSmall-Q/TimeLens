@@ -22,6 +22,16 @@ export interface DashboardWindowConfig {
   visible: boolean;
 }
 
+export interface TodayOverviewCardVisibility {
+  mostUsed: boolean;
+  vscode: boolean;
+}
+
+const defaultTodayOverviewCards = (): TodayOverviewCardVisibility => ({
+  mostUsed: true,
+  vscode: true,
+});
+
 const defaultLayout = (): DashboardWindowConfig[] => DASHBOARD_WINDOW_IDS.map((id) => ({
   id,
   visible: true,
@@ -50,11 +60,13 @@ function normalizeLayout(layout?: DashboardWindowConfig[]): DashboardWindowConfi
 
 interface DashboardLayoutState {
   layout: DashboardWindowConfig[];
+  todayOverviewCards: TodayOverviewCardVisibility;
   moveWindow: (activeId: DashboardWindowId, overId: DashboardWindowId) => void;
   moveUp: (id: DashboardWindowId) => void;
   moveDown: (id: DashboardWindowId) => void;
   hideWindow: (id: DashboardWindowId) => void;
   restoreWindow: (id: DashboardWindowId) => void;
+  setTodayOverviewCardVisibility: (card: keyof TodayOverviewCardVisibility, visible: boolean) => void;
   restoreDefault: () => void;
 }
 
@@ -62,6 +74,7 @@ export const useDashboardLayoutStore = create<DashboardLayoutState>()(
   persist(
     (set) => ({
       layout: defaultLayout(),
+      todayOverviewCards: defaultTodayOverviewCards(),
       moveWindow: (activeId, overId) => {
         if (activeId === overId) return;
         set((state) => {
@@ -102,7 +115,18 @@ export const useDashboardLayoutStore = create<DashboardLayoutState>()(
           layout: state.layout.map((item) => (item.id === id ? { ...item, visible: true } : item)),
         }));
       },
-      restoreDefault: () => set({ layout: defaultLayout() }),
+      setTodayOverviewCardVisibility: (card, visible) => {
+        set((state) => ({
+          todayOverviewCards: {
+            ...state.todayOverviewCards,
+            [card]: visible,
+          },
+        }));
+      },
+      restoreDefault: () => set({
+        layout: defaultLayout(),
+        todayOverviewCards: defaultTodayOverviewCards(),
+      }),
     }),
     {
       name: "timelens-dashboard-layout",
