@@ -1,6 +1,4 @@
 import * as vscode from "vscode";
-import * as path from "node:path";
-import * as fs from "node:fs";
 
 /** Fetch JSON from the TimeLens local API, returns null on any error. */
 async function fetchJson<T>(url: string): Promise<T | null> {
@@ -59,6 +57,8 @@ export class DashboardPanel {
       }
     );
 
+    panel.webview.html = buildLoadingHtml();
+
     try {
       panel.iconPath = iconPath;
     } catch {
@@ -88,48 +88,56 @@ export class DashboardPanel {
     // Auto-refresh every 30 s while panel is visible
     this.refreshTimer = setInterval(() => {
       if (this.panel.visible) {
-        this.refresh();
+        void this.refresh();
       }
     }, 30_000);
 
-    this.refresh();
+    void this.refresh().catch((error) => {
+      this.panel.webview.html = buildErrorHtml(error);
+    });
   }
 
   public async refresh(): Promise<void> {
+    this.panel.webview.html = buildLoadingHtml();
+
     const apiBase = vscode.workspace
       .getConfiguration("timelens")
       .get<string>("apiBaseUrl", "http://127.0.0.1:49152");
 
-    const [todayStats, todayApps, langStats, projectStats, trackingStatus, appStatus] =
-      await Promise.all([
-        fetchJson<{ total_seconds: number; session_count: number }>(
-          `${apiBase}/api/vscode/stats/today`
-        ),
-        fetchJson<{ app_name: string; exe_name: string; total_seconds: number; category: string }[]>(
-          `${apiBase}/api/screen-time/today`
-        ),
-        fetchJson<{ language: string; total_seconds: number }[]>(
-          `${apiBase}/api/vscode/languages/range?start=${today()}&end=${today()}`
-        ),
-        fetchJson<{ project_name: string; project_path: string; total_seconds: number; session_count: number }[]>(
-          `${apiBase}/api/vscode/projects/range?start=${today()}&end=${today()}`
-        ),
-        fetchJson<{ enabled: boolean; tracking_level?: string }>(
-          `${apiBase}/api/vscode/enabled`
-        ),
-        fetchJson<{ version: string; focus_active: boolean }>(
-          `${apiBase}/api/status`
-        ),
-      ]);
+    try {
+      const [todayStats, todayApps, langStats, projectStats, trackingStatus, appStatus] =
+        await Promise.all([
+          fetchJson<{ total_seconds: number; session_count: number }>(
+            `${apiBase}/api/vscode/stats/today`
+          ),
+          fetchJson<{ app_name: string; exe_path: string; total_seconds: number }[]>(
+            `${apiBase}/api/screen-time/today`
+          ),
+          fetchJson<{ language: string; total_seconds: number }[]>(
+            `${apiBase}/api/vscode/languages/range?start=${today()}&end=${today()}`
+          ),
+          fetchJson<{ project_name: string; project_path: string; total_seconds: number; session_count: number }[]>(
+            `${apiBase}/api/vscode/projects/range?start=${today()}&end=${today()}`
+          ),
+          fetchJson<{ enabled: boolean; tracking_level?: string }>(
+            `${apiBase}/api/vscode/enabled`
+          ),
+          fetchJson<{ version: string; focus_active: boolean }>(
+            `${apiBase}/api/status`
+          ),
+        ]);
 
-    this.panel.webview.html = buildHtml({
-      todayStats,
-      todayApps: todayApps ?? [],
-      langStats: langStats ?? [],
-      projectStats: projectStats ?? [],
-      trackingStatus,
-      appStatus,
-    });
+      this.panel.webview.html = buildHtml({
+        todayStats,
+        todayApps: todayApps ?? [],
+        langStats: langStats ?? [],
+        projectStats: projectStats ?? [],
+        trackingStatus,
+        appStatus,
+      });
+    } catch (error) {
+      this.panel.webview.html = buildErrorHtml(error);
+    }
   }
 
   private async handleMessage(msg: { command: string; payload?: unknown }): Promise<void> {
@@ -193,7 +201,7 @@ function today(): string {
 
 interface BuildHtmlOptions {
   todayStats: { total_seconds: number; session_count: number } | null;
-  todayApps: { app_name: string; exe_name: string; total_seconds: number; category: string }[];
+  todayApps: { app_name: string; exe_path: string; total_seconds: number }[];
   langStats: { language: string; total_seconds: number }[];
   projectStats: { project_name: string; project_path: string; total_seconds: number; session_count: number }[];
   trackingStatus: { enabled: boolean; tracking_level?: string } | null;
@@ -221,7 +229,7 @@ function buildHtml(opts: BuildHtmlOptions): string {
       const pct = totalAppSeconds > 0 ? Math.round((app.total_seconds / totalAppSeconds) * 100) : 0;
       return `<div class="bar-row">
         <div class="bar-label">
-          <span class="app-name" title="${esc(app.exe_name)}">${esc(app.app_name || app.exe_name)}</span>
+          <span class="app-name" title="${esc(app.exe_path)}">${esc(app.app_name || app.exe_path)}</span>
           <span class="bar-dur">${fmtDuration(app.total_seconds)}</span>
         </div>
         <div class="bar-track"><div class="bar-fill bar-fill-blue" style="width:${pct}%"></div></div>
@@ -419,6 +427,65 @@ ${topApps.length > 0 ? `
 </html>`;
 }
 
-function esc(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+function esc(s: unknown): string {
+  const value = typeof s === "string" ? s : String(s ?? "");
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function buildLoadingHtml(): string {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline';">
+  <style>
+    body { font-family: var(--vscode-font-family); padding: 16px; color: var(--vscode-foreground); background: var(--vscode-editor-background); }
+    .card { border: 1px solid var(--vscode-panel-border); border-radius: 8px; padding: 12px; background: var(--vscode-sideBar-background); }
+    .title { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+    .muted { color: var(--vscode-descriptionForeground); font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="title">TimeLens Dashboard</div>
+    <div class="muted">Loading...</div>
+  </div>
+</body>
+</html>`;
+}
+
+function buildErrorHtml(error: unknown): string {
+  const message = error instanceof Error ? error.message : "Unknown error";
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline';">
+  <style>
+    body { font-family: var(--vscode-font-family); padding: 16px; color: var(--vscode-foreground); background: var(--vscode-editor-background); }
+    .card { border: 1px solid var(--vscode-panel-border); border-radius: 8px; padding: 12px; background: var(--vscode-sideBar-background); }
+    .title { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+    .muted { color: var(--vscode-descriptionForeground); font-size: 12px; }
+    button { margin-top: 12px; border: 1px solid var(--vscode-panel-border); border-radius: 6px; padding: 6px 10px; background: var(--vscode-button-background); color: var(--vscode-button-foreground); cursor: pointer; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="title">TimeLens Dashboard</div>
+    <div class="muted">页面加载失败，但扩展仍在运行。</div>
+    <div class="muted" style="margin-top:8px;">${esc(message)}</div>
+    <button onclick="refresh()">重试</button>
+  </div>
+  <script>
+    const vscode = acquireVsCodeApi();
+    function refresh() { vscode.postMessage({ command: 'refresh' }); }
+  </script>
+</body>
+</html>`;
 }

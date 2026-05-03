@@ -54,3 +54,4 @@ src-tauri/windows/msix-staging/AppxManifest.xml
 src-tauri/windows/msix-staging/timelens.exe
 browser-extension.zip
 src-tauri/windows/msix-staging/timelens.exe
+vscode-extension/timelens-vscode-extension-0.1.0.vsix

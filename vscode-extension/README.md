@@ -34,7 +34,7 @@ npm run build
 ## Package VSIX
 
 ```bash
-npm --prefix vscode-extension run package
+npm run package
 ```
 
 Or from repository root:

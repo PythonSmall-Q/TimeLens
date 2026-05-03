@@ -3,7 +3,7 @@
   "displayName": "TimeLens",
   "description": "Track VS Code session time and send local analytics to TimeLens desktop app.",
   "icon": "icons/icon.png",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "ShanWenxiao",
   "license": "MIT",
   "repository": {
@@ -50,6 +50,10 @@
       ]
     },
     "commands": [
+      {
+        "command": "timelens.openSidebar",
+        "title": "TimeLens: Open Sidebar"
+      },
       {
         "command": "timelens.enableTracking",
         "title": "TimeLens: Enable Tracking"

@@ -11,7 +11,10 @@ export function activate(context: vscode.ExtensionContext): void {
   tracker = new SessionTracker(context);
   tracker.start();
 
-  sidebarProvider = new DashboardSidebarViewProvider(context);
+  sidebarProvider = new DashboardSidebarViewProvider(
+    context,
+    () => tracker?.snapshotAndFlush() ?? Promise.resolve(),
+  );
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(
       DashboardSidebarViewProvider.viewType,
@@ -45,6 +48,12 @@ export function activate(context: vscode.ExtensionContext): void {
           void syncTrackingLevelToBackend();
         }
       }
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand("timelens.openSidebar", async () => {
+      await vscode.commands.executeCommand("workbench.view.extension.timelens");
     })
   );
 
@@ -108,8 +117,12 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand("timelens.openDashboard", () => {
+    vscode.commands.registerCommand("timelens.openDashboard", async () => {
+      // Snapshot and flush in-progress session data before showing so both
+      // panel and sidebar display up-to-date numbers without ending the session.
+      await tracker?.snapshotAndFlush();
       DashboardPanel.createOrShow(context);
+      void sidebarProvider?.refresh();
     })
   );
 

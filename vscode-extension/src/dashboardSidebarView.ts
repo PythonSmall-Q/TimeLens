@@ -24,14 +24,19 @@ function formatDuration(seconds: number): string {
 export class DashboardSidebarViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = "timelens.homeView";
   private view?: vscode.WebviewView;
+  private refreshTimer: ReturnType<typeof setInterval> | undefined;
 
-  constructor(private readonly context: vscode.ExtensionContext) {}
+  constructor(
+    private readonly context: vscode.ExtensionContext,
+    private readonly flushFn?: () => Promise<void>,
+  ) {}
 
   resolveWebviewView(webviewView: vscode.WebviewView): void | Thenable<void> {
     this.view = webviewView;
     webviewView.webview.options = {
       enableScripts: true,
     };
+    webviewView.webview.html = this.buildLoadingHtml();
 
     webviewView.webview.onDidReceiveMessage(async (msg: { command: string; payload?: unknown }) => {
       if (msg.command === "refresh") {
@@ -58,26 +63,69 @@ export class DashboardSidebarViewProvider implements vscode.WebviewViewProvider 
       }
     });
 
-    void this.refresh();
+    // Auto-refresh every 30s while the view is visible
+    webviewView.onDidChangeVisibility(() => {
+      if (webviewView.visible) {
+        void this.refresh();
+        this.startTimer();
+      } else {
+        this.stopTimer();
+      }
+    });
+
+    webviewView.onDidDispose(() => {
+      this.stopTimer();
+    });
+
+    this.startTimer();
+
+    void this.refresh().catch((error) => {
+      if (this.view) {
+        this.view.webview.html = this.buildErrorHtml(error);
+      }
+    });
+  }
+
+  private startTimer(): void {
+    this.stopTimer();
+    this.refreshTimer = setInterval(() => {
+      if (this.view?.visible) {
+        void this.refresh();
+      }
+    }, 10_000);
+  }
+
+  private stopTimer(): void {
+    if (this.refreshTimer !== undefined) {
+      clearInterval(this.refreshTimer);
+      this.refreshTimer = undefined;
+    }
   }
 
   async refresh(): Promise<void> {
     if (!this.view) return;
+
+    // Flush in-progress session data to backend before querying so the
+    // displayed numbers are always up-to-date.
+    if (this.flushFn) {
+      await this.flushFn().catch(() => undefined);
+    }
 
     const cfg = vscode.workspace.getConfiguration("timelens");
     const enabled = cfg.get<boolean>("enabled", true);
     const level = cfg.get<string>("trackingLevel", "standard");
     const apiBase = cfg.get<string>("apiBaseUrl", "http://127.0.0.1:49152");
 
-    const [status, vscodeToday, appToday] = await Promise.all([
-      fetchJson<{ version: string; focus_active: boolean }>(`${apiBase}/api/status`),
-      fetchJson<{ total_seconds: number; session_count: number }>(`${apiBase}/api/vscode/stats/today`),
-      fetchJson<Array<{ app_name: string; total_seconds: number }>>(`${apiBase}/api/screen-time/today`),
-    ]);
+    try {
+      const [status, vscodeToday, appToday] = await Promise.all([
+        fetchJson<{ version: string; focus_active: boolean }>(`${apiBase}/api/status`),
+        fetchJson<{ total_seconds: number; session_count: number }>(`${apiBase}/api/vscode/stats/today`),
+        fetchJson<Array<{ app_name: string; total_seconds: number }>>(`${apiBase}/api/screen-time/today`),
+      ]);
 
-    const topApp = (appToday ?? []).sort((a, b) => b.total_seconds - a.total_seconds)[0];
+      const topApp = (appToday ?? []).sort((a, b) => b.total_seconds - a.total_seconds)[0];
 
-    this.view.webview.html = `<!DOCTYPE html>
+      this.view.webview.html = `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="UTF-8" />
@@ -141,6 +189,68 @@ export class DashboardSidebarViewProvider implements vscode.WebviewViewProvider 
   function openDashboard(){ vscode.postMessage({ command: 'openDashboard' }); }
   function toggleTracking(){ vscode.postMessage({ command: 'toggleTracking', payload: { enabled: ${!enabled} } }); }
   function setLevel(level){ vscode.postMessage({ command: 'setLevel', payload: { level } }); }
+</script>
+</body>
+</html>`;
+    } catch (error) {
+      this.view.webview.html = this.buildErrorHtml(error);
+    }
+  }
+
+  private buildLoadingHtml(): string {
+    return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline';" />
+<style>
+  body { font-family: var(--vscode-font-family); color: var(--vscode-foreground); background: var(--vscode-editor-background); padding: 12px; }
+  .card { border: 1px solid var(--vscode-panel-border); border-radius: 8px; padding: 10px; background: var(--vscode-sideBar-background); }
+  .title { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+  .muted { color: var(--vscode-descriptionForeground); font-size: 12px; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="title">TimeLens</div>
+    <div class="muted">Loading...</div>
+  </div>
+</body>
+</html>`;
+  }
+
+  private buildErrorHtml(error: unknown): string {
+    const msg = error instanceof Error ? error.message : "Unknown error";
+    const safe = String(msg)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/\"/g, "&quot;");
+    return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline';" />
+<style>
+  body { font-family: var(--vscode-font-family); color: var(--vscode-foreground); background: var(--vscode-editor-background); padding: 12px; }
+  .card { border: 1px solid var(--vscode-panel-border); border-radius: 8px; padding: 10px; background: var(--vscode-sideBar-background); }
+  .title { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+  .muted { color: var(--vscode-descriptionForeground); font-size: 12px; }
+  button { margin-top: 10px; border: 1px solid var(--vscode-panel-border); border-radius: 6px; padding: 5px 10px; background: var(--vscode-button-background); color: var(--vscode-button-foreground); cursor: pointer; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="title">TimeLens</div>
+    <div class="muted">页面加载失败，请重试。</div>
+    <div class="muted">${safe}</div>
+    <button onclick="refresh()">重试</button>
+  </div>
+<script>
+  const vscode = acquireVsCodeApi();
+  function refresh(){ vscode.postMessage({ command: 'refresh' }); }
 </script>
 </body>
 </html>`;

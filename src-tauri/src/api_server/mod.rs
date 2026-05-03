@@ -22,7 +22,7 @@ use tower_http::cors::{Any, CorsLayer};
 
 use crate::db;
 use crate::monitor::SharedMonitorStatus;
-use crate::models::{BrowserSession, VsCodeLanguageDuration, VsCodeSession};
+use crate::models::{AppUsageSummary, BrowserSession, VsCodeLanguageDuration, VsCodeSession};
 
 /// Shared state threaded through axum handlers.
 #[derive(Clone)]
@@ -98,8 +98,11 @@ async fn get_today(State(s): State<ApiState>) -> impl IntoResponse {
     let today = chrono::Local::now().format("%Y-%m-%d").to_string();
     match s.db.lock() {
         Ok(conn) => {
-            let rows = db::get_app_totals_in_range(&conn, &today, &today)
-                .unwrap_or_default();
+            let rows: Vec<AppUsageSummary> = db::get_app_totals_in_range(&conn, &today, &today)
+                .unwrap_or_default()
+                .into_iter()
+                .map(|(app_name, exe_path, total_seconds)| AppUsageSummary { app_name, exe_path, total_seconds })
+                .collect();
             Json(rows).into_response()
         }
         Err(_) => axum::http::StatusCode::INTERNAL_SERVER_ERROR.into_response(),
@@ -115,8 +118,11 @@ async fn get_range(
     let end   = p.end.as_deref().unwrap_or(&today).to_string();
     match s.db.lock() {
         Ok(conn) => {
-            let rows = db::get_app_totals_in_range(&conn, &start, &end)
-                .unwrap_or_default();
+            let rows: Vec<AppUsageSummary> = db::get_app_totals_in_range(&conn, &start, &end)
+                .unwrap_or_default()
+                .into_iter()
+                .map(|(app_name, exe_path, total_seconds)| AppUsageSummary { app_name, exe_path, total_seconds })
+                .collect();
             Json(rows).into_response()
         }
         Err(_) => axum::http::StatusCode::INTERNAL_SERVER_ERROR.into_response(),

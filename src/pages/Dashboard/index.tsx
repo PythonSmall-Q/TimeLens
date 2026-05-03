@@ -132,6 +132,15 @@ export default function Dashboard() {
   }, [fetchForDate, fetchToday, periodMode, selectedDate]);
 
   useEffect(() => {
+    if (periodMode !== "day" || selectedDate !== todayString()) return;
+    const id = setInterval(() => {
+      void fetchToday();
+      void fetchVsCodeStatsForRange(selectedDate, selectedDate);
+    }, 10_000);
+    return () => clearInterval(id);
+  }, [periodMode, selectedDate, fetchToday, fetchVsCodeStatsForRange]);
+
+  useEffect(() => {
     const end = todayString();
     const startDate = new Date(`${end}T00:00:00`);
     startDate.setDate(startDate.getDate() - 364);

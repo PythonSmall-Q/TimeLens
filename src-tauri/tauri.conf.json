@@ -29,7 +29,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["nsis"],
     "publisher": "CN=67203FD7-3571-4CF3-9A8B-DE6BA454CE5B",
     "homepage": "https://github.com/PythonSmall-Q/TimeLens",
     "license": "MIT",

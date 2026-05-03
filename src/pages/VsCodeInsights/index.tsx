@@ -65,6 +65,15 @@ export default function VsCodeInsights() {
   }, [fetchVsCodeStatsForRange, range.start, range.end]);
 
   useEffect(() => {
+    const today = todayString();
+    if (range.start > today || range.end < today) return;
+    const id = setInterval(() => {
+      void fetchVsCodeStatsForRange(range.start, range.end);
+    }, 10_000);
+    return () => clearInterval(id);
+  }, [fetchVsCodeStatsForRange, range.start, range.end]);
+
+  useEffect(() => {
     getVsCodeTrackingEnabled()
       .then((res) => {
         setTrackingEnabled(res.enabled);

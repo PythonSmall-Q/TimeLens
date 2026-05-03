@@ -50,6 +50,16 @@ export class SessionTracker {
     await this.flushPending();
   }
 
+  /**
+   * Send the latest in-progress session data to the backend WITHOUT ending
+   * the session. Use this before querying stats so the UI shows up-to-date
+   * numbers without fragmenting the active session.
+   */
+  async snapshotAndFlush(): Promise<void> {
+    this.enqueueCurrentSessionSnapshot();
+    await this.flushPending();
+  }
+
   getQueueSize(): number {
     return this.pendingQueue.length;
   }
@@ -62,24 +72,29 @@ export class SessionTracker {
       return;
     }
 
-    const editor = vscode.window.activeTextEditor;
-    if (!editor) {
+    if (!vscode.window.state.focused) {
       if (this.lastActiveAt && this.secondsSince(this.lastActiveAt, now) >= this.idleThresholdSeconds()) {
         this.finalizeCurrentSession(this.lastActiveAt);
       }
       return;
     }
 
-    const document = editor.document;
-    const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri);
+    const editor = vscode.window.activeTextEditor;
+    const workspaceFolder = editor
+      ? vscode.workspace.getWorkspaceFolder(editor.document.uri)
+      : vscode.workspace.workspaceFolders?.[0];
+
     if (!workspaceFolder) {
+      if (this.lastActiveAt && this.secondsSince(this.lastActiveAt, now) >= this.idleThresholdSeconds()) {
+        this.finalizeCurrentSession(this.lastActiveAt);
+      }
       return;
     }
 
     this.lastActiveAt = now;
     const projectPath = workspaceFolder.uri.fsPath;
     const projectName = path.basename(projectPath) || projectPath;
-    const language = document.languageId || "unknown";
+    const language = editor?.document.languageId || "unknown";
 
     if (!this.currentSession) {
       this.currentSession = this.createSession(now, projectName, projectPath);
@@ -95,6 +110,11 @@ export class SessionTracker {
     if (this.trackingLevel() !== "basic") {
       const current = this.currentSession.languageDurations.get(language) ?? 0;
       this.currentSession.languageDurations.set(language, current + 1);
+    }
+
+    // Push in-progress snapshots so app UI can show live stats without waiting for session finalization.
+    if (this.currentSession.durationSeconds > 0 && this.currentSession.durationSeconds % this.liveSyncIntervalSeconds() === 0) {
+      this.enqueueCurrentSessionSnapshot();
     }
   }
 
@@ -146,8 +166,47 @@ export class SessionTracker {
       payload.project_path = this.currentSession.projectPath;
     }
 
-    this.pendingQueue.push(payload);
+    this.enqueueOrReplacePayload(payload);
     this.currentSession = null;
+  }
+
+  private enqueueCurrentSessionSnapshot(): void {
+    if (!this.currentSession || this.currentSession.durationSeconds <= 0) {
+      return;
+    }
+
+    const level = this.trackingLevel();
+    const payload: VsCodeSessionPayload = {
+      session_id: this.currentSession.sessionId,
+      started_at: this.currentSession.startedAt.toISOString(),
+      ended_at: this.currentSession.endedAt.toISOString(),
+      duration_seconds: this.currentSession.durationSeconds,
+    };
+
+    if (level === "standard" || level === "detailed") {
+      const languageDurations: VsCodeLanguageDuration[] = Array.from(this.currentSession.languageDurations.entries())
+        .map(([language, seconds]) => ({ language, seconds }))
+        .filter((item) => item.seconds > 0);
+      if (languageDurations.length > 0) {
+        payload.language_durations = languageDurations;
+      }
+    }
+
+    if (level === "detailed") {
+      payload.project_name = this.currentSession.projectName;
+      payload.project_path = this.currentSession.projectPath;
+    }
+
+    this.enqueueOrReplacePayload(payload);
+  }
+
+  private enqueueOrReplacePayload(payload: VsCodeSessionPayload): void {
+    const idx = this.pendingQueue.findIndex((p) => p.session_id === payload.session_id);
+    if (idx >= 0) {
+      this.pendingQueue[idx] = payload;
+      return;
+    }
+    this.pendingQueue.push(payload);
   }
 
   private async flushPending(): Promise<void> {
@@ -183,6 +242,10 @@ export class SessionTracker {
       .getConfiguration("timelens")
       .get<number>("flushIntervalSeconds", 30);
     return Math.max(5, seconds) * 1000;
+  }
+
+  private liveSyncIntervalSeconds(): number {
+    return 10;
   }
 
   private trackingLevel(): "basic" | "standard" | "detailed" {
