@@ -23,8 +23,9 @@ import * as api from "@/services/tauriApi";
 import { formatDuration } from "@/utils/format";
 import { useTranslation } from "react-i18next";
 import { todayString } from "@/utils/format";
+import { APP_VERSION } from "./version";
 
-const CURRENT_VERSION = "1.0.0";
+const CURRENT_VERSION = APP_VERSION;
 const LIMIT_WARNED_KEY = "timelens-limit-warned";
 const LIMIT_STORAGE_KEY = "timelens-app-limits";
 
@@ -218,6 +219,21 @@ export default function MainApp() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [checkLimits, fetchMonitorStatus, fetchToday, fetchTodaySummary, periodMode, selectedDate]);
 
+  useEffect(() => {
+    const onVsCodeExtensionUnavailable = () => {
+      void notifyWithNavigate(
+        t("common:vscodeExtensionOfflineTitle"),
+        t("common:vscodeExtensionOfflineBody"),
+        "#/vscode"
+      );
+    };
+
+    window.addEventListener(api.VSCODE_EXTENSION_UNAVAILABLE_EVENT, onVsCodeExtensionUnavailable);
+    return () => {
+      window.removeEventListener(api.VSCODE_EXTENSION_UNAVAILABLE_EVENT, onVsCodeExtensionUnavailable);
+    };
+  }, [notifyWithNavigate, t]);
+
   // Update check – once after 4 s
   useEffect(() => {
     const timer = setTimeout(async () => {
@@ -270,13 +286,21 @@ export default function MainApp() {
   useEffect(() => {
     let mounted = true;
 
+    const safeUnregisterAllGlobalShortcuts = async () => {
+      try {
+        await unregisterAllGlobalShortcuts();
+      } catch {
+        // Some channels/environments may not grant unregister_all permission.
+      }
+    };
+
     const registerShortcuts = async (shortcuts: {
       open_widget_center: string;
       toggle_widget_visibility: string;
       start_recording: string;
       pause_recording: string;
     }) => {
-      await unregisterAllGlobalShortcuts().catch(() => {});
+      await safeUnregisterAllGlobalShortcuts();
 
       await registerGlobalShortcut(shortcuts.open_widget_center, () => {
         void focusMainAndNavigate("#/widgets");
@@ -322,12 +346,12 @@ export default function MainApp() {
     return () => {
       mounted = false;
       window.removeEventListener("timelens-shortcuts-changed", onShortcutChanged);
-      void unregisterAllGlobalShortcuts();
+      void safeUnregisterAllGlobalShortcuts();
     };
   }, [focusMainAndNavigate, setMonitorActive, setMonitoringActive, toggleWidgetsVisibility]);
 
   return (
-    <HashRouter>
+    <HashRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <MainLayout>
         <Routes>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />

@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import { Globe, Search, EyeOff, Eye, Bell, BellOff, Trash2, Check, X } from "lucide-react";
+import { Globe, Search, EyeOff, Eye, Bell, BellOff, Trash2, Check, X, Puzzle, Settings } from "lucide-react";
 import * as api from "@/services/tauriApi";
-import type { BrowserDomainStats, BrowserDomainLimit } from "@/types";
+import type { BrowserDomainStats, BrowserDomainLimit, BrowserExtensionStatus } from "@/types";
 import { formatDuration } from "@/utils/format";
 import { todayString, daysAgo } from "@/utils/format";
 import clsx from "clsx";
@@ -212,7 +212,7 @@ function DomainRow({
 // ── Main page ─────────────────────────────────────────────────
 
 export default function BrowserUsage() {
-  const { t } = useTranslation(["browserUsage", "common"]);
+  const { t } = useTranslation(["browserUsage", "common", "settings"]);
 
   const [preset, setPreset] = useState<DatePreset>("today");
   const [search, setSearch] = useState("");
@@ -224,6 +224,9 @@ export default function BrowserUsage() {
   const [loading, setLoading] = useState(true);
 
   const [editingHost, setEditingHost] = useState<string | null>(null);
+  const [browserExtensionEnabled, setBrowserExtensionEnabled] = useState(true);
+  const [browserExtensionStatus, setBrowserExtensionStatus] = useState<BrowserExtensionStatus | null>(null);
+  const [showExtensionSettings, setShowExtensionSettings] = useState(false);
 
   // Compute date range from preset
   const { startDate, endDate } = useMemo(() => {
@@ -252,6 +255,23 @@ export default function BrowserUsage() {
   }, [startDate, endDate]);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  const refreshBrowserExtensionStatus = useCallback(async () => {
+    try {
+      const [settings, status] = await Promise.all([
+        api.getAppSettings(),
+        api.getBrowserExtensionStatus(),
+      ]);
+      setBrowserExtensionEnabled(settings.browser_extension_enabled);
+      setBrowserExtensionStatus(status);
+    } catch {
+      // Keep current state on failure
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshBrowserExtensionStatus();
+  }, [refreshBrowserExtensionStatus]);
 
   const limitsMap = useMemo(() => {
     const m = new Map<string, BrowserDomainLimit>();
@@ -303,6 +323,16 @@ export default function BrowserUsage() {
   }, []);
 
   const PRESETS: DatePreset[] = ["today", "week", "month"];
+  const BROWSER_EXTENSION_DOWNLOAD_URL = "https://microsoftedge.microsoft.com/addons/detail/ggpfddncgjgicapbhiifkcffbfjcdcpi";
+  const browserLinkPayload = JSON.stringify(
+    {
+      app: "TimeLens",
+      apiBaseUrl: browserExtensionStatus?.api_base_url ?? "http://127.0.0.1:49152",
+      enabled: browserExtensionEnabled,
+    },
+    null,
+    2,
+  );
 
   return (
     <div className="p-6 space-y-6 animate-fade-in">
@@ -315,25 +345,160 @@ export default function BrowserUsage() {
           </h1>
           <p className="text-text-muted text-xs mt-0.5">{t("browserUsage:subtitle")}</p>
         </div>
+        <div className="flex items-center gap-2 flex-wrap justify-end">
+          <button
+            onClick={() => setShowExtensionSettings(true)}
+            className="px-3 py-1.5 rounded-xl text-xs font-medium border border-surface-border text-text-secondary hover:text-text-primary hover:bg-surface-hover transition-colors inline-flex items-center gap-1.5"
+          >
+            <Settings size={13} />
+            {t("settings:browser.title")}
+          </button>
+          <a
+            href={BROWSER_EXTENSION_DOWNLOAD_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-3 py-1.5 rounded-xl text-xs font-medium border border-accent-blue/40 text-accent-blue hover:bg-accent-blue/10 transition-colors"
+          >
+            {t("browserUsage:downloadEdgeAddon")}
+          </a>
 
-        {/* Date preset selector */}
-        <div className="flex gap-1.5 bg-surface-hover rounded-xl p-1">
-          {PRESETS.map((p) => (
-            <button
-              key={p}
-              onClick={() => setPreset(p)}
-              className={clsx(
-                "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors",
-                preset === p
-                  ? "bg-accent-blue text-white shadow"
-                  : "text-text-secondary hover:text-text-primary"
-              )}
-            >
-              {t(`browserUsage:${p}`)}
-            </button>
-          ))}
+          {/* Date preset selector */}
+          <div className="flex gap-1.5 bg-surface-hover rounded-xl p-1">
+            {PRESETS.map((p) => (
+              <button
+                key={p}
+                onClick={() => setPreset(p)}
+                className={clsx(
+                  "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors",
+                  preset === p
+                    ? "bg-accent-blue text-white shadow"
+                    : "text-text-secondary hover:text-text-primary"
+                )}
+              >
+                {t(`browserUsage:${p}`)}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
+
+      {showExtensionSettings && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="glass-card w-full max-w-2xl p-5 space-y-4 max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Puzzle size={15} className="text-accent-blue" />
+                <h2 className="text-sm font-semibold text-text-primary">{t("settings:browser.title")}</h2>
+              </div>
+              <button
+                onClick={() => setShowExtensionSettings(false)}
+                className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
+              >
+                {t("common:close")}
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-sm text-text-secondary">{t("settings:browser.enable")}</span>
+              <button
+                onClick={async () => {
+                  const next = !browserExtensionEnabled;
+                  setBrowserExtensionEnabled(next);
+                  await api.setBrowserExtensionEnabled(next).catch(() => setBrowserExtensionEnabled(!next));
+                  await refreshBrowserExtensionStatus();
+                }}
+                title={t("settings:browser.enable")}
+                className={clsx(
+                  "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+                  browserExtensionEnabled ? "bg-accent-blue" : "bg-surface-hover"
+                )}
+              >
+                <span
+                  className={clsx(
+                    "inline-block h-4 w-4 rounded-full bg-white shadow transition-transform",
+                    browserExtensionEnabled ? "translate-x-6" : "translate-x-1"
+                  )}
+                />
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-sm text-text-secondary">{t("settings:browser.status")}</span>
+              <span className={clsx(
+                "text-xs px-2.5 py-1 rounded-full border",
+                browserExtensionStatus?.connected
+                  ? "border-accent-green/40 text-accent-green bg-accent-green/10"
+                  : "border-surface-border text-text-muted bg-surface-hover"
+              )}>
+                {browserExtensionStatus?.connected ? t("settings:browser.connected") : t("settings:browser.waiting")}
+              </span>
+            </div>
+
+            <div className="rounded-lg border border-surface-border bg-surface-hover/40 p-3 space-y-2">
+              <p className="text-xs text-text-secondary">{t("settings:browser.hint")}</p>
+              <div className="flex items-center gap-2 justify-between flex-wrap">
+                <span className="text-xs font-mono text-text-secondary">
+                  {browserExtensionStatus?.api_base_url ?? "http://127.0.0.1:49152"}
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={async () => {
+                      await navigator.clipboard.writeText(browserExtensionStatus?.api_base_url ?? "http://127.0.0.1:49152");
+                    }}
+                    className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
+                  >
+                    {t("settings:browser.copyApiUrl")}
+                  </button>
+                  <button
+                    onClick={async () => {
+                      await navigator.clipboard.writeText(browserLinkPayload);
+                    }}
+                    className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
+                  >
+                    {t("settings:browser.copyConfig")}
+                  </button>
+                </div>
+              </div>
+              <div className="text-xs text-text-muted space-y-1">
+                <p>{t("settings:browser.lastBrowser", { browser: browserExtensionStatus?.last_browser_name ?? t("settings:browser.none") })}</p>
+                <p>{t("settings:browser.lastLocale", { locale: browserExtensionStatus?.last_locale ?? t("settings:browser.none") })}</p>
+                <p>{t("settings:browser.lastSync", { time: browserExtensionStatus?.last_sync_at ?? t("settings:browser.none") })}</p>
+                <p>{t("settings:browser.recentSessions", { count: browserExtensionStatus?.recent_session_count ?? 0 })}</p>
+              </div>
+              <div className="space-y-2 max-h-40 overflow-y-auto">
+                {(browserExtensionStatus?.recent_sessions ?? []).map((session) => (
+                  <div key={`${session.started_at}-${session.tab_url}`} className="rounded-lg border border-surface-border px-3 py-2">
+                    <div className="text-xs text-text-primary truncate">{session.title || session.host}</div>
+                    <div className="text-[11px] text-text-muted truncate">{session.host || session.tab_url}</div>
+                    <div className="text-[11px] text-text-muted">
+                      {session.browser_name} · {Math.floor(session.duration_seconds / 60)}m · {session.locale || t("settings:browser.none")}
+                    </div>
+                  </div>
+                ))}
+                {(browserExtensionStatus?.recent_sessions ?? []).length === 0 && (
+                  <p className="text-xs text-text-muted">{t("settings:browser.noSessions")}</p>
+                )}
+              </div>
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={refreshBrowserExtensionStatus}
+                  className="text-xs px-3 py-1.5 rounded-lg border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
+                >
+                  {t("settings:browser.refresh")}
+                </button>
+                <a
+                  href={BROWSER_EXTENSION_DOWNLOAD_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium border border-accent-blue/40 text-accent-blue hover:bg-accent-blue/10 transition-colors"
+                >
+                  {t("browserUsage:downloadEdgeAddon")}
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Search + ignored toggle */}
       <div className="flex gap-3 items-center flex-wrap">
@@ -375,9 +540,19 @@ export default function BrowserUsage() {
           {!search && (
             <>
               <p className="text-text-muted text-xs">{t("browserUsage:noBrowserDataHint")}</p>
-              <p className="text-accent-blue text-xs font-medium">
-                {t("browserUsage:noBrowserDataEdgeAddon")}
-              </p>
+              <div className="flex items-center justify-center gap-2 flex-wrap">
+                <p className="text-accent-blue text-xs font-medium">
+                  {t("browserUsage:noBrowserDataEdgeAddon")}
+                </p>
+                <a
+                  href={BROWSER_EXTENSION_DOWNLOAD_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium border border-accent-blue/40 text-accent-blue hover:bg-accent-blue/10 transition-colors"
+                >
+                  {t("browserUsage:downloadEdgeAddon")}
+                </a>
+              </div>
             </>
           )}
         </div>

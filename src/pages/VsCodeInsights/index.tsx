@@ -24,6 +24,8 @@ const LEVEL_COLORS: Record<string, string> = {
   detailed: "bg-green-500/10 text-green-400",
 };
 
+const VSCODE_EXTENSION_DOWNLOAD_URL = "https://marketplace.visualstudio.com/items?itemName=ShanWenxiao.timelens-vscode-extension";
+
 export default function VsCodeInsights() {
   const { t } = useTranslation(["dashboard", "common"]);
   const {
@@ -170,6 +172,21 @@ export default function VsCodeInsights() {
             </select>
           )}
         </div>
+      </div>
+
+      <div className="glass-card p-4 flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <h2 className="text-sm font-semibold text-text-primary">{t("dashboard:vscodeExtensionTitle")}</h2>
+          <p className="text-xs text-text-muted mt-0.5">{t("dashboard:vscodeExtensionHint")}</p>
+        </div>
+        <a
+          href={VSCODE_EXTENSION_DOWNLOAD_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="px-3 py-1.5 rounded-lg text-xs font-medium border border-accent-blue/40 text-accent-blue hover:bg-accent-blue/10 transition-colors"
+        >
+          {t("dashboard:vscodeExtensionDownload")}
+        </a>
       </div>
 
       {/* Disabled banner */}

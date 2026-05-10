@@ -46,11 +46,6 @@ fn is_microsoft_store_install() -> bool {
     false
 }
 
-#[cfg(not(target_os = "windows"))]
-fn is_microsoft_store_install() -> bool {
-    false
-}
-
 #[tauri::command]
 pub fn get_install_channel_info() -> InstallChannelInfo {
     #[cfg(target_os = "windows")]
@@ -299,6 +294,7 @@ pub fn set_shortcuts(shortcuts: ShortcutSettings, db: State<DbState>) -> Result<
     Ok(())
 }
 
+#[cfg(target_os = "windows")]
 fn xml_escape(input: &str) -> String {
     input
         .replace('&', "&amp;")

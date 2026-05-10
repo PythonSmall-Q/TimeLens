@@ -1,10 +1,163 @@
 Param(
-  [string]$Version = "1.0.0.0"
+  [string]$Version,
+  [string]$MakeAppxPath
 )
 
 $ErrorActionPreference = "Stop"
 
 $RepoRoot = Split-Path -Parent $PSScriptRoot
+$PackageJsonPath = Join-Path $RepoRoot "package.json"
+$PackageJson = Get-Content $PackageJsonPath -Raw | ConvertFrom-Json
+$TauriConfigPath = Join-Path $RepoRoot "src-tauri\tauri.conf.json"
+$TauriConfig = Get-Content $TauriConfigPath -Raw | ConvertFrom-Json
+
+function Get-MsixVersion {
+  param([string]$InputVersion)
+
+  $v = $InputVersion.Trim()
+  if ($v -match '^\d+\.\d+\.\d+$') {
+    return "$v.0"
+  }
+  if ($v -match '^\d+\.\d+\.\d+\.\d+$') {
+    return $v
+  }
+
+  throw "Invalid MSIX version '$InputVersion'. Use x.y.z or x.y.z.w."
+}
+
+function Convert-ToAppxIdentityName {
+  param([string]$Raw)
+
+  $name = ($Raw -replace '[^A-Za-z0-9\.]', '.')
+  $name = ($name -replace '\.+', '.').Trim('.')
+  if ([string]::IsNullOrWhiteSpace($name)) {
+    return "TimeLens.App"
+  }
+  return $name
+}
+
+function New-AppxManifest {
+  param(
+    [string]$Path,
+    [string]$IdentityName,
+    [string]$IdentityPublisher,
+    [string]$IdentityVersion,
+    [string]$DisplayName,
+    [string]$Description,
+    [string]$PublisherDisplayName
+  )
+
+  $manifest = @"
+<?xml version="1.0" encoding="utf-8"?>
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap rescap">
+  <Identity Name="$IdentityName" Publisher="$IdentityPublisher" Version="$IdentityVersion" />
+  <Properties>
+    <DisplayName>$DisplayName</DisplayName>
+    <PublisherDisplayName>$PublisherDisplayName</PublisherDisplayName>
+    <Description>$Description</Description>
+    <Logo>Assets\StoreLogo.png</Logo>
+  </Properties>
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Universal" MinVersion="10.0.17763.0" MaxVersionTested="10.0.22621.0" />
+  </Dependencies>
+  <Resources>
+    <Resource Language="en-us" />
+    <Resource Language="zh-cn" />
+  </Resources>
+  <Applications>
+    <Application Id="App" Executable="timelens.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        DisplayName="$DisplayName"
+        Description="$Description"
+        BackgroundColor="transparent"
+        Square44x44Logo="Assets\Square44x44Logo.png"
+        Square150x150Logo="Assets\Square150x150Logo.png">
+        <uap:DefaultTile
+          Wide310x150Logo="Assets\Wide310x150Logo.png"
+          Square310x310Logo="Assets\Square310x310Logo.png"
+          Square71x71Logo="Assets\Square71x71Logo.png" />
+      </uap:VisualElements>
+    </Application>
+  </Applications>
+  <Capabilities>
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+</Package>
+"@
+
+  Set-Content -Path $Path -Value $manifest -Encoding UTF8
+}
+
+function Resolve-MakeAppxPath {
+  param([string]$OverridePath)
+
+  $checked = New-Object System.Collections.Generic.List[string]
+
+  if (-not [string]::IsNullOrWhiteSpace($OverridePath)) {
+    $overrideResolved = [Environment]::ExpandEnvironmentVariables($OverridePath)
+    $checked.Add($overrideResolved)
+    if (Test-Path $overrideResolved) {
+      return @($overrideResolved, $checked)
+    }
+  }
+
+  $cmd = Get-Command MakeAppx.exe -ErrorAction SilentlyContinue
+  if ($cmd -and $cmd.Source) {
+    $checked.Add($cmd.Source)
+    return @($cmd.Source, $checked)
+  }
+
+  $roots = @(
+    "${env:ProgramFiles(x86)}\Windows Kits\10",
+      "${env:ProgramFiles}\Windows Kits\10",
+      "D:\\Program Files (x86)\\Windows Kits\\10",
+    "D:\\Program Files\\Windows Kits\\10",
+    "D:\\Windows Kits\\10",
+    "C:\\Windows Kits\\10"
+  ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) -and (Test-Path $_) }
+
+  foreach ($root in $roots) {
+    $directCandidates = @(
+      (Join-Path $root "App Certification Kit\MakeAppx.exe"),
+      (Join-Path $root "bin\x64\MakeAppx.exe"),
+      (Join-Path $root "bin\x86\MakeAppx.exe"),
+      (Join-Path $root "bin\arm64\MakeAppx.exe")
+    )
+    foreach ($candidate in $directCandidates) {
+      $checked.Add($candidate)
+      if (Test-Path $candidate) {
+        return @($candidate, $checked)
+      }
+    }
+
+    $binRoot = Join-Path $root "bin"
+    if (Test-Path $binRoot) {
+      $versioned = Get-ChildItem -Path $binRoot -Directory -ErrorAction SilentlyContinue
+      foreach ($dir in ($versioned | Sort-Object Name -Descending)) {
+        foreach ($arch in @("x64", "x86", "arm64")) {
+          $candidate = Join-Path $dir.FullName "$arch\MakeAppx.exe"
+          $checked.Add($candidate)
+          if (Test-Path $candidate) {
+            return @($candidate, $checked)
+          }
+        }
+      }
+    }
+  }
+
+  return @($null, $checked)
+}
+
+if (-not $Version) {
+  $Version = $PackageJson.version
+}
+
+$Version = Get-MsixVersion -InputVersion $Version
+
 $WindowsDir = Join-Path $RepoRoot "src-tauri\windows"
 $ManifestPath = Join-Path $WindowsDir "Package.appxmanifest"
 $StagingDir = Join-Path $WindowsDir "msix-staging"
@@ -14,7 +167,20 @@ $MsixPath = Join-Path $OutDir "TimeLens-$Version.msix"
 $SourceIcon = Join-Path $RepoRoot "src-tauri\icons\icon.png"
 
 if (!(Test-Path $ManifestPath)) {
-  throw "Package.appxmanifest not found: $ManifestPath"
+  Write-Host "Package.appxmanifest not found. Generating a default manifest..."
+  $identityName = Convert-ToAppxIdentityName -Raw $TauriConfig.identifier
+  $publisher = $TauriConfig.bundle.publisher
+  if ([string]::IsNullOrWhiteSpace($publisher)) {
+    $publisher = "CN=TimeLens"
+  }
+  $displayName = if ([string]::IsNullOrWhiteSpace($TauriConfig.productName)) { "TimeLens" } else { $TauriConfig.productName }
+  $description = if ([string]::IsNullOrWhiteSpace($PackageJson.description)) {
+    "Screen time tracker and desktop widget manager"
+  } else {
+    $PackageJson.description
+  }
+  New-AppxManifest -Path $ManifestPath -IdentityName $identityName -IdentityPublisher $publisher -IdentityVersion $Version -DisplayName $displayName -Description $description -PublisherDisplayName $displayName
+  Write-Host "Generated manifest: $ManifestPath"
 }
 
 Write-Host "[1/5] Building Tauri release binary..."
@@ -101,24 +267,17 @@ finally {
 }
 
 Write-Host "[3/5] Resolving MakeAppx.exe..."
-$makeAppx = (Get-Command MakeAppx.exe -ErrorAction SilentlyContinue).Source
+$resolved = Resolve-MakeAppxPath -OverridePath $MakeAppxPath
+$makeAppx = $resolved[0]
+$checkedPaths = $resolved[1]
 
 if (-not $makeAppx) {
-  $sdkBinRoot = "${env:ProgramFiles(x86)}\Windows Kits\10\bin"
-  if (Test-Path $sdkBinRoot) {
-    $candidates = Get-ChildItem -Path $sdkBinRoot -Filter MakeAppx.exe -Recurse -File -ErrorAction SilentlyContinue |
-      Where-Object { $_.FullName -match "\\x64\\|\\x86\\" } |
-      Sort-Object FullName -Descending
-
-    if ($candidates -and $candidates.Count -gt 0) {
-      $makeAppx = $candidates[0].FullName
-    }
-  }
+  Write-Host "Checked locations for MakeAppx.exe:"
+  $checkedPaths | Select-Object -Unique | ForEach-Object { Write-Host " - $_" }
+  throw "MakeAppx.exe not found. Install Windows 10/11 SDK components that include MSIX/App Certification Kit tools, or pass -MakeAppxPath with the full executable path."
 }
 
-if (-not $makeAppx) {
-  throw "MakeAppx.exe not found. Install Windows 10/11 SDK and ensure App Certification Kit tools are available."
-}
+Write-Host "Using MakeAppx: $makeAppx"
 
 Write-Host "[4/5] Building MSIX package..."
 & $makeAppx pack /d $StagingDir /p $MsixPath /o

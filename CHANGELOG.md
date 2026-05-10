@@ -5,6 +5,58 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [1.2.0] - 2026-05-10
+
+### Added
+
+#### Settings Experience
+
+- New **Settings card hub** — the settings page now opens into a card-based section picker instead of a single long scroll view
+- **Settings search** — quickly filter settings sections by keyword
+- Platform-aware visibility — unsupported settings are hidden automatically on macOS, Windows, or Linux instead of being shown in a disabled state
+
+#### Browser Extension Access
+
+- **Browser extension download entry** — added a download button that navigates to the browser extension download page
+- **Browser usage extension settings panel** — browser extension controls moved into a dedicated settings panel opened from the Browser Usage page
+
+#### VS Code Integration
+
+- **VS Code extension download entry** — added a download button that navigates to the VS Code extension download page
+- **VS Code extension unavailable fallback** — when the extension is not open, the app now degrades gracefully and shows a clear notification instead of failing noisily
+
+#### Release Workflow
+
+- **Release version consistency guard** — release automation now checks that the git tag, `package.json`, and `src-tauri/tauri.conf.json` versions match before publishing
+- **Windows MSIX packaging** — release workflow now builds a `.msix` package and uploads it to the GitHub release
+
+### Changed
+
+#### Data Management
+
+- **Data settings simplified** — the Data section now focuses on excluding applications, while export/import actions were moved into Backup & Restore
+- **Backup & Restore v2** — file selection was fixed so backup packages can be opened and restored reliably
+- **Data Health Center** — repair now shows visible loading/error states and no longer feels frozen during long-running operations
+
+#### Repair and Reliability
+
+- **Data repair flow** — repair now pauses monitor writes during the rebuild step to avoid lock contention and timeout-like behavior
+- **Repair scope expanded** — repair also restores missing core indexes in addition to rebuilding daily aggregates
+
+#### App Infrastructure
+
+- **Version sync** — app version values were synchronized across the frontend version display, packaging config, and MSIX build script
+- **Windows packaging script** — MSIX build logic was updated to find SDK tools more robustly and generate a manifest when one is missing
+
+### Fixed
+
+- Fixed the Data Health Center repair button appearing to do nothing in some environments
+- Fixed backup package file selection for Backup & Restore v2
+- Fixed release packaging failures caused by version mismatches and missing MSIX artifacts
+- Reduced noise from unavailable optional integrations by using soft-degradation behavior
+
+---
+
 ## [1.1.0] - 2026-05-02
 
 ### Added

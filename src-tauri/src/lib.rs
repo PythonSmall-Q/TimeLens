@@ -280,6 +280,15 @@ pub fn run() {
             // Monitor
             commands::get_monitor_status,
             commands::set_monitoring_active,
+            commands::get_data_health_summary,
+            commands::repair_data_issues,
+            commands::export_backup_v2,
+            commands::import_backup_v2_validate,
+            commands::import_backup_v2_apply,
+            commands::get_retention_policy_info,
+            commands::set_retention_policy,
+            commands::run_local_archive_now,
+            commands::get_tracking_transparency,
             // Storage – screen time
             commands::get_today_app_totals,
             commands::get_app_totals_for_date,

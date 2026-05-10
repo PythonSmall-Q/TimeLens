@@ -54,6 +54,33 @@ pub fn initialize(conn: &Connection) -> Result<()> {
         CREATE INDEX IF NOT EXISTS idx_app_usage_date     ON app_usage(date);
         CREATE INDEX IF NOT EXISTS idx_app_usage_app_date ON app_usage(app_name, date);
 
+        CREATE TABLE IF NOT EXISTS app_usage_archive (
+            id              INTEGER PRIMARY KEY,
+            date            TEXT    NOT NULL,
+            app_name        TEXT    NOT NULL,
+            exe_path        TEXT    NOT NULL DEFAULT '',
+            window_title    TEXT    NOT NULL DEFAULT '',
+            active_seconds  INTEGER NOT NULL DEFAULT 0,
+            first_seen_at   TEXT    NOT NULL,
+            last_seen_at    TEXT    NOT NULL,
+            archived_at     TEXT    NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_app_usage_archive_date ON app_usage_archive(date);
+
+        CREATE TABLE IF NOT EXISTS daily_app_usage_archive (
+            date            TEXT    NOT NULL,
+            app_name        TEXT    NOT NULL,
+            exe_path        TEXT    NOT NULL DEFAULT '',
+            total_seconds   INTEGER NOT NULL DEFAULT 0,
+            first_seen_at   TEXT    NOT NULL,
+            last_seen_at    TEXT    NOT NULL,
+            archived_at     TEXT    NOT NULL,
+            PRIMARY KEY (date, app_name, exe_path, archived_at)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_daily_app_usage_archive_date ON daily_app_usage_archive(date);
+
         CREATE TABLE IF NOT EXISTS daily_app_usage (
             date            TEXT    NOT NULL,
             app_name        TEXT    NOT NULL,
@@ -239,7 +266,7 @@ pub fn initialize(conn: &Connection) -> Result<()> {
         [],
     )?;
 
-    set_setting(conn, "schema_version", "3")?;
+    set_setting(conn, "schema_version", "4")?;
 
     Ok(())
 }

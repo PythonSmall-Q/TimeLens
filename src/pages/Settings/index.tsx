@@ -2,10 +2,20 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSettingsStore } from "@/stores/settingsStore";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
-import { Moon, Sun, Activity, Database, Info, Rocket, Keyboard, PanelsTopLeft, Puzzle } from "lucide-react";
+import { Moon, Sun, Activity, Database, Info, Rocket, Keyboard, PanelsTopLeft, ArrowLeft, Search } from "lucide-react";
 import clsx from "clsx";
 import * as api from "@/services/tauriApi";
-import type { BrowserExtensionStatus, ExecutableOption, ShortcutSettings } from "@/types";
+import { APP_VERSION } from "../../version";
+import type {
+  BackupPreview,
+  DataHealthSummary,
+  ExecutableOption,
+  InstallChannelInfo,
+  RepairAssistantResult,
+  RetentionPolicyInfo,
+  ShortcutSettings,
+  TrackingTransparencyReport,
+} from "@/types";
 import ExePickerInput from "@/components/ExePickerInput";
 
 function Section({
@@ -40,17 +50,41 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 }
 
 export default function Settings() {
-  const { t } = useTranslation("settings");
+  const { t } = useTranslation(["settings", "common"]);
   const importJsonInputRef = useRef<HTMLInputElement | null>(null);
   const [launchAtStartup, setLaunchAtStartup] = useState(false);
   const [silentStartup, setSilentStartup] = useState(true);
   const [autoOpenWidgets, setAutoOpenWidgets] = useState(true);
   const [fadeOnBlur, setFadeOnBlur] = useState(true);
+  const [installChannelInfo, setInstallChannelInfo] = useState<InstallChannelInfo | null>(null);
+  const [dataHealth, setDataHealth] = useState<DataHealthSummary | null>(null);
+  const [repairPreview, setRepairPreview] = useState<RepairAssistantResult | null>(null);
+  const [backupPreview, setBackupPreview] = useState<BackupPreview | null>(null);
+  const [backupPackagePath, setBackupPackagePath] = useState<string | null>(null);
+  const [backupStrategy, setBackupStrategy] = useState<"overwrite" | "merge">("overwrite");
+  const [retentionInfo, setRetentionInfo] = useState<RetentionPolicyInfo | null>(null);
+  const [trackingTransparency, setTrackingTransparency] = useState<TrackingTransparencyReport | null>(null);
+  const [repairing, setRepairing] = useState(false);
+  const [repairError, setRepairError] = useState<string | null>(null);
+  const [settingSearch, setSettingSearch] = useState("");
+  const [activeSection, setActiveSection] = useState<
+    | "general"
+    | "appearance"
+    | "tracking"
+    | "startup"
+    | "widgets"
+    | "shortcuts"
+    | "data"
+    | "dataHealth"
+    | "backup"
+    | "retention"
+    | "transparency"
+    | "about"
+    | null
+  >(null);
   const [executableOptions, setExecutableOptions] = useState<ExecutableOption[]>([]);
   const [ignoredApps, setIgnoredAppsState] = useState<string[]>([]);
   const [excludePickerValue, setExcludePickerValue] = useState("");
-  const [browserExtensionEnabled, setBrowserExtensionEnabledState] = useState(true);
-  const [browserExtensionStatus, setBrowserExtensionStatus] = useState<BrowserExtensionStatus | null>(null);
   const [shortcuts, setShortcutState] = useState<ShortcutSettings>({
     open_widget_center: "Alt+W",
     toggle_widget_visibility: "Alt+Shift+W",
@@ -89,13 +123,24 @@ export default function Settings() {
         setIgnoreSystemProcesses(s.ignore_system_processes);
         setIdleTimePolicy(s.idle_time_policy);
         setTrackWindowTitles(s.track_window_titles);
-        setBrowserExtensionEnabledState(s.browser_extension_enabled);
         setShortcutState(s.shortcuts);
       })
       .catch(() => {});
 
-    api.getBrowserExtensionStatus()
-      .then(setBrowserExtensionStatus)
+    api.getInstallChannelInfo()
+      .then(setInstallChannelInfo)
+      .catch(() => {});
+
+    api.getDataHealthSummary()
+      .then(setDataHealth)
+      .catch(() => {});
+
+    api.getRetentionPolicyInfo()
+      .then(setRetentionInfo)
+      .catch(() => {});
+
+    api.getTrackingTransparency()
+      .then(setTrackingTransparency)
       .catch(() => {});
 
     const mergeOptions = (incoming: ExecutableOption[]) => {
@@ -173,41 +218,220 @@ export default function Settings() {
     URL.revokeObjectURL(url);
   };
 
-  const refreshBrowserExtensionStatus = async () => {
+  const refreshReliabilityPanels = async () => {
     try {
-      const status = await api.getBrowserExtensionStatus();
-      setBrowserExtensionStatus(status);
+      const [health, retention, transparency] = await Promise.all([
+        api.getDataHealthSummary(),
+        api.getRetentionPolicyInfo(),
+        api.getTrackingTransparency(),
+      ]);
+      setDataHealth(health);
+      setRetentionInfo(retention);
+      setTrackingTransparency(transparency);
     } catch {
-      // keep silent to match current settings UX
+      // keep silent to preserve current settings behavior
     }
   };
 
-  const browserLinkPayload = JSON.stringify(
-    {
-      app: "TimeLens",
-      apiBaseUrl: browserExtensionStatus?.api_base_url ?? "http://127.0.0.1:49152",
-      enabled: browserExtensionEnabled,
-    },
-    null,
-    2,
-  );
+  const previewRepairAssistant = async () => {
+    setRepairError(null);
+    try {
+      const preview = await api.repairDataIssues(true);
+      setRepairPreview(preview);
+    } catch (error) {
+      setRepairError(error instanceof Error ? error.message : t("dataHealth.repairFailed"));
+    }
+  };
+
+  const applyRepairAssistant = async () => {
+    setRepairing(true);
+    setRepairError(null);
+    try {
+      const result = await Promise.race([
+        api.repairDataIssues(false),
+        new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error(t("dataHealth.repairTimeout"))), 30000);
+        }),
+      ]);
+      setRepairPreview(result);
+      await refreshReliabilityPanels();
+    } catch (error) {
+      setRepairError(error instanceof Error ? error.message : t("dataHealth.repairFailed"));
+    } finally {
+      setRepairing(false);
+    }
+  };
+
+  const formatBytes = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+    return `${(bytes / 1024 / 1024 / 1024).toFixed(1)} GB`;
+  };
+
+  const openBackupPackage = async () => {
+    const { open } = await import("@tauri-apps/plugin-dialog");
+    try {
+      const selected = await open({
+        multiple: false,
+        title: t("backup.openTitle"),
+        filters: [{ name: t("backup.filterName"), extensions: ["timelens-backup", "timelensbackup", "zip"] }],
+      });
+      return typeof selected === "string" ? selected : null;
+    } catch {
+      const selected = await open({ multiple: false, title: t("backup.openTitle") });
+      return typeof selected === "string" ? selected : null;
+    }
+  };
+
+  const saveBackupPackage = async () => {
+    const { save } = await import("@tauri-apps/plugin-dialog");
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+    try {
+      return save({
+        defaultPath: `timelens-backup-${stamp}.timelens-backup`,
+        title: t("backup.saveTitle"),
+        filters: [{ name: t("backup.filterName"), extensions: ["timelens-backup", "timelensbackup", "zip"] }],
+      });
+    } catch {
+      return save({
+        defaultPath: `timelens-backup-${stamp}.timelens-backup`,
+        title: t("backup.saveTitle"),
+      });
+    }
+  };
+
+  const validateBackupPackage = async () => {
+    const path = await openBackupPackage();
+    if (!path) return;
+    setBackupPackagePath(path);
+    const preview = await api.importBackupV2Validate(path);
+    setBackupPreview(preview);
+  };
+
+  const applyBackupPackage = async () => {
+    const path = backupPackagePath ?? await openBackupPackage();
+    if (!path) return;
+    setBackupPackagePath(path);
+    const result = await api.importBackupV2Apply(path, backupStrategy);
+    setBackupPreview({
+      manifest: result.manifest,
+      compatible: true,
+      supported_strategies: ["overwrite", "merge"],
+      warnings: result.warnings,
+    });
+    await refreshReliabilityPanels();
+  };
+
+  const exportBackupPackage = async () => {
+    const path = await saveBackupPackage();
+    if (!path) return;
+    const manifest = await api.exportBackupV2(path);
+    setBackupPackagePath(path);
+    setBackupPreview({
+      manifest,
+      compatible: true,
+      supported_strategies: ["overwrite", "merge"],
+      warnings: [],
+    });
+    await refreshReliabilityPanels();
+  };
+
+  const runRetentionArchive = async () => {
+    await api.runLocalArchiveNow();
+    await refreshReliabilityPanels();
+  };
+
+  const showWindowsStartupSettings = installChannelInfo?.platform === "windows";
+  const sectionCards: Array<{
+    key: NonNullable<typeof activeSection>;
+    title: string;
+    icon: React.ElementType;
+    keywords: string[];
+  }> = [
+    { key: "general", title: t("general"), icon: Sun, keywords: [t("language")] },
+    { key: "appearance", title: t("appearance"), icon: Moon, keywords: [t("theme.label")] },
+    { key: "tracking", title: t("tracking.title"), icon: Activity, keywords: [t("tracking.active"), t("tracking.samplingInterval"), t("tracking.idleTimePolicy")] },
+    { key: "startup", title: t("startup.title"), icon: Rocket, keywords: [t("startup.launchAtStartup"), t("startup.silentStartup"), t("startup.autoOpenWidgets")] },
+    { key: "widgets", title: t("widgets.title"), icon: PanelsTopLeft, keywords: [t("widgets.fadeOnBlur")] },
+    { key: "shortcuts", title: t("shortcuts.title"), icon: Keyboard, keywords: [t("shortcuts.openWidgetCenter"), t("shortcuts.toggleWidgetVisibility")] },
+    { key: "data", title: t("data.title"), icon: Database, keywords: [t("data.excludeApps")] },
+    { key: "dataHealth", title: t("dataHealth.title"), icon: Database, keywords: [t("dataHealth.integrity"), t("dataHealth.applyRepair")] },
+    { key: "backup", title: t("backup.title"), icon: Database, keywords: [t("backup.exportAction"), t("backup.applyAction")] },
+    { key: "retention", title: t("retention.title"), icon: Rocket, keywords: [t("retention.current"), t("retention.runNow")] },
+    { key: "transparency", title: t("transparency.title"), icon: Info, keywords: [t("transparency.active"), t("transparency.fields")] },
+    { key: "about", title: t("about.title"), icon: Info, keywords: [t("about.version"), "github"] },
+  ];
+  const settingSearchLower = settingSearch.trim().toLowerCase();
+  const filteredSectionCards = sectionCards.filter((section) => {
+    if (!settingSearchLower) return true;
+    const haystacks = [section.title, ...section.keywords].map((item) => item.toLowerCase());
+    return haystacks.some((item) => item.includes(settingSearchLower));
+  });
 
   return (
     <div className="p-6 space-y-5 animate-fade-in">
       {/* Header */}
       <div>
         <h1 className="text-xl font-bold text-text-primary">{t("title")}</h1>
-        <p className="text-text-muted text-xs mt-0.5">{t("subtitle")}</p>
+        <p className="text-text-muted text-xs mt-0.5">
+          {activeSection ? t("subtitle") : t("subtitle")}
+        </p>
       </div>
 
+      {!activeSection && (
+        <>
+        <div className="relative">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
+          <input
+            type="text"
+            value={settingSearch}
+            onChange={(e) => setSettingSearch(e.target.value)}
+            placeholder={t("searchPlaceholder")}
+            className="w-full pl-8 pr-3 py-2 bg-surface-hover border border-surface-border rounded-xl text-sm text-text-primary placeholder:text-text-muted outline-none focus:border-accent-blue transition-colors"
+          />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {filteredSectionCards.map(({ key, title, icon: Icon }) => (
+            <button
+              key={key}
+              onClick={() => setActiveSection(key)}
+              className="glass-card p-4 text-left border border-surface-border hover:border-accent-blue/40 hover:bg-surface-hover transition-colors"
+            >
+              <div className="flex items-center gap-2 text-text-primary">
+                <Icon size={15} className="text-accent-blue" />
+                <span className="text-sm font-medium">{title}</span>
+              </div>
+            </button>
+          ))}
+        </div>
+        {filteredSectionCards.length === 0 && (
+          <p className="text-xs text-text-muted text-center">{t("searchNoResult")}</p>
+        )}
+        </>
+      )}
+
+      {activeSection && (
+        <button
+          onClick={() => setActiveSection(null)}
+          className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
+        >
+          <ArrowLeft size={13} />
+          {t("common:previous")}
+        </button>
+      )}
+
       {/* General */}
+      {activeSection === "general" && (
       <Section icon={Sun} title={t("general")}>
         <Row label={t("language")}>
           <LanguageSwitcher />
         </Row>
       </Section>
+      )}
 
       {/* Appearance */}
+      {activeSection === "appearance" && (
       <Section icon={Moon} title={t("appearance")}>
         <Row label={t("theme.label")}>
           <div className="flex gap-2">
@@ -228,12 +452,17 @@ export default function Settings() {
           </div>
         </Row>
       </Section>
+      )}
 
       {/* Tracking */}
+      {activeSection === "tracking" && (
       <Section icon={Activity} title={t("tracking.title")}>
         <Row label={t("tracking.active")}>
           <button
-            onClick={() => setMonitoringActive(!monitoringActive)}
+            onClick={async () => {
+              await setMonitoringActive(!monitoringActive);
+              await refreshReliabilityPanels();
+            }}
             title={t("tracking.active")}
             className={clsx(
               "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
@@ -403,52 +632,58 @@ export default function Settings() {
         </Row>
         <p className="text-xs text-text-muted text-right">{t("tracking.idleTimePolicyHint")}</p>
 
-  </Section>
+    </Section>
+      )}
 
   {/* Startup */}
+      {activeSection === "startup" && (
       <Section icon={Rocket} title={t("startup.title")}>
-        <Row label={t("startup.launchAtStartup")}>
-          <button
-            onClick={async () => {
-              const next = !launchAtStartup;
-              setLaunchAtStartup(next);
-              await api.setLaunchAtStartup(next).catch(() => setLaunchAtStartup(!next));
-            }}
-            title={t("startup.launchAtStartup")}
-            className={clsx(
-              "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
-              launchAtStartup ? "bg-accent-blue" : "bg-surface-hover"
-            )}
-          >
-            <span
-              className={clsx(
-                "inline-block h-4 w-4 rounded-full bg-white shadow transition-transform",
-                launchAtStartup ? "translate-x-6" : "translate-x-1"
-              )}
-            />
-          </button>
-        </Row>
-        <Row label={t("startup.silentStartup")}>
-          <button
-            onClick={async () => {
-              const next = !silentStartup;
-              setSilentStartup(next);
-              await api.setSilentStartup(next).catch(() => setSilentStartup(!next));
-            }}
-            title={t("startup.silentStartup")}
-            className={clsx(
-              "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
-              silentStartup ? "bg-accent-blue" : "bg-surface-hover"
-            )}
-          >
-            <span
-              className={clsx(
-                "inline-block h-4 w-4 rounded-full bg-white shadow transition-transform",
-                silentStartup ? "translate-x-6" : "translate-x-1"
-              )}
-            />
-          </button>
-        </Row>
+        {showWindowsStartupSettings && (
+          <>
+            <Row label={t("startup.launchAtStartup")}>
+              <button
+                onClick={async () => {
+                  const next = !launchAtStartup;
+                  setLaunchAtStartup(next);
+                  await api.setLaunchAtStartup(next).catch(() => setLaunchAtStartup(!next));
+                }}
+                title={t("startup.launchAtStartup")}
+                className={clsx(
+                  "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+                  launchAtStartup ? "bg-accent-blue" : "bg-surface-hover"
+                )}
+              >
+                <span
+                  className={clsx(
+                    "inline-block h-4 w-4 rounded-full bg-white shadow transition-transform",
+                    launchAtStartup ? "translate-x-6" : "translate-x-1"
+                  )}
+                />
+              </button>
+            </Row>
+            <Row label={t("startup.silentStartup")}>
+              <button
+                onClick={async () => {
+                  const next = !silentStartup;
+                  setSilentStartup(next);
+                  await api.setSilentStartup(next).catch(() => setSilentStartup(!next));
+                }}
+                title={t("startup.silentStartup")}
+                className={clsx(
+                  "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+                  silentStartup ? "bg-accent-blue" : "bg-surface-hover"
+                )}
+              >
+                <span
+                  className={clsx(
+                    "inline-block h-4 w-4 rounded-full bg-white shadow transition-transform",
+                    silentStartup ? "translate-x-6" : "translate-x-1"
+                  )}
+                />
+              </button>
+            </Row>
+          </>
+        )}
         <Row label={t("startup.autoOpenWidgets")}>
           <button
             onClick={async () => {
@@ -470,10 +705,14 @@ export default function Settings() {
             />
           </button>
         </Row>
-        <p className="text-xs text-text-muted text-right">{t("startup.silentHint")}</p>
+        {showWindowsStartupSettings && (
+          <p className="text-xs text-text-muted text-right">{t("startup.silentHint")}</p>
+        )}
       </Section>
+      )}
 
       {/* Widgets */}
+      {activeSection === "widgets" && (
       <Section icon={PanelsTopLeft} title={t("widgets.title")}>
         <Row label={t("widgets.fadeOnBlur")}>
           <button
@@ -498,104 +737,10 @@ export default function Settings() {
         </Row>
         <p className="text-xs text-text-muted text-right">{t("widgets.fadeHint")}</p>
       </Section>
-
-      <Section icon={Puzzle} title={t("browser.title")}> 
-        <Row label={t("browser.enable")}> 
-          <button
-            onClick={async () => {
-              const next = !browserExtensionEnabled;
-              setBrowserExtensionEnabledState(next);
-              await api.setBrowserExtensionEnabled(next).catch(() => setBrowserExtensionEnabledState(!next));
-              await refreshBrowserExtensionStatus();
-            }}
-            title={t("browser.enable")}
-            className={clsx(
-              "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
-              browserExtensionEnabled ? "bg-accent-blue" : "bg-surface-hover"
-            )}
-          >
-            <span
-              className={clsx(
-                "inline-block h-4 w-4 rounded-full bg-white shadow transition-transform",
-                browserExtensionEnabled ? "translate-x-6" : "translate-x-1"
-              )}
-            />
-          </button>
-        </Row>
-        <Row label={t("browser.status")}>
-          <span className={clsx(
-            "text-xs px-2.5 py-1 rounded-full border",
-            browserExtensionStatus?.connected
-              ? "border-accent-green/40 text-accent-green bg-accent-green/10"
-              : "border-surface-border text-text-muted bg-surface-hover"
-          )}>
-            {browserExtensionStatus?.connected ? t("browser.connected") : t("browser.waiting")}
-          </span>
-        </Row>
-        <Row label={t("browser.apiUrl")}>
-          <div className="flex items-center gap-2 justify-end flex-wrap">
-            <span className="text-xs font-mono text-text-secondary">
-              {browserExtensionStatus?.api_base_url ?? "http://127.0.0.1:49152"}
-            </span>
-            <button
-              onClick={async () => {
-                await navigator.clipboard.writeText(browserExtensionStatus?.api_base_url ?? "http://127.0.0.1:49152");
-              }}
-              className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
-            >
-              {t("browser.copyApiUrl")}
-            </button>
-          </div>
-        </Row>
-        <Row label={t("browser.linkConfig")}>
-          <button
-            onClick={async () => {
-              await navigator.clipboard.writeText(browserLinkPayload);
-            }}
-            className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
-          >
-            {t("browser.copyConfig")}
-          </button>
-        </Row>
-        <div className="rounded-lg border border-surface-border bg-surface-hover/40 p-3 space-y-2">
-          <p className="text-xs text-text-secondary">{t("browser.hint")}</p>
-          <div className="flex flex-wrap gap-2 text-xs text-text-muted">
-            <span className="px-2 py-1 rounded-full bg-surface-hover">Chrome</span>
-            <span className="px-2 py-1 rounded-full bg-surface-hover">Edge</span>
-            <span className="px-2 py-1 rounded-full bg-surface-hover">Brave</span>
-          </div>
-          <div className="text-xs text-text-muted space-y-1">
-            <p>{t("browser.lastBrowser", { browser: browserExtensionStatus?.last_browser_name ?? t("browser.none") })}</p>
-            <p>{t("browser.lastLocale", { locale: browserExtensionStatus?.last_locale ?? t("browser.none") })}</p>
-            <p>{t("browser.lastSync", { time: browserExtensionStatus?.last_sync_at ?? t("browser.none") })}</p>
-            <p>{t("browser.recentSessions", { count: browserExtensionStatus?.recent_session_count ?? 0 })}</p>
-          </div>
-          <div className="space-y-2 max-h-48 overflow-y-auto">
-            {(browserExtensionStatus?.recent_sessions ?? []).map((session) => (
-              <div key={`${session.started_at}-${session.tab_url}`} className="rounded-lg border border-surface-border px-3 py-2">
-                <div className="text-xs text-text-primary truncate">{session.title || session.host}</div>
-                <div className="text-[11px] text-text-muted truncate">{session.host || session.tab_url}</div>
-                <div className="text-[11px] text-text-muted">
-                  {session.browser_name} · {Math.floor(session.duration_seconds / 60)}m · {session.locale || t("browser.none")}
-                </div>
-              </div>
-            ))}
-            {(browserExtensionStatus?.recent_sessions ?? []).length === 0 && (
-              <p className="text-xs text-text-muted">{t("browser.noSessions")}</p>
-            )}
-          </div>
-          <div className="flex justify-end">
-            <button
-              onClick={refreshBrowserExtensionStatus}
-              className="text-xs px-3 py-1.5 rounded-lg border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
-            >
-              {t("browser.refresh")}
-            </button>
-          </div>
-        </div>
-      </Section>
+      )}
 
       {/* Shortcuts */}
+      {activeSection === "shortcuts" && (
       <Section icon={Keyboard} title={t("shortcuts.title")}>
         <Row label={t("shortcuts.openWidgetCenter")}>
           <input
@@ -649,8 +794,10 @@ export default function Settings() {
           </button>
         </div>
       </Section>
+      )}
 
       {/* Data */}
+      {activeSection === "data" && (
       <Section icon={Database} title={t("data.title")}>
         <div className="space-y-2">
           <div className="text-sm text-text-secondary">{t("data.excludeApps")}</div>
@@ -702,7 +849,85 @@ export default function Settings() {
             </button>
           </div>
         </div>
+      </Section>
+      )}
 
+      {activeSection === "dataHealth" && (
+      <Section icon={Database} title={t("dataHealth.title")}>
+        <div className="grid gap-2 sm:grid-cols-3">
+          <div className="rounded-lg border border-surface-border bg-surface-hover/40 p-3">
+            <div className="text-[11px] text-text-muted">{t("dataHealth.integrity")}</div>
+            <div className={clsx("text-sm font-semibold", dataHealth?.integrity_ok ? "text-accent-green" : "text-red-400")}>{dataHealth?.integrity_ok ? t("dataHealth.ok") : t("dataHealth.fail")}</div>
+          </div>
+          <div className="rounded-lg border border-surface-border bg-surface-hover/40 p-3">
+            <div className="text-[11px] text-text-muted">{t("dataHealth.indexes")}</div>
+            <div className={clsx("text-sm font-semibold", dataHealth?.index_ok ? "text-accent-green" : "text-yellow-400")}>{dataHealth?.index_ok ? t("dataHealth.ok") : t("dataHealth.warn")}</div>
+          </div>
+          <div className="rounded-lg border border-surface-border bg-surface-hover/40 p-3">
+            <div className="text-[11px] text-text-muted">{t("dataHealth.timeline")}</div>
+            <div className="text-sm font-semibold text-text-primary">{(dataHealth?.missing_days?.length ?? 0) + (dataHealth?.zero_usage_days?.length ?? 0)}</div>
+          </div>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-3 text-xs text-text-muted">
+          <div className="rounded-lg border border-surface-border px-3 py-2">{t("dataHealth.schema", { version: dataHealth?.schema_version ?? t("backup.none") })}</div>
+          <div className="rounded-lg border border-surface-border px-3 py-2">{t("dataHealth.appRows", { count: dataHealth?.app_usage_rows ?? 0 })}</div>
+          <div className="rounded-lg border border-surface-border px-3 py-2">{t("dataHealth.archiveRows", { count: dataHealth?.archive_rows ?? 0 })}</div>
+        </div>
+        <div className="space-y-2">
+          {(dataHealth?.issues ?? []).map((issue) => (
+            <div key={issue.code} className="rounded-lg border border-surface-border bg-surface-hover/40 px-3 py-2 text-xs">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-text-primary font-medium">{issue.title}</span>
+                <span className={clsx("px-2 py-0.5 rounded-full border", issue.severity === "error" ? "border-red-400/40 text-red-300" : issue.severity === "warning" ? "border-yellow-400/40 text-yellow-300" : "border-accent-blue/40 text-accent-blue")}>{issue.severity}</span>
+              </div>
+              <p className="text-text-muted mt-1">{issue.detail}{issue.count ? ` (${issue.count})` : ""}</p>
+            </div>
+          ))}
+          {(dataHealth?.issues ?? []).length === 0 && (
+            <p className="text-xs text-text-muted">{t("dataHealth.noIssues")}</p>
+          )}
+        </div>
+        <div className="flex justify-end gap-2">
+          <button
+            onClick={previewRepairAssistant}
+            className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
+          >
+            {t("dataHealth.previewRepair")}
+          </button>
+          <button
+            onClick={applyRepairAssistant}
+            disabled={repairing}
+            className="text-xs px-3 py-1.5 rounded-lg border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
+          >
+            {repairing ? t("dataHealth.repairing") : t("dataHealth.applyRepair")}
+          </button>
+        </div>
+        {repairError && (
+          <div className="rounded-lg border border-red-400/40 bg-red-500/10 p-3 text-xs text-red-200">
+            {repairError}
+          </div>
+        )}
+        {repairPreview && (
+          <div className="rounded-lg border border-surface-border bg-surface-hover/40 p-3 text-xs text-text-muted space-y-1">
+            <p>{t("dataHealth.repairRows", { count: repairPreview.rebuilt_daily_rows })}</p>
+            {repairPreview.actions.map((action) => (
+              <p key={action.code}>{action.description}</p>
+            ))}
+          </div>
+        )}
+        <div className="flex justify-end">
+          <button
+            onClick={refreshReliabilityPanels}
+            className="text-xs px-3 py-1.5 rounded-lg border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
+          >
+            {t("dataHealth.refresh")}
+          </button>
+        </div>
+      </Section>
+      )}
+
+      {activeSection === "backup" && (
+      <Section icon={Database} title={t("backup.title")}>
         <Row label={t("data.export")}>
           <div className="flex items-center gap-2 flex-wrap justify-end">
             <button
@@ -753,12 +978,170 @@ export default function Settings() {
             />
           </div>
         </Row>
+
+        <Row label={t("backup.export")}> 
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            <button
+              onClick={exportBackupPackage}
+              className="text-xs px-3 py-1.5 rounded-lg border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
+            >
+              {t("backup.exportAction")}
+            </button>
+            <button
+              onClick={validateBackupPackage}
+              className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
+            >
+              {t("backup.validateAction")}
+            </button>
+          </div>
+        </Row>
+        <Row label={t("backup.restoreMode")}>
+          <div className="flex gap-2 flex-wrap justify-end">
+            {(["overwrite", "merge"] as const).map((mode) => (
+              <button
+                key={mode}
+                onClick={() => setBackupStrategy(mode)}
+                className={clsx(
+                  "px-3 py-1.5 rounded-lg text-xs border transition-colors",
+                  backupStrategy === mode
+                    ? "border-accent-blue bg-accent-blue/15 text-accent-blue"
+                    : "border-surface-border text-text-muted hover:text-text-secondary"
+                )}
+              >
+                {t(`backup.${mode}`)}
+              </button>
+            ))}
+            <button
+              onClick={applyBackupPackage}
+              className="text-xs px-3 py-1.5 rounded-lg border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
+            >
+              {t("backup.applyAction")}
+            </button>
+          </div>
+        </Row>
+        <div className="rounded-lg border border-surface-border bg-surface-hover/40 p-3 space-y-2 text-xs">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-text-secondary">{t("backup.currentPath")}</span>
+            <span className="text-text-primary truncate max-w-80">{backupPackagePath || t("backup.none")}</span>
+          </div>
+          {backupPreview && (
+            <div className="space-y-1 text-text-muted">
+              <p>{t("backup.previewVersion", { version: backupPreview.manifest.version, appVersion: backupPreview.manifest.app_version })}</p>
+              <p>{t("backup.previewSchema", { schema: backupPreview.manifest.schema_version })}</p>
+              <p>{t("backup.previewCounts", { appUsage: backupPreview.manifest.counts.app_usage, todos: backupPreview.manifest.counts.todos, widgets: backupPreview.manifest.counts.widget_configs })}</p>
+              <p>{t("backup.previewChecksum", { checksum: backupPreview.manifest.checksum.slice(0, 12) })}</p>
+              {backupPreview.warnings.length > 0 && (
+                <div className="space-y-1">
+                  {backupPreview.warnings.map((warning) => (
+                    <p key={warning} className="text-yellow-300">{warning}</p>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </Section>
+      )}
+
+      {activeSection === "retention" && (
+      <Section icon={Rocket} title={t("retention.title")}>
+        <Row label={t("retention.current")}> 
+          <div className="flex gap-2 flex-wrap justify-end">
+            {(["keep_all", "3m", "6m", "12m"] as const).map((policy) => (
+              <button
+                key={policy}
+                onClick={async () => {
+                  await api.setRetentionPolicy(policy);
+                  await refreshReliabilityPanels();
+                }}
+                className={clsx(
+                  "px-3 py-1.5 rounded-lg text-xs border transition-colors",
+                  retentionInfo?.policy === policy
+                    ? "border-accent-blue bg-accent-blue/15 text-accent-blue"
+                    : "border-surface-border text-text-muted hover:text-text-secondary"
+                )}
+              >
+                {t(`retention.${policy}`)}
+              </button>
+            ))}
+          </div>
+        </Row>
+        <div className="rounded-lg border border-surface-border bg-surface-hover/40 p-3 text-xs text-text-muted space-y-1">
+          <p>{t("retention.preview", { label: retentionInfo?.label ?? t("backup.none") })}</p>
+          <p>{t("retention.cutoff", { date: retentionInfo?.cutoff_date ?? t("backup.none") })}</p>
+          <p>{t("retention.impact", { rows: retentionInfo?.estimated_rows ?? 0, size: formatBytes(retentionInfo?.estimated_storage_bytes ?? 0) })}</p>
+        </div>
+        <div className="flex justify-end">
+          <button
+            onClick={runRetentionArchive}
+            className="text-xs px-3 py-1.5 rounded-lg border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
+          >
+            {t("retention.runNow")}
+          </button>
+        </div>
+      </Section>
+      )}
+
+      {activeSection === "transparency" && (
+      <Section icon={Info} title={t("transparency.title")}>
+        <Row label={t("transparency.active")}>
+          <button
+            onClick={async () => {
+              await setMonitoringActive(!monitoringActive);
+              await refreshReliabilityPanels();
+            }}
+            title={t("transparency.active")}
+            className={clsx(
+              "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+              monitoringActive ? "bg-accent-blue" : "bg-surface-hover"
+            )}
+          >
+            <span
+              className={clsx(
+                "inline-block h-4 w-4 rounded-full bg-white shadow transition-transform",
+                monitoringActive ? "translate-x-6" : "translate-x-1"
+              )}
+            />
+          </button>
+        </Row>
+        <div className="rounded-lg border border-surface-border bg-surface-hover/40 p-3 text-xs text-text-muted space-y-1">
+          <p>{t("transparency.pausedAt", { value: trackingTransparency?.paused_at ?? t("backup.none") })}</p>
+          <p>{t("transparency.pausedBy", { value: trackingTransparency?.paused_by ?? t("backup.none") })}</p>
+          <p>{t("transparency.pauseReason", { value: trackingTransparency?.pause_reason ?? t("backup.none") })}</p>
+          <p>{t("transparency.writeFrequency", { day: trackingTransparency?.writes_last_24h ?? 0, week: trackingTransparency?.writes_last_7d ?? 0 })}</p>
+        </div>
+        <div className="space-y-2">
+          <div className="text-xs text-text-secondary">{t("transparency.fields")}</div>
+          <div className="flex flex-wrap gap-2">
+            {(trackingTransparency?.tracked_fields ?? []).map((field) => (
+              <span key={field.field} className="px-2 py-1 rounded-full bg-surface-hover text-[11px] text-text-secondary border border-surface-border" title={field.description}>
+                {field.field}
+              </span>
+            ))}
+          </div>
+        </div>
+        <div className="space-y-2 max-h-56 overflow-y-auto">
+          {(trackingTransparency?.recent_writes ?? []).map((entry, index) => (
+            <div key={`${entry.first_seen_at}-${entry.exe_path}-${index}`} className="rounded-lg border border-surface-border px-3 py-2 text-xs">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-text-primary truncate">{entry.app_name}</span>
+                <span className="text-text-muted">{entry.active_seconds}s</span>
+              </div>
+              <div className="text-text-muted truncate">{entry.exe_path || entry.window_title || entry.date}</div>
+            </div>
+          ))}
+          {(trackingTransparency?.recent_writes ?? []).length === 0 && (
+            <p className="text-xs text-text-muted">{t("transparency.noWrites")}</p>
+          )}
+        </div>
+      </Section>
+      )}
 
       {/* About */}
+      {activeSection === "about" && (
       <Section icon={Info} title={t("about.title")}>
         <Row label={t("about.version")}>
-          <span className="text-xs font-mono text-text-secondary">v1.1.0</span>
+          <span className="text-xs font-mono text-text-secondary">v{APP_VERSION}</span>
         </Row>
         <Row label="GitHub">
           <a
@@ -771,6 +1154,7 @@ export default function Settings() {
           </a>
         </Row>
       </Section>
+      )}
     </div>
   );
 }

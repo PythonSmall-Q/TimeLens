@@ -28,7 +28,15 @@ import type {
   VsCodeStatsSummary,
   VsCodeTrackingStatus,
   InstallChannelInfo,
+  BackupApplyResult,
+  BackupManifest,
+  BackupPreview,
+  DataHealthSummary,
+  RepairAssistantResult,
   ShortcutSettings,
+  RetentionPolicyInfo,
+  RetentionRunResult,
+  TrackingTransparencyReport,
   WidgetRegistryResponse,
   WidgetRegistryItem,
   ProductivityScore,
@@ -36,6 +44,28 @@ import type {
 } from "@/types";
 
 const LOCAL_API_BASE_URL = "http://127.0.0.1:49152";
+const unsupportedLocalApiPaths = new Set<string>();
+let vscodeApiUnavailable = false;
+let vscodeUnavailableNotified = false;
+
+export const VSCODE_EXTENSION_UNAVAILABLE_EVENT = "timelens-vscode-extension-unavailable";
+
+function localApiPathKey(path: string): string {
+  const idx = path.indexOf("?");
+  return idx >= 0 ? path.slice(0, idx) : path;
+}
+
+function isVsCodeApiPath(path: string): boolean {
+  return localApiPathKey(path).startsWith("/api/vscode/");
+}
+
+function emitVsCodeUnavailableOnce() {
+  if (vscodeUnavailableNotified) return;
+  vscodeUnavailableNotified = true;
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(VSCODE_EXTENSION_UNAVAILABLE_EVENT));
+  }
+}
 
 async function localApiRequest<T>(
   path: string,
@@ -55,6 +85,36 @@ async function localApiRequest<T>(
     return undefined as T;
   }
   return (await resp.json()) as T;
+}
+
+async function localApiRequestWith404Fallback<T>(
+  path: string,
+  fallback: T,
+  init?: RequestInit
+): Promise<T> {
+  const key = localApiPathKey(path);
+  if (isVsCodeApiPath(path) && vscodeApiUnavailable) {
+    return fallback;
+  }
+
+  if (unsupportedLocalApiPaths.has(key)) {
+    return fallback;
+  }
+
+  try {
+    return await localApiRequest<T>(path, init);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (message.includes("404")) {
+      unsupportedLocalApiPaths.add(key);
+      if (isVsCodeApiPath(path)) {
+        vscodeApiUnavailable = true;
+        emitVsCodeUnavailableOnce();
+      }
+      return fallback;
+    }
+    throw error;
+  }
 }
 
 // ── Monitor ───────────────────────────────────────────────────
@@ -200,6 +260,39 @@ export const exportDataJson = (): Promise<string> =>
 
 export const importDataJson = (payload: string): Promise<void> =>
   invoke("import_data_json", { payload });
+
+// ── Data reliability / v1.2.0 ─────────────────────────────────
+export const getDataHealthSummary = (): Promise<DataHealthSummary> =>
+  invoke("get_data_health_summary");
+
+export const repairDataIssues = (dryRun: boolean): Promise<RepairAssistantResult> =>
+  invoke("repair_data_issues", { dryRun });
+
+export const exportBackupV2 = (path: string): Promise<BackupManifest> =>
+  invoke("export_backup_v2", { path });
+
+export const importBackupV2Validate = (path: string): Promise<BackupPreview> =>
+  invoke("import_backup_v2_validate", { path });
+
+export const importBackupV2Apply = (
+  path: string,
+  strategy: "overwrite" | "merge" | "new_profile"
+): Promise<BackupApplyResult> =>
+  invoke("import_backup_v2_apply", { path, strategy });
+
+export const getRetentionPolicyInfo = (): Promise<RetentionPolicyInfo> =>
+  invoke("get_retention_policy_info");
+
+export const setRetentionPolicy = (
+  policy: "keep_all" | "3m" | "6m" | "12m"
+): Promise<void> =>
+  invoke("set_retention_policy", { policy });
+
+export const runLocalArchiveNow = (): Promise<RetentionRunResult> =>
+  invoke("run_local_archive_now");
+
+export const getTrackingTransparency = (): Promise<TrackingTransparencyReport> =>
+  invoke("get_tracking_transparency");
 
 // ── Todos ─────────────────────────────────────────────────────
 export const getTodos = (): Promise<TodoItem[]> => invoke("get_todos");
@@ -361,31 +454,34 @@ export const getVsCodeStatsInRange = (
   startDate: string,
   endDate: string
 ): Promise<VsCodeStatsSummary> =>
-  localApiRequest<VsCodeStatsSummary>(
-    `/api/vscode/stats/range?start=${encodeURIComponent(startDate)}&end=${encodeURIComponent(endDate)}`
+  localApiRequestWith404Fallback<VsCodeStatsSummary>(
+    `/api/vscode/stats/range?start=${encodeURIComponent(startDate)}&end=${encodeURIComponent(endDate)}`,
+    { total_seconds: 0, session_count: 0 }
   );
 
 export const getVsCodeLanguageStatsInRange = (
   startDate: string,
   endDate: string
 ): Promise<VsCodeLanguageStats[]> =>
-  localApiRequest<VsCodeLanguageStats[]>(
-    `/api/vscode/languages/range?start=${encodeURIComponent(startDate)}&end=${encodeURIComponent(endDate)}`
+  localApiRequestWith404Fallback<VsCodeLanguageStats[]>(
+    `/api/vscode/languages/range?start=${encodeURIComponent(startDate)}&end=${encodeURIComponent(endDate)}`,
+    []
   );
 
 export const getVsCodeProjectStatsInRange = (
   startDate: string,
   endDate: string
 ): Promise<VsCodeProjectStats[]> =>
-  localApiRequest<VsCodeProjectStats[]>(
-    `/api/vscode/projects/range?start=${encodeURIComponent(startDate)}&end=${encodeURIComponent(endDate)}`
+  localApiRequestWith404Fallback<VsCodeProjectStats[]>(
+    `/api/vscode/projects/range?start=${encodeURIComponent(startDate)}&end=${encodeURIComponent(endDate)}`,
+    []
   );
 
 export const setVsCodeTrackingEnabled = (enabled: boolean, trackingLevel?: string): Promise<void> =>
-  localApiRequest<void>("/api/vscode/enabled", {
+  localApiRequestWith404Fallback<void>("/api/vscode/enabled", undefined, {
     method: "POST",
     body: JSON.stringify({ enabled, ...(trackingLevel ? { tracking_level: trackingLevel } : {}) }),
   });
 
 export const getVsCodeTrackingEnabled = (): Promise<VsCodeTrackingStatus> =>
-  localApiRequest<VsCodeTrackingStatus>("/api/vscode/enabled");
+  localApiRequestWith404Fallback<VsCodeTrackingStatus>("/api/vscode/enabled", { enabled: false });

@@ -17,7 +17,7 @@ interface SettingsState {
   excludeTimelens: boolean;
   setLanguage: (lang: string) => void;
   setTheme: (theme: "dark" | "light" | "system") => void;
-  setMonitoringActive: (active: boolean) => void;
+  setMonitoringActive: (active: boolean) => Promise<void>;
   setSamplingInterval: (ms: number) => void;
   setDebounce: (ms: number) => void;
   setAutoOpenWidgets: (active: boolean) => void;
@@ -53,7 +53,7 @@ export const useSettingsStore = create<SettingsState>()(
 
       setMonitoringActive: (monitoringActive) => {
         set({ monitoringActive });
-        api.setMonitoringActive(monitoringActive).catch((e) => {
+        return api.setMonitoringActive(monitoringActive).catch((e) => {
           console.error("setMonitoringActive failed", e);
         });
       },

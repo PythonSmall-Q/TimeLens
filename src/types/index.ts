@@ -204,6 +204,112 @@ export interface InstallChannelInfo {
   should_trigger_update: boolean;
 }
 
+export interface BackupBundleCounts {
+  app_usage: number;
+  browser_sessions: number;
+  todos: number;
+  widget_configs: number;
+  ignored_apps: number;
+  app_settings: number;
+}
+
+export interface BackupManifest {
+  version: string;
+  app_version: string;
+  schema_version: string;
+  locale: string;
+  created_at: string;
+  checksum: string;
+  counts: BackupBundleCounts;
+}
+
+export interface DataHealthIssue {
+  code: string;
+  severity: "info" | "warning" | "error";
+  title: string;
+  detail: string;
+  count: number;
+}
+
+export interface DataHealthSummary {
+  schema_version: string;
+  integrity_ok: boolean;
+  foreign_key_ok: boolean;
+  index_ok: boolean;
+  app_usage_rows: number;
+  daily_app_usage_rows: number;
+  archive_rows: number;
+  missing_days: string[];
+  zero_usage_days: string[];
+  issues: DataHealthIssue[];
+}
+
+export interface RepairActionPreview {
+  code: string;
+  description: string;
+}
+
+export interface RepairAssistantResult {
+  dry_run: boolean;
+  actions: RepairActionPreview[];
+  rebuilt_daily_rows: number;
+}
+
+export interface BackupPreview {
+  manifest: BackupManifest;
+  compatible: boolean;
+  supported_strategies: Array<"overwrite" | "merge" | "new_profile">;
+  warnings: string[];
+}
+
+export interface BackupApplyResult {
+  manifest: BackupManifest;
+  strategy: "overwrite" | "merge" | "new_profile";
+  imported_rows: number;
+  warnings: string[];
+}
+
+export interface RetentionPolicyInfo {
+  policy: "keep_all" | "3m" | "6m" | "12m";
+  label: string;
+  cutoff_date: string | null;
+  estimated_rows: number;
+  estimated_storage_bytes: number;
+}
+
+export interface RetentionRunResult {
+  policy: "keep_all" | "3m" | "6m" | "12m";
+  cutoff_date: string | null;
+  archived_app_usage_rows: number;
+  archived_daily_rows: number;
+}
+
+export interface TrackingFieldInfo {
+  field: string;
+  description: string;
+}
+
+export interface TrackingWriteEntry {
+  date: string;
+  app_name: string;
+  exe_path: string;
+  window_title: string;
+  active_seconds: number;
+  first_seen_at: string;
+  last_seen_at: string;
+}
+
+export interface TrackingTransparencyReport {
+  status: MonitorStatus;
+  paused_at: string | null;
+  paused_by: string | null;
+  pause_reason: string | null;
+  tracked_fields: TrackingFieldInfo[];
+  writes_last_24h: number;
+  writes_last_7d: number;
+  recent_writes: TrackingWriteEntry[];
+}
+
 export interface AppLimit {
   exePath: string;
   appName: string;

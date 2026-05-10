@@ -37,6 +37,7 @@ export default function HourlyTimeline() {
   const { todayHourly, interruptionPeriods } = useStatsStore();
   const data = buildHourlyData(todayHourly);
   const currentHour = new Date().getHours();
+  const currentHourRow = data[currentHour];
 
   // Hours with heavy fragmentation (fragment_score > 0.6)
   const fragmentedHours = new Set(
@@ -71,22 +72,16 @@ export default function HourlyTimeline() {
             stroke="#6c8ebf"
             strokeWidth={2}
             fill="url(#blueGrad)"
-            dot={(props: any) => {
-              if (props.payload.hour === currentHour) {
-                return (
-                  <circle
-                    key="cur"
-                    cx={props.cx}
-                    cy={props.cy}
-                    r={4}
-                    fill="#6c8ebf"
-                    stroke="#1a1b2e"
-                    strokeWidth={2}
-                  />
-                );
-              }
-              return <></>;
-            }}
+            dot={false}
+          />
+          <ReferenceDot
+            key={`cur-${currentHour}`}
+            x={currentHour}
+            y={currentHourRow?.seconds ?? 0}
+            r={4}
+            fill="#6c8ebf"
+            stroke="#1a1b2e"
+            strokeWidth={2}
           />
           {/* Interruption dots for fragmented hours */}
           {Array.from(fragmentedHours).map((h) => {
