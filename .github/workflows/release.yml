@@ -23,7 +23,7 @@ jobs:
             - platform: windows-latest
               args: "--bundles nsis,msi"
             - platform: macos-latest
-              args: "--target universal-apple-darwin"
+              args: "--target universal-apple-darwin --bundles app,dmg,updater"
             - platform: ubuntu-latest
               args: ""
 
