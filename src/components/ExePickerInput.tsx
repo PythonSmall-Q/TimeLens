@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from "react";
 import { FolderOpen } from "lucide-react";
-import { open as dialogOpen } from "@tauri-apps/plugin-dialog";
 import type { ExecutableOption } from "@/types";
 import clsx from "clsx";
 
@@ -60,6 +59,7 @@ export default function ExePickerInput({
 
   const browseFile = async () => {
     try {
+      const { open: dialogOpen } = await import("@tauri-apps/plugin-dialog");
       const selected = await dialogOpen({
         filters: [{ name: "Executable", extensions: ["exe", "app", ""] }],
         multiple: false,

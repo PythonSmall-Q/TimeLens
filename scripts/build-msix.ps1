@@ -166,22 +166,25 @@ $OutDir = Join-Path $WindowsDir "out"
 $MsixPath = Join-Path $OutDir "TimeLens-$Version.msix"
 $SourceIcon = Join-Path $RepoRoot "src-tauri\icons\icon.png"
 
-if (!(Test-Path $ManifestPath)) {
-  Write-Host "Package.appxmanifest not found. Generating a default manifest..."
-  $identityName = Convert-ToAppxIdentityName -Raw $TauriConfig.identifier
-  $publisher = $TauriConfig.bundle.publisher
-  if ([string]::IsNullOrWhiteSpace($publisher)) {
-    $publisher = "CN=TimeLens"
-  }
-  $displayName = if ([string]::IsNullOrWhiteSpace($TauriConfig.productName)) { "TimeLens" } else { $TauriConfig.productName }
-  $description = if ([string]::IsNullOrWhiteSpace($PackageJson.description)) {
-    "Screen time tracker and desktop widget manager"
-  } else {
-    $PackageJson.description
-  }
-  New-AppxManifest -Path $ManifestPath -IdentityName $identityName -IdentityPublisher $publisher -IdentityVersion $Version -DisplayName $displayName -Description $description -PublisherDisplayName $displayName
-  Write-Host "Generated manifest: $ManifestPath"
+$identityName = Convert-ToAppxIdentityName -Raw $TauriConfig.identifier
+$publisher = $TauriConfig.bundle.publisher
+if ([string]::IsNullOrWhiteSpace($publisher)) {
+  $publisher = "CN=TimeLens"
 }
+$displayName = if ([string]::IsNullOrWhiteSpace($TauriConfig.productName)) { "TimeLens" } else { $TauriConfig.productName }
+$publisherDisplayName = if ($PackageJson.authors -and $PackageJson.authors.Count -gt 0) {
+  [string]$PackageJson.authors[0]
+} else {
+  $displayName
+}
+$description = if ([string]::IsNullOrWhiteSpace($PackageJson.description)) {
+  "Screen time tracker and desktop widget manager"
+} else {
+  $PackageJson.description
+}
+Write-Host "Regenerating Package.appxmanifest..."
+New-AppxManifest -Path $ManifestPath -IdentityName $identityName -IdentityPublisher $publisher -IdentityVersion $Version -DisplayName $displayName -Description $description -PublisherDisplayName $publisherDisplayName
+Write-Host "Generated manifest: $ManifestPath"
 
 Write-Host "[1/5] Building Tauri release binary..."
 Push-Location $RepoRoot
