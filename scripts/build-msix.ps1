@@ -26,14 +26,18 @@ function Get-MsixVersion {
 }
 
 function Convert-ToAppxIdentityName {
-  param([string]$Raw)
+  param([string]$PublisherName, [string]$ProductName)
 
-  $name = ($Raw -replace '[^A-Za-z0-9\.]', '.')
-  $name = ($name -replace '\.+', '.').Trim('.')
-  if ([string]::IsNullOrWhiteSpace($name)) {
-    return "TimeLens.App"
-  }
-  return $name
+  # PublisherName: "Shan Wenxiao" -> "ShanWenxiao"
+  $pubName = ($PublisherName -replace '\s', '')
+  
+  # ProductName: "TimeLens" -> "TimeLens"
+  $prodName = ($ProductName -replace '[^A-Za-z0-9]', '')
+  
+  # Rest: "Time Management App with Widgets" -> "TimeManagementAppwithWidgets"
+  $rest = "TimeManagementAppwithWidgets"
+  
+  return "$pubName.$prodName-$rest"
 }
 
 function New-AppxManifest {
@@ -166,17 +170,21 @@ $OutDir = Join-Path $WindowsDir "out"
 $MsixPath = Join-Path $OutDir "TimeLens-$Version.msix"
 $SourceIcon = Join-Path $RepoRoot "src-tauri\icons\icon.png"
 
-$identityName = Convert-ToAppxIdentityName -Raw $TauriConfig.identifier
+# Define publisher and display name first
 $publisher = $TauriConfig.bundle.publisher
 if ([string]::IsNullOrWhiteSpace($publisher)) {
   $publisher = "CN=TimeLens"
 }
-$displayName = if ([string]::IsNullOrWhiteSpace($TauriConfig.productName)) { "TimeLens" } else { $TauriConfig.productName }
+
 $publisherDisplayName = if ($PackageJson.authors -and $PackageJson.authors.Count -gt 0) {
   [string]$PackageJson.authors[0]
 } else {
-  $displayName
+  "Shan Wenxiao"
 }
+
+# Now create identity name using publisher and product name
+$identityName = Convert-ToAppxIdentityName -PublisherName $publisherDisplayName -ProductName "TimeLens"
+$displayName = "TimeLens - Time Management App with Widgets"
 $description = if ([string]::IsNullOrWhiteSpace($PackageJson.description)) {
   "Screen time tracker and desktop widget manager"
 } else {
