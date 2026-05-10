@@ -143,6 +143,12 @@ TimeLens/
 
 ---
 
+## 🗺 路线图
+
+- [v2.0.0 路线图（本地优先）](docs/ROADMAP_v2.0.0.md)
+
+---
+
 ## 📋 更新日志
 
 见 [CHANGELOG.md](CHANGELOG.md)。

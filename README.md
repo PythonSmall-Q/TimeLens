@@ -145,6 +145,12 @@ Please read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting pull requests.
 
 ---
 
+## 🗺 Roadmap
+
+- [Roadmap to v2.0.0 (Local-First)](docs/ROADMAP_v2.0.0.md)
+
+---
+
 ## 📋 Changelog
 
 See [CHANGELOG.md](CHANGELOG.md).

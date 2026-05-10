@@ -21,7 +21,7 @@ jobs:
       matrix:
           include:
             - platform: windows-latest
-              args: ""
+              args: "--bundles nsis,msi"
             - platform: macos-latest
               args: "--target universal-apple-darwin"
             - platform: ubuntu-latest
