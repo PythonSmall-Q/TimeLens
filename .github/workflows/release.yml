@@ -25,7 +25,7 @@ jobs:
             - platform: macos-latest
               args: "--target universal-apple-darwin --bundles app,dmg,updater"
             - platform: ubuntu-latest
-              args: ""
+              args: "--bundles appimage,deb,rpm"
 
     runs-on: ${{ matrix.platform }}
 
@@ -75,6 +75,25 @@ jobs:
 
       - name: Install frontend dependencies
         run: npm ci
+
+      - name: Validate version consistency
+        shell: bash
+        run: |
+          TAG_VERSION="${{ steps.release_tag.outputs.version }}"
+          TAG_VERSION="${TAG_VERSION#v}"
+
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          TAURI_VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
+
+          echo "Release tag version: $TAG_VERSION"
+          echo "package.json version: $PKG_VERSION"
+          echo "tauri.conf.json version: $TAURI_VERSION"
+
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ] || [ "$TAG_VERSION" != "$TAURI_VERSION" ]; then
+            echo "Version mismatch detected."
+            echo "Tag version must match package.json and src-tauri/tauri.conf.json."
+            exit 1
+          fi
 
       - name: Extract release notes from CHANGELOG.md
         id: changelog
