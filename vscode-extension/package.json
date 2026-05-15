@@ -71,6 +71,10 @@
         "title": "TimeLens: Set Detail Level"
       },
       {
+        "command": "timelens.setExtensionBridgeKey",
+        "title": "TimeLens: Set/Update Extension Bridge Key"
+      },
+      {
         "command": "timelens.openDashboard",
         "title": "TimeLens: Open Dashboard",
         "icon": "$(graph)"
@@ -96,6 +100,11 @@
           "type": "string",
           "default": "http://127.0.0.1:49152",
           "description": "Local TimeLens API base URL."
+        },
+        "timelens.bridgeKey": {
+          "type": "string",
+          "default": "",
+          "description": "Extension bridge key for authenticating with TimeLens local API. Get this from Settings > Local API / Extension Bridge."
         },
         "timelens.flushIntervalSeconds": {
           "type": "number",

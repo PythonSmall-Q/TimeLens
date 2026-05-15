@@ -146,6 +146,16 @@
     "fields": "Tracked fields",
     "noWrites": "No recent writes yet"
   },
+  "extensionBridge": {
+    "title": "Local API / Extension Bridge",
+    "key": "Extension bridge key",
+    "copyKey": "Copy key",
+    "rotateKey": "Rotate key",
+    "hint": "Used to authenticate VS Code and browser extensions with your local API",
+    "description": "This key is used to verify requests from extensions. Keep it secure. Rotating invalidates old keys immediately.",
+    "lastRotated": "Last rotated: {{time}}",
+    "none": "Not set"
+  },
   "about": {
     "title": "About",
     "version": "Version",

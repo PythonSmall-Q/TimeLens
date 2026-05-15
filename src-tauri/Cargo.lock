@@ -5005,11 +5005,13 @@ dependencies = [
 
 [[package]]
 name = "timelens"
-version = "1.2.0"
+version = "1.4.0"
 dependencies = [
  "axum",
  "chrono",
  "env_logger",
+ "hex",
+ "hmac",
  "log",
  "rusqlite",
  "serde",

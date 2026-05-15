@@ -6,6 +6,7 @@ import TodoWidget from "./TodoWidget";
 import TimerWidget from "./TimerWidget";
 import NoteWidget from "./NoteWidget";
 import StatusWidget from "./StatusWidget";
+import PetWidget from "./PetWidget";
 import ExternalWidgetHost from "./ExternalWidgetHost";
 import * as api from "@/services/tauriApi";
 
@@ -150,11 +151,13 @@ export default function WidgetWindow({ widgetId }: Props) {
       {widgetType === "timer" && <TimerWidget widgetId={widgetId} />}
       {widgetType === "note" && <NoteWidget widgetId={widgetId} />}
       {widgetType === "status" && <StatusWidget widgetId={widgetId} />}
+      {widgetType === "pet" && <PetWidget widgetId={widgetId} />}
       {widgetType !== "clock"
         && widgetType !== "todo"
         && widgetType !== "timer"
         && widgetType !== "note"
         && widgetType !== "status"
+        && widgetType !== "pet"
         && <ExternalWidgetHost widgetId={widgetId} widgetType={widgetType} />}
     </div>
   );

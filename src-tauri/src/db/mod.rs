@@ -112,7 +112,8 @@ pub fn initialize(conn: &Connection) -> Result<()> {
             opacity             REAL    NOT NULL DEFAULT 0.85,
             always_on_top_mode  TEXT    NOT NULL DEFAULT 'focus',
             pinned              INTEGER NOT NULL DEFAULT 0,
-            start_on_launch     INTEGER NOT NULL DEFAULT 1
+            start_on_launch     INTEGER NOT NULL DEFAULT 1,
+            data_json           TEXT
         );
 
         CREATE TABLE IF NOT EXISTS ignored_apps (
@@ -244,6 +245,12 @@ pub fn initialize(conn: &Connection) -> Result<()> {
     if !widget_columns.iter().any(|c| c == "monitor_index") {
         conn.execute(
             "ALTER TABLE widget_configs ADD COLUMN monitor_index INTEGER NOT NULL DEFAULT -1",
+            [],
+        )?;
+    }
+    if !widget_columns.iter().any(|c| c == "data_json") {
+        conn.execute(
+            "ALTER TABLE widget_configs ADD COLUMN data_json TEXT",
             [],
         )?;
     }
@@ -873,7 +880,7 @@ pub fn reorder_todo(conn: &Connection, id: i64, order_index: i64) -> Result<()> 
 
 pub fn get_widget_config(conn: &Connection, id: &str) -> Result<Option<crate::models::WidgetConfig>> {
     let mut stmt = conn.prepare(
-        "SELECT id, widget_type, monitor_index, x, y, width, height, opacity, always_on_top_mode, pinned, start_on_launch
+        "SELECT id, widget_type, monitor_index, x, y, width, height, opacity, always_on_top_mode, pinned, start_on_launch, data_json
          FROM widget_configs WHERE id = ?1",
     )?;
     let mut rows = stmt.query_map(params![id], |row| {
@@ -889,6 +896,7 @@ pub fn get_widget_config(conn: &Connection, id: &str) -> Result<Option<crate::mo
             always_on_top_mode: row.get(8)?,
             pinned: row.get::<_, i32>(9)? != 0,
             start_on_launch: row.get::<_, i32>(10)? != 0,
+            data_json: row.get(11)?,
         })
     })?;
     match rows.next() {
@@ -899,7 +907,7 @@ pub fn get_widget_config(conn: &Connection, id: &str) -> Result<Option<crate::mo
 
 pub fn get_all_widget_configs(conn: &Connection) -> Result<Vec<crate::models::WidgetConfig>> {
     let mut stmt = conn.prepare(
-        "SELECT id, widget_type, monitor_index, x, y, width, height, opacity, always_on_top_mode, pinned, start_on_launch
+        "SELECT id, widget_type, monitor_index, x, y, width, height, opacity, always_on_top_mode, pinned, start_on_launch, data_json
          FROM widget_configs",
     )?;
     let rows = stmt.query_map([], |row| {
@@ -915,6 +923,7 @@ pub fn get_all_widget_configs(conn: &Connection) -> Result<Vec<crate::models::Wi
             always_on_top_mode: row.get(8)?,
             pinned: row.get::<_, i32>(9)? != 0,
             start_on_launch: row.get::<_, i32>(10)? != 0,
+            data_json: row.get(11)?,
         })
     })?;
     rows.collect()
@@ -923,8 +932,8 @@ pub fn get_all_widget_configs(conn: &Connection) -> Result<Vec<crate::models::Wi
 pub fn upsert_widget_config(conn: &Connection, cfg: &crate::models::WidgetConfig) -> Result<()> {
     conn.execute(
         "INSERT INTO widget_configs
-            (id, widget_type, monitor_index, x, y, width, height, opacity, always_on_top_mode, pinned, start_on_launch)
-         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)
+            (id, widget_type, monitor_index, x, y, width, height, opacity, always_on_top_mode, pinned, start_on_launch, data_json)
+         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12)
          ON CONFLICT(id) DO UPDATE SET
             monitor_index=excluded.monitor_index,
             x=excluded.x, y=excluded.y,
@@ -932,7 +941,8 @@ pub fn upsert_widget_config(conn: &Connection, cfg: &crate::models::WidgetConfig
             opacity=excluded.opacity,
             always_on_top_mode=excluded.always_on_top_mode,
             pinned=excluded.pinned,
-            start_on_launch=excluded.start_on_launch",
+            start_on_launch=excluded.start_on_launch,
+            data_json=excluded.data_json",
         params![
             cfg.id,
             cfg.widget_type,
@@ -944,7 +954,8 @@ pub fn upsert_widget_config(conn: &Connection, cfg: &crate::models::WidgetConfig
             cfg.opacity,
             cfg.always_on_top_mode,
             cfg.pinned as i32,
-            cfg.start_on_launch as i32
+            cfg.start_on_launch as i32,
+            cfg.data_json,
         ],
     )?;
     Ok(())

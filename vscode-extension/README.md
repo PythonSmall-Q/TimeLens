@@ -11,6 +11,7 @@ Track VS Code coding sessions and send local analytics to TimeLens desktop app.
   - `TimeLens: Enable Tracking`
   - `TimeLens: Disable Tracking`
   - `TimeLens: Show Tracking Status`
+  - `TimeLens: Set/Update Extension Bridge Key`
 
 ## Requirements
 
@@ -21,6 +22,7 @@ Track VS Code coding sessions and send local analytics to TimeLens desktop app.
 
 - `timelens.enabled`: enable/disable tracking
 - `timelens.apiBaseUrl`: local API URL
+- `timelens.bridgeKey`: extension bridge key (can be updated anytime)
 - `timelens.flushIntervalSeconds`: queue flush interval
 - `timelens.idleThresholdSeconds`: idle split threshold
 

@@ -116,6 +116,7 @@ export interface WidgetConfig {
   always_on_top_mode: "always" | "focus" | "never";
   pinned: boolean;
   start_on_launch: boolean;
+  data_json?: string | null;
 }
 
 export interface WidgetRegistryItem {
@@ -138,6 +139,28 @@ export interface WidgetRegistryLoadError {
 export interface WidgetRegistryResponse {
   items: WidgetRegistryItem[];
   errors: WidgetRegistryLoadError[];
+}
+
+export type DesktopPetStateKey = "idle" | "focus" | "rest";
+
+export interface DesktopPetPackState {
+  label: string;
+  messages: string[];
+  accent_color?: string;
+  avatar_emoji?: string;
+}
+
+export interface DesktopPetPackManifest {
+  manifest_version: string;
+  pack_id: string;
+  name: string;
+  description?: string;
+  character_name: string;
+  default_avatar_emoji: string;
+  states: Record<DesktopPetStateKey, DesktopPetPackState>;
+  interactions?: {
+    tap_messages?: string[];
+  };
 }
 
 export interface MonitorStatus {

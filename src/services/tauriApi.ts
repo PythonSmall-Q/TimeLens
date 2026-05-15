@@ -485,3 +485,11 @@ export const setVsCodeTrackingEnabled = (enabled: boolean, trackingLevel?: strin
 
 export const getVsCodeTrackingEnabled = (): Promise<VsCodeTrackingStatus> =>
   localApiRequestWith404Fallback<VsCodeTrackingStatus>("/api/vscode/enabled", { enabled: false });
+
+// ── Extension Bridge Commands ────────────────────────────────────────
+
+export const getExtensionBridgeKey = (): Promise<string> =>
+  invoke<string>("get_extension_bridge_key");
+
+export const rotateExtensionBridgeKey = (): Promise<string> =>
+  invoke<string>("rotate_extension_bridge_key");

@@ -7,5 +7,14 @@
   },
   "extensionActionTitle": {
     "message": "TimeLens 浏览器伴侣"
+  },
+  "extensionBridgeKey": {
+    "message": "扩展网桥密钥"
+  },
+  "bridgeKeyHint": {
+    "message": "从 TimeLens 设置 > 本地 API / 扩展网桥中获取密钥。"
+  },
+  "save": {
+    "message": "保存"
   }
 }

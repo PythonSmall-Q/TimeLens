@@ -22,6 +22,13 @@ const TRANSLATIONS = {
     activeTab: "Active tab",
     unknownSite: "Unknown site",
     extensionDisabled: "Desktop app has browser sync disabled.",
+    extensionBridgeKey: "Extension bridge key",
+    bridgeKeyHint: "Get the key from TimeLens Settings > Local API / Extension Bridge.",
+    bridgeKeyPlaceholder: "Paste extension bridge key from TimeLens Settings",
+    save: "Save",
+    saveOrUpdate: "Save / Update",
+    bridgeKeySaved: "Extension bridge key saved successfully.",
+    bridgeKeyCleared: "Extension bridge key cleared.",
   },
   "zh-CN": {
     connection: "桌面端连接",
@@ -46,6 +53,13 @@ const TRANSLATIONS = {
     activeTab: "活动标签页",
     unknownSite: "未知站点",
     extensionDisabled: "桌面端已关闭浏览器同步。",
+    extensionBridgeKey: "扩展网桥密钥",
+    bridgeKeyHint: "从 TimeLens 设置 > 本地 API / 扩展网桥中获取密钥。",
+    bridgeKeyPlaceholder: "粘贴从 TimeLens 设置中获取的扩展网桥密钥",
+    save: "保存",
+    saveOrUpdate: "保存/更新",
+    bridgeKeySaved: "扩展网桥密钥已保存。",
+    bridgeKeyCleared: "扩展网桥密钥已清除。",
   },
 };
 

@@ -15,9 +15,39 @@ const todayList = document.querySelector("#today-list");
 const recentList = document.querySelector("#recent-list");
 const activeTabPill = document.querySelector("#active-tab-pill");
 const refreshButton = document.querySelector("#refresh-button");
+const bridgeKeyPanel = document.querySelector("#bridge-key-panel");
+const bridgeKeyInput = document.querySelector("#bridge-key-input");
+const saveKeyButton = document.querySelector("#save-key-button");
 const locale = getLocale();
 
 applyStaticTranslations();
+
+if (bridgeKeyInput) {
+  bridgeKeyInput.placeholder = t("bridgeKeyPlaceholder", {}, locale);
+}
+
+// Setup bridge key UI
+if (saveKeyButton) {
+  saveKeyButton.addEventListener("click", async () => {
+    const key = bridgeKeyInput?.value.trim() || "";
+    await chrome.storage.local.set({ "timelens.bridgeKey": key });
+    if (key) {
+      alert(t("bridgeKeySaved", {}, locale));
+    } else {
+      alert(t("bridgeKeyCleared", {}, locale));
+    }
+  });
+}
+
+// Load saved bridge key into input so users can modify it anytime.
+async function loadBridgeKey() {
+  const { "timelens.bridgeKey": savedKey } = await chrome.storage.local.get("timelens.bridgeKey");
+  if (bridgeKeyInput) {
+    bridgeKeyInput.value = savedKey || "";
+  }
+}
+
+void loadBridgeKey();
 
 refreshButton.addEventListener("click", () => {
   loadAll();

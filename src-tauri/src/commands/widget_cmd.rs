@@ -16,6 +16,63 @@ fn default_size(app: &AppHandle, widget_type: &str) -> Result<(f64, f64), String
     Ok((item.default_width, item.default_height))
 }
 
+pub fn default_widget_data_json(widget_type: &str) -> Option<String> {
+    if widget_type != "pet" {
+        return None;
+    }
+
+    Some(
+        serde_json::json!({
+            "manifest_version": "1",
+            "pack_id": "timelens.focus-fox",
+            "name": "Focus Fox",
+            "description": "Built-in desktop pet pack for the first pet widget slice.",
+            "character_name": "Mochi",
+            "default_avatar_emoji": "🦊",
+            "states": {
+                "idle": {
+                    "label": "Companion",
+                    "messages": [
+                        "{{app}} looks steady. Keep going.",
+                        "I am watching the rhythm while you work in {{app}}.",
+                        "Small uninterrupted blocks still count as momentum."
+                    ],
+                    "accent_color": "#fb923c",
+                    "avatar_emoji": "🦊"
+                },
+                "focus": {
+                    "label": "Focus mode",
+                    "messages": [
+                        "Focus mode is on. I will keep this lane quiet.",
+                        "One block at a time. Protect this stretch.",
+                        "Stay with the current task a little longer."
+                    ],
+                    "accent_color": "#0ea5e9",
+                    "avatar_emoji": "🎯"
+                },
+                "rest": {
+                    "label": "Resting",
+                    "messages": [
+                        "A short reset is still progress.",
+                        "Good pause. Come back when your attention is ready.",
+                        "Breaks protect the next focus block."
+                    ],
+                    "accent_color": "#14b8a6",
+                    "avatar_emoji": "🌿"
+                }
+            },
+            "interactions": {
+                "tap_messages": [
+                    "Hydrate, then continue.",
+                    "If the task feels vague, shrink the next step.",
+                    "You do not need a new plan every five minutes."
+                ]
+            }
+        })
+        .to_string(),
+    )
+}
+
 #[derive(Clone, Copy)]
 struct Rect {
     x: f64,
@@ -184,6 +241,7 @@ pub async fn create_widget(
         always_on_top_mode: "focus".to_string(),
         pinned: false,
         start_on_launch: true,
+        data_json: default_widget_data_json(&widget_type),
     };
 
     build_widget_window(&app, &config)?;
@@ -241,12 +299,15 @@ pub fn build_widget_window_sync(app: &AppHandle, config: &WidgetConfig) -> Resul
     let is_timer = config.widget_type == "timer";
     let is_note = config.widget_type == "note";
     let is_status = config.widget_type == "status";
+    let is_pet = config.widget_type == "pet";
     let (width, height) = if is_timer {
         (config.width.max(360.0), config.height.max(320.0))
     } else if is_note {
         (config.width.max(560.0), config.height.max(340.0))
     } else if is_status {
         (config.width.max(520.0), config.height.max(330.0))
+    } else if is_pet {
+        (config.width.max(340.0), config.height.max(260.0))
     } else {
         (config.width, config.height)
     };
@@ -256,6 +317,8 @@ pub fn build_widget_window_sync(app: &AppHandle, config: &WidgetConfig) -> Resul
         (500.0, 300.0)
     } else if is_status {
         (460.0, 300.0)
+    } else if is_pet {
+        (300.0, 220.0)
     } else {
         (200.0, 120.0)
     };

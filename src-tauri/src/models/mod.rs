@@ -194,6 +194,8 @@ pub struct WidgetConfig {
     pub always_on_top_mode: String, // "always" | "focus" | "never"
     pub pinned: bool,
     pub start_on_launch: bool,
+    #[serde(default)]
+    pub data_json: Option<String>,
 }
 
 impl Default for WidgetConfig {
@@ -210,6 +212,7 @@ impl Default for WidgetConfig {
             always_on_top_mode: "focus".to_string(),
             pinned: false,
             start_on_launch: true,
+            data_json: None,
         }
     }
 }

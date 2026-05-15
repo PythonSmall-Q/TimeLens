@@ -146,6 +146,16 @@
     "fields": "正在记录的字段",
     "noWrites": "暂无最近写入"
   },
+  "extensionBridge": {
+    "title": "本地 API / 扩展网桥",
+    "key": "扩展网桥密钥",
+    "copyKey": "复制密钥",
+    "rotateKey": "轮转密钥",
+    "hint": "用于认证 VS Code 和浏览器扩展与本地 API 的通信",
+    "description": "该密钥用于验证扩展的请求。请妥善保管。轮转密钥将立即使旧密钥失效。",
+    "lastRotated": "上次轮转于：{{time}}",
+    "none": "未设置"
+  },
   "about": {
     "title": "关于",
     "version": "版本",

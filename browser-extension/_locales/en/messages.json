@@ -3,9 +3,18 @@
     "message": "TimeLens Browser Companion"
   },
   "extensionDescription": {
-    "message": "Companion extension for TimeLens. Tracks active tab sessions, detects idle time, and syncs browser usage data to the local desktop app."
+    "message": "TimeLens browser companion that tracks tab sessions and syncs browser usage to the desktop app."
   },
   "extensionActionTitle": {
     "message": "TimeLens Browser Companion"
+  },
+  "extensionBridgeKey": {
+    "message": "Extension bridge key"
+  },
+  "bridgeKeyHint": {
+    "message": "Get the key from TimeLens Settings > Local API / Extension Bridge."
+  },
+  "save": {
+    "message": "Save"
   }
 }

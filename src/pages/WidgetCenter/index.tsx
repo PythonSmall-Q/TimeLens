@@ -2,10 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Clock, List, Timer, ExternalLink, Trash2, Plus, StickyNote, Activity,
-  Layers, Puzzle, FolderOpen, ShieldCheck,
+  Layers, Puzzle, FolderOpen, ShieldCheck, PawPrint, Ruler, Upload,
 } from "lucide-react";
 import { useWidgetStore } from "@/stores/widgetStore";
-import type { WidgetConfig, WidgetRegistryItem, WidgetRegistryLoadError } from "@/types";
+import type { DesktopPetPackManifest, WidgetConfig, WidgetRegistryItem, WidgetRegistryLoadError } from "@/types";
 import * as api from "@/services/tauriApi";
 import clsx from "clsx";
 import WidgetPermissionDialog from "./WidgetPermissionDialog";
@@ -16,6 +16,7 @@ const ICONS = {
   timer: Timer,
   note: StickyNote,
   status: Activity,
+  pet: PawPrint,
 };
 
 const TYPE_LABELS: Record<string, string> = {
@@ -24,12 +25,60 @@ const TYPE_LABELS: Record<string, string> = {
   timer: "widgets:timer.title",
   note: "widgets:note.title",
   status: "widgets:status.title",
+  pet: "widgets:pet.title",
 };
 
 function WidgetCard({ config }: { config: WidgetConfig }) {
   const { t } = useTranslation("widgets");
   const { openWidget, closeWidget, removeWidget, updateWidgetConfig } = useWidgetStore();
   const Icon = ICONS[config.widget_type as keyof typeof ICONS] ?? Clock;
+  const petPackInputRef = useRef<HTMLInputElement | null>(null);
+  const [petWidth, setPetWidth] = useState(String(Math.round(config.width)));
+  const [petHeight, setPetHeight] = useState(String(Math.round(config.height)));
+
+  useEffect(() => {
+    setPetWidth(String(Math.round(config.width)));
+    setPetHeight(String(Math.round(config.height)));
+  }, [config.width, config.height, config.data_json]);
+
+  const applyPetWindowSize = async () => {
+    const width = Number(petWidth);
+    const height = Number(petHeight);
+    if (!Number.isFinite(width) || !Number.isFinite(height)) {
+      return;
+    }
+
+    const normalizedWidth = Math.max(260, Math.min(900, Math.round(width)));
+    const normalizedHeight = Math.max(180, Math.min(700, Math.round(height)));
+    await updateWidgetConfig({
+      ...config,
+      width: normalizedWidth,
+      height: normalizedHeight,
+    });
+    setPetWidth(String(normalizedWidth));
+    setPetHeight(String(normalizedHeight));
+  };
+
+  const handleImportPetPack = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      const raw = await file.text();
+      const parsed = JSON.parse(raw);
+      if (!isPetManifest(parsed)) {
+        return;
+      }
+
+      await updateWidgetConfig({
+        ...config,
+        data_json: JSON.stringify(parsed),
+      });
+    } catch {
+      // Keep silent in the card itself; Widget Center already has visible import flow.
+    } finally {
+      event.target.value = "";
+    }
+  };
 
   return (
     <div className="glass-card p-4 flex flex-col gap-3">
@@ -77,6 +126,64 @@ function WidgetCard({ config }: { config: WidgetConfig }) {
         <ExternalLink size={12} />
         {t("openWidget")}
       </button>
+
+      {config.widget_type === "pet" && (
+        <div className="mt-1 rounded-xl border border-accent-blue/20 bg-accent-blue/5 p-3 space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs font-semibold text-text-secondary uppercase tracking-wider flex items-center gap-1.5">
+              <PawPrint size={12} /> {t("petStudio.title")}
+            </p>
+            <button
+              onClick={() => petPackInputRef.current?.click()}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs border border-surface-border text-text-secondary hover:text-text-primary transition-colors"
+            >
+              <Upload size={12} /> {t("petStudio.importPack")}
+            </button>
+            <input
+              ref={petPackInputRef}
+              type="file"
+              accept="application/json,.json"
+              className="hidden"
+              onChange={handleImportPetPack}
+            />
+          </div>
+          <p className="text-xs text-text-muted">{t("petStudio.petCardDesc")}</p>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="text-xs text-text-secondary space-y-1">
+              <span>{t("petStudio.width")}</span>
+              <input
+                type="number"
+                min={260}
+                max={900}
+                step={10}
+                value={petWidth}
+                onChange={(e) => setPetWidth(e.target.value)}
+                className="ui-field w-full"
+              />
+            </label>
+            <label className="text-xs text-text-secondary space-y-1">
+              <span>{t("petStudio.height")}</span>
+              <input
+                type="number"
+                min={180}
+                max={700}
+                step={10}
+                value={petHeight}
+                onChange={(e) => setPetHeight(e.target.value)}
+                className="ui-field w-full"
+              />
+            </label>
+          </div>
+          <div className="flex justify-end">
+            <button
+              onClick={applyPetWindowSize}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs border border-surface-border text-text-secondary hover:text-text-primary transition-colors"
+            >
+              <Ruler size={12} /> {t("petStudio.applySize")}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -89,7 +196,32 @@ const OFFICIAL_CATALOG: { type: string; icon: typeof Clock; descKey: string }[] 
   { type: "timer", icon: Timer, descKey: "timerDesc" },
   { type: "note", icon: StickyNote, descKey: "noteDesc" },
   { type: "status", icon: Activity, descKey: "statusDesc" },
+  { type: "pet", icon: PawPrint, descKey: "petDesc" },
 ];
+
+function isPetManifest(input: unknown): input is DesktopPetPackManifest {
+  if (!input || typeof input !== "object") return false;
+  const m = input as Record<string, unknown>;
+  const states = m.states && typeof m.states === "object" ? m.states as Record<string, unknown> : null;
+  if (!states) return false;
+  const hasState = (key: "idle" | "focus" | "rest") => {
+    const state = states[key];
+    if (!state || typeof state !== "object") return false;
+    const s = state as Record<string, unknown>;
+    return typeof s.label === "string" && Array.isArray(s.messages);
+  };
+
+  return (
+    typeof m.manifest_version === "string"
+    && typeof m.pack_id === "string"
+    && typeof m.name === "string"
+    && typeof m.character_name === "string"
+    && typeof m.default_avatar_emoji === "string"
+    && hasState("idle")
+    && hasState("focus")
+    && hasState("rest")
+  );
+}
 
 interface MarketplaceCardProps {
   type: string;
@@ -334,6 +466,14 @@ export default function WidgetCenter() {
               ))}
             </div>
           )}
+          {importMsg && (
+            <p className={clsx(
+              "text-xs px-3 py-2 rounded-lg",
+              importMsg.kind === "ok" ? "bg-accent-green/10 text-accent-green" : "bg-accent-red/10 text-accent-red"
+            )}>
+              {importMsg.text}
+            </p>
+          )}
         </>
       )}
 
@@ -376,15 +516,6 @@ export default function WidgetCenter() {
                 <FolderOpen size={12} /> {t("importLocalWidget")}
               </button>
             </div>
-
-            {importMsg && (
-              <p className={clsx(
-                "text-xs px-3 py-2 rounded-lg",
-                importMsg.kind === "ok" ? "bg-accent-green/10 text-accent-green" : "bg-accent-red/10 text-accent-red"
-              )}>
-                {importMsg.text}
-              </p>
-            )}
 
             {thirdPartyEntries.length === 0 && (
               <div className="glass-card p-6 text-center text-text-muted text-xs space-y-1">

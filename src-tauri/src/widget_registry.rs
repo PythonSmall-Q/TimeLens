@@ -106,6 +106,17 @@ fn official_widgets() -> Vec<WidgetRegistryItem> {
             default_height: 330.0,
             permissions: Vec::new(),
         },
+        WidgetRegistryItem {
+            widget_type: "pet".to_string(),
+            display_name: "Desktop Pet".to_string(),
+            source: "official".to_string(),
+            description: Some("Built-in manifest-driven desktop pet widget".to_string()),
+            entry: None,
+            icon: Some("pet".to_string()),
+            default_width: 420.0,
+            default_height: 300.0,
+            permissions: Vec::new(),
+        },
     ]
 }
 

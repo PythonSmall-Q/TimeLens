@@ -26,6 +26,7 @@ const STORAGE_KEYS = {
 const MAX_RECENT_SESSIONS   = 100;
 const MAX_PENDING_SESSIONS  = 200;
 const API_BASE              = "http://127.0.0.1:49152";
+let authRequiredCache = { value: false, expiresAt: 0 };
 
 // Consider the user idle after 60 s without mouse/keyboard input.
 const IDLE_THRESHOLD_SECONDS = 60;
@@ -274,21 +275,31 @@ async function flushPendingSessions() {
 
 async function syncSessionToDesktop(session) {
   try {
+    const bridgeKey = await getBridgeKey();
+    const body = JSON.stringify({
+      browser_name: session.browserName,
+      tab_url: session.url,
+      host: session.host || "",
+      title: session.title || "",
+      started_at: new Date(session.startedAt).toISOString(),
+      ended_at: new Date(session.endedAt).toISOString(),
+      duration_seconds: Math.max(0, Math.round((session.durationMs || 0) / 1000)),
+      locale: session.locale || getLocale(),
+    });
+
+    const headers = {
+      "Content-Type": "application/json",
+    };
+
+    // Only attach signature when desktop API explicitly requires bridge auth.
+    if (bridgeKey && await shouldAttachBridgeSignature()) {
+      headers["X-Extension-Signature"] = await signRequestBody(body, bridgeKey);
+    }
+
     const response = await fetch(`${API_BASE}/api/browser/session`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        browser_name: session.browserName,
-        tab_url: session.url,
-        host: session.host || "",
-        title: session.title || "",
-        started_at: new Date(session.startedAt).toISOString(),
-        ended_at: new Date(session.endedAt).toISOString(),
-        duration_seconds: Math.max(0, Math.round((session.durationMs || 0) / 1000)),
-        locale: session.locale || getLocale(),
-      }),
+      headers,
+      body,
     });
 
     if (!response.ok) {
@@ -341,4 +352,65 @@ async function pingApiStatus() {
       },
     });
   }
+}
+
+/**
+ * Old desktop APIs do not expose auth capability. In that case default to false
+ * and do not send key/signature headers.
+ */
+async function shouldAttachBridgeSignature() {
+  const now = Date.now();
+  if (authRequiredCache.expiresAt > now) {
+    return authRequiredCache.value;
+  }
+
+  try {
+    const response = await fetch(`${API_BASE}/api/status`);
+    if (!response.ok) {
+      authRequiredCache = { value: false, expiresAt: now + 30_000 };
+      return false;
+    }
+    const data = await response.json();
+    const required = data?.extension_bridge_auth_required === true;
+    authRequiredCache = { value: required, expiresAt: now + 30_000 };
+    return required;
+  } catch {
+    authRequiredCache = { value: false, expiresAt: now + 15_000 };
+    return false;
+  }
+}
+
+/**
+ * Get the stored extension bridge key from local storage
+ */
+async function getBridgeKey() {
+  const { "timelens.bridgeKey": key } = await chrome.storage.local.get("timelens.bridgeKey");
+  return key || "";
+}
+
+/**
+ * Sign a request body using HMAC-SHA256
+ * @param {string} body - The request body JSON string
+ * @param {string} key - The bridge key
+ * @returns {Promise<string>} The hex-encoded HMAC signature
+ */
+async function signRequestBody(body, key) {
+  // Use SubtleCrypto API available in Service Workers
+  const encoder = new TextEncoder();
+  const keyData = encoder.encode(key);
+  const bodyData = encoder.encode(body);
+
+  const cryptoKey = await crypto.subtle.importKey(
+    "raw",
+    keyData,
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+
+  const signature = await crypto.subtle.sign("HMAC", cryptoKey, bodyData);
+  const signatureArray = new Uint8Array(signature);
+  return Array.from(signatureArray)
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
 }

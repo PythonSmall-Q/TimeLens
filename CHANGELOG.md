@@ -5,6 +5,58 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [1.4.0] - 2026-05-16
+
+### Added
+
+#### Extension Bridge Authentication
+
+- **Extension bridge key management** — the desktop app now generates a shared bridge key on first launch, stores it locally, and exposes it in Settings with copy and rotate actions
+- **Capability negotiation for extension auth** — VS Code and browser extensions now probe the desktop API before signing requests, so old app versions without bridge auth support do not receive key-protected traffic
+- **VS Code extension key entry** — the extension now includes an input command and settings key for saving, updating, and reusing the bridge key
+- **Browser extension key entry** — the browser popup now keeps the bridge key field visible, auto-fills the saved key, and allows users to modify and re-save it at any time
+
+#### Desktop Pet / Widget Center
+
+- **Desktop pet widget** — added a built-in manifest-driven desktop pet widget with idle / focus / rest states and tap messages
+- **Pet resource pack import** — users can import JSON pet packs and apply the manifest to all existing pet widgets from a prominent entry in Widget Center
+- **Pet size controls** — Widget Center now exposes a visible pet settings panel for adjusting default pet window width and height in bulk
+- **Pet default sizing** — the default pet window size was increased to better match the richer pet UI
+
+#### Data Migration and Compatibility
+
+- **Legacy database migration** — Windows startup now detects the old Roaming data directory and automatically copies the legacy database into the new app data location, including SQLite `-wal` / `-shm` sidecar files
+- **Fallback compatibility** — [Crucial] older data directories remain readable during the transition so existing users do not hit a blank or empty state after the 1.2.0 path change
+
+#### Widget Center / Registry
+
+- **Widget Center pet section** — the widget marketplace now surfaces the pet widget more prominently alongside the official widget catalog
+- **Widget registry alignment** — built-in pet registry sizing was aligned with the new default pet window dimensions
+
+### Changed
+
+#### Local API and Sync Flow
+
+- **Local API status payload expanded** — `/api/status` now advertises whether extension bridge authentication is required so clients can decide whether to send signed traffic
+- **Signed request flow tightened** — both extensions only attach signatures when the desktop API explicitly declares support, preventing bridge-key traffic from reaching older app builds
+
+#### Settings UX
+
+- **Settings bridge section** — the desktop Settings page now shows the bridge key in full, supports one-click copy, and lets users rotate the key without leaving the page
+- **Browser and VS Code key UX** — both extensions now emphasize that the bridge key can be updated after initial save instead of being a one-time setup
+
+#### Default Widget Behavior
+
+- **Pet widget startup size** — the pet widget defaults were updated in both registry metadata and tray-based widget creation paths so new windows open at a more natural size
+
+### Fixed
+
+- Fixed browser and VS Code extensions sending bridge signatures to older desktop API versions that did not support key-based auth
+- Fixed pet widget sizing being too tight for the richer built-in manifest-based UI
+- Fixed legacy Windows users from landing on an empty database path after the app data migration change
+- Fixed the browser extension key field being hidden after save, which made updating the saved key awkward
+
+
 ## [1.2.0] - 2026-05-10
 
 ### Added

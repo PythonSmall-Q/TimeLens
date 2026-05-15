@@ -11,6 +11,29 @@ export function activate(context: vscode.ExtensionContext): void {
   tracker = new SessionTracker(context);
   tracker.start();
 
+  const promptSetBridgeKey = async () => {
+    const current = vscode.workspace
+      .getConfiguration("timelens")
+      .get<string>("bridgeKey", "");
+    const value = await vscode.window.showInputBox({
+      title: "TimeLens: Set Extension Bridge Key",
+      prompt: "Enter the extension bridge key from TimeLens Settings > Local API / Extension Bridge",
+      password: false,
+      value: current,
+      ignoreFocusOut: true,
+    });
+    if (value !== undefined) {
+      await vscode.workspace
+        .getConfiguration("timelens")
+        .update("bridgeKey", value, vscode.ConfigurationTarget.Global);
+      if (value.trim()) {
+        void vscode.window.showInformationMessage("Extension bridge key saved successfully.");
+      } else {
+        void vscode.window.showInformationMessage("Extension bridge key cleared.");
+      }
+    }
+  };
+
   sidebarProvider = new DashboardSidebarViewProvider(
     context,
     () => tracker?.snapshotAndFlush() ?? Promise.resolve(),
@@ -127,6 +150,12 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   context.subscriptions.push(
+    vscode.commands.registerCommand("timelens.setExtensionBridgeKey", async () => {
+      await promptSetBridgeKey();
+    })
+  );
+
+  context.subscriptions.push(
     vscode.commands.registerCommand("timelens.showStatus", () => {
       const enabled = vscode.workspace.getConfiguration("timelens").get<boolean>("enabled", true);
       const pending = tracker?.getQueueSize() ?? 0;
@@ -138,6 +167,23 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   updateStatusBar();
+
+  const bridgeKey = vscode.workspace
+    .getConfiguration("timelens")
+    .get<string>("bridgeKey", "")
+    .trim();
+  if (!bridgeKey) {
+    void vscode.window
+      .showInformationMessage(
+        "TimeLens: Set your extension bridge key to enable authenticated sync.",
+        "Set Key"
+      )
+      .then((picked) => {
+        if (picked === "Set Key") {
+          void promptSetBridgeKey();
+        }
+      });
+  }
 }
 
 export async function deactivate(): Promise<void> {

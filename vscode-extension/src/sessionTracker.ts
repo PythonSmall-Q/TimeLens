@@ -216,12 +216,28 @@ export class SessionTracker {
     }
 
     const apiBaseUrl = this.apiBaseUrl();
+    const bridgeKey = this.getBridgeKey();
+    
     while (this.pendingQueue.length > 0) {
       const head = this.pendingQueue[0];
       try {
-        await postVsCodeSession(apiBaseUrl, head);
+        await postVsCodeSession(apiBaseUrl, head, bridgeKey);
         this.pendingQueue.shift();
-      } catch {
+      } catch (err) {
+        // Log error but don't break - might be a temporary network issue
+        if (err instanceof Error && err.message.includes("403")) {
+          // Bridge key auth failed - prompt user to set key
+          void vscode.window
+            .showErrorMessage(
+              "TimeLens: Extension bridge key authentication failed.",
+              "Update Key"
+            )
+            .then((picked) => {
+              if (picked === "Update Key") {
+                void vscode.commands.executeCommand("timelens.setExtensionBridgeKey");
+              }
+            });
+        }
         break;
       }
     }
@@ -235,6 +251,14 @@ export class SessionTracker {
     return vscode.workspace
       .getConfiguration("timelens")
       .get<string>("apiBaseUrl", "http://127.0.0.1:49152");
+  }
+
+  private getBridgeKey(): string | undefined {
+    const value = vscode.workspace
+      .getConfiguration("timelens")
+      .get<string>("bridgeKey", "")
+      .trim();
+    return value || undefined;
   }
 
   private flushIntervalMs(): number {

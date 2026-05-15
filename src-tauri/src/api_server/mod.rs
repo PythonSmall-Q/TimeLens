@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex};
 use axum::{
     extract::{Query, State, WebSocketUpgrade},
     extract::ws::{Message, WebSocket},
-    http::Method,
+    http::{Method, HeaderMap},
     response::{IntoResponse, Json},
     routing::{get, post},
     Router,
@@ -23,6 +23,7 @@ use tower_http::cors::{Any, CorsLayer};
 use crate::db;
 use crate::monitor::SharedMonitorStatus;
 use crate::models::{AppUsageSummary, BrowserSession, VsCodeLanguageDuration, VsCodeSession};
+use crate::commands::extension_bridge_cmd;
 
 /// Shared state threaded through axum handlers.
 #[derive(Clone)]
@@ -43,6 +44,7 @@ struct StatusResponse {
     version: &'static str,
     focus_active: bool,
     browser_extension_enabled: bool,
+    extension_bridge_auth_required: bool,
 }
 
 #[derive(Serialize)]
@@ -53,7 +55,7 @@ struct BrowserLinkResponse {
     api_base_url: &'static str,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 struct BrowserSessionInput {
     browser_name: String,
     tab_url: String,
@@ -65,13 +67,13 @@ struct BrowserSessionInput {
     locale: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 struct VsCodeLanguageDurationInput {
     language: String,
     seconds: i64,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 struct VsCodeSessionInput {
     session_id: String,
     started_at: String,
@@ -140,7 +142,7 @@ async fn get_categories(State(s): State<ApiState>) -> impl IntoResponse {
 }
 
 async fn get_status(State(s): State<ApiState>) -> impl IntoResponse {
-    let (focus_active, browser_extension_enabled) = s
+    let (focus_active, browser_extension_enabled, extension_bridge_auth_required) = s
         .db
         .lock()
         .ok()
@@ -148,13 +150,19 @@ async fn get_status(State(s): State<ApiState>) -> impl IntoResponse {
             (
                 db::get_bool_setting(&conn, "focus_mode_active", false).unwrap_or(false),
                 db::get_bool_setting(&conn, "browser_extension_enabled", true).unwrap_or(true),
+                db::get_setting(&conn, "extension_bridge_key")
+                    .ok()
+                    .flatten()
+                    .map(|k| !k.trim().is_empty())
+                    .unwrap_or(false),
             )
         })
-        .unwrap_or((false, true));
+        .unwrap_or((false, true, false));
     Json(StatusResponse {
         version: env!("CARGO_PKG_VERSION"),
         focus_active,
         browser_extension_enabled,
+        extension_bridge_auth_required,
     })
 }
 
@@ -175,11 +183,34 @@ async fn get_browser_link(State(s): State<ApiState>) -> impl IntoResponse {
 
 async fn post_browser_session(
     State(s): State<ApiState>,
+    headers: HeaderMap,
     Json(payload): Json<BrowserSessionInput>,
 ) -> impl IntoResponse {
     let Ok(conn) = s.db.lock() else {
         return axum::http::StatusCode::INTERNAL_SERVER_ERROR;
     };
+
+    // Check if extension bridge key is set up and validate signature if provided
+    if let Ok(Some(key)) = db::get_setting(&conn, "extension_bridge_key") {
+        // Key is set; signature is required
+        let provided_signature = headers
+            .get("X-Extension-Signature")
+            .and_then(|h| h.to_str().ok());
+
+        if let Some(sig) = provided_signature {
+            // Verify signature
+            let body_json = match serde_json::to_string(&payload) {
+                Ok(j) => j,
+                Err(_) => return axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            };
+            if !extension_bridge_cmd::verify_request_signature(body_json.as_bytes(), sig, &key) {
+                return axum::http::StatusCode::FORBIDDEN;
+            }
+        } else {
+            // Key is set but no signature provided
+            return axum::http::StatusCode::FORBIDDEN;
+        }
+    }
 
     let enabled = db::get_bool_setting(&conn, "browser_extension_enabled", true).unwrap_or(true);
     if !enabled {
@@ -211,11 +242,34 @@ async fn post_browser_session(
 
 async fn post_vscode_session(
     State(s): State<ApiState>,
+    headers: HeaderMap,
     Json(payload): Json<VsCodeSessionInput>,
 ) -> impl IntoResponse {
     let Ok(conn) = s.db.lock() else {
         return axum::http::StatusCode::INTERNAL_SERVER_ERROR;
     };
+
+    // Check if extension bridge key is set up and validate signature if provided
+    if let Ok(Some(key)) = db::get_setting(&conn, "extension_bridge_key") {
+        // Key is set; signature is required
+        let provided_signature = headers
+            .get("X-Extension-Signature")
+            .and_then(|h| h.to_str().ok());
+
+        if let Some(sig) = provided_signature {
+            // Verify signature
+            let body_json = match serde_json::to_string(&payload) {
+                Ok(j) => j,
+                Err(_) => return axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            };
+            if !extension_bridge_cmd::verify_request_signature(body_json.as_bytes(), sig, &key) {
+                return axum::http::StatusCode::FORBIDDEN;
+            }
+        } else {
+            // Key is set but no signature provided
+            return axum::http::StatusCode::FORBIDDEN;
+        }
+    }
 
     let enabled = db::get_bool_setting(&conn, "vscode_tracking_enabled", true).unwrap_or(true);
     if !enabled {

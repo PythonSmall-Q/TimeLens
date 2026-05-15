@@ -6,6 +6,7 @@ pub mod monitor;
 pub mod widget_registry;
 
 use std::sync::{Arc, Mutex};
+use std::path::{Path, PathBuf};
 
 use tauri::{
     menu::{Menu, MenuItem},
@@ -76,6 +77,91 @@ fn format_seconds(secs: i64) -> String {
     if h > 0 { format!("{}h {}m", h, m) } else { format!("{}m", m) }
 }
 
+#[cfg(target_os = "windows")]
+fn legacy_windows_db_path() -> Option<PathBuf> {
+    let appdata = std::env::var_os("APPDATA")?;
+    let legacy_dir = PathBuf::from(appdata)
+        .join("ShanWenxiao.TimeLens-TimeManagementAppwithWidgets");
+    let legacy_db = legacy_dir.join("timelens.db");
+    if legacy_db.exists() {
+        Some(legacy_db)
+    } else {
+        None
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn copy_if_exists(src: &Path, dst: &Path) -> std::io::Result<()> {
+    if src.exists() {
+        std::fs::copy(src, dst)?;
+    }
+    Ok(())
+}
+
+#[cfg(target_os = "windows")]
+fn migrate_legacy_windows_db(legacy_db: &Path, default_db_path: &Path) -> std::io::Result<()> {
+    if let Some(parent) = default_db_path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+
+    // Copy main DB and SQLite sidecar files if present.
+    let legacy_db_wal = PathBuf::from(format!("{}-wal", legacy_db.display()));
+    let legacy_db_shm = PathBuf::from(format!("{}-shm", legacy_db.display()));
+    let default_db_wal = PathBuf::from(format!("{}-wal", default_db_path.display()));
+    let default_db_shm = PathBuf::from(format!("{}-shm", default_db_path.display()));
+
+    std::fs::copy(legacy_db, default_db_path)?;
+    copy_if_exists(&legacy_db_wal, &default_db_wal)?;
+    copy_if_exists(&legacy_db_shm, &default_db_shm)?;
+
+    Ok(())
+}
+
+fn resolve_database_path(default_db_path: &Path) -> PathBuf {
+    #[cfg(target_os = "windows")]
+    {
+        if let Some(legacy_path) = legacy_windows_db_path() {
+            let current_size = std::fs::metadata(default_db_path)
+                .map(|m| m.len())
+                .unwrap_or(0);
+            let legacy_size = std::fs::metadata(&legacy_path)
+                .map(|m| m.len())
+                .unwrap_or(0);
+
+            let should_migrate = !default_db_path.exists()
+                || (current_size <= 4096 && legacy_size > current_size);
+
+            if should_migrate {
+                match migrate_legacy_windows_db(&legacy_path, default_db_path) {
+                    Ok(()) => {
+                        log::info!(
+                            "TimeLens DB migrated from legacy Roaming path to app data path: {} -> {}",
+                            legacy_path.display(),
+                            default_db_path.display()
+                        );
+                    }
+                    Err(err) => {
+                        log::warn!(
+                            "TimeLens DB migration failed ({} -> {}): {}. Falling back to legacy DB path.",
+                            legacy_path.display(),
+                            default_db_path.display(),
+                            err
+                        );
+                        return legacy_path;
+                    }
+                }
+            }
+        }
+
+        return default_db_path.to_path_buf();
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        default_db_path.to_path_buf()
+    }
+}
+
 pub fn run() {
     env_logger::init();
 
@@ -88,7 +174,8 @@ pub fn run() {
         .setup(|app| {
             // ── Database ──────────────────────────────────────
             let data_dir = app.path().app_data_dir()?;
-            let db_path = data_dir.join("timelens.db");
+            std::fs::create_dir_all(&data_dir)?;
+            let db_path = resolve_database_path(&data_dir.join("timelens.db"));
             let conn = db::open(&db_path)
                 .expect("Failed to open SQLite database");
             let db_state: DbState = Arc::new(Mutex::new(conn));
@@ -96,6 +183,18 @@ pub fn run() {
             // Register shared DB state before opening any extra windows.
             // Widget/main windows can start invoking commands immediately.
             app.manage(db_state.clone());
+
+            // Initialize extension bridge key on first run
+            {
+                let conn = db_state.lock().unwrap();
+                if let Ok(None) = db::get_setting(&conn, "extension_bridge_key") {
+                    let new_key = uuid::Uuid::new_v4().to_string();
+                    let now = chrono::Local::now().to_rfc3339();
+                    let _ = db::set_setting(&conn, "extension_bridge_key", &new_key);
+                    let _ = db::set_setting(&conn, "extension_bridge_key_rotated_at", &now);
+                    log::info!("Generated initial extension bridge key for local API authentication");
+                }
+            }
 
             // Restore widget windows that were open last session (if setting enabled)
             {
@@ -349,6 +448,8 @@ pub fn run() {
             commands::set_track_window_titles,
             commands::set_shortcuts,
             commands::send_native_notification,
+            commands::get_extension_bridge_key,
+            commands::rotate_extension_bridge_key,
             // Browser domain
             commands::get_browser_domain_stats,
             commands::get_browser_ignored_domains,
@@ -505,6 +606,7 @@ fn spawn_widget(app: &AppHandle, widget_type: &str) {
         "clock" => (300.0_f64, 180.0_f64),
         "todo" => (320.0, 420.0),
         "timer" => (360.0, 320.0),
+        "pet" => (420.0, 300.0),
         _ => (320.0, 240.0),
     };
     let cfg = models::WidgetConfig {
@@ -519,6 +621,7 @@ fn spawn_widget(app: &AppHandle, widget_type: &str) {
         always_on_top_mode: "focus".to_string(),
         pinned: false,
         start_on_launch: true,
+        data_json: commands::widget_cmd::default_widget_data_json(widget_type),
     };
     let _ = commands::widget_cmd::build_widget_window_sync(app, &cfg);
 }

@@ -22,6 +22,22 @@
         <p id="status-text" class="muted">Trying to reach the local TimeLens API.</p>
       </section>
 
+      <section id="bridge-key-panel" class="panel">
+        <div class="panel-head">
+          <h2 data-i18n="extensionBridgeKey">Extension bridge key</h2>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <input
+            id="bridge-key-input"
+            type="password"
+            placeholder="Paste extension bridge key from TimeLens Settings"
+            style="flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 12px;"
+          />
+          <button id="save-key-button" class="ghost-button" type="button" data-i18n="saveOrUpdate">Save / Update</button>
+        </div>
+        <p class="muted" style="margin-top: 8px; font-size: 11px;" data-i18n="bridgeKeyHint">Get the key from TimeLens Settings > Local API / Extension Bridge.</p>
+      </section>
+
       <section class="panel">
         <div class="panel-head">
           <h2 data-i18n="today">Today in TimeLens</h2>

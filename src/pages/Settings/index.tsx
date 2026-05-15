@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSettingsStore } from "@/stores/settingsStore";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
-import { Moon, Sun, Activity, Database, Info, Rocket, Keyboard, PanelsTopLeft, ArrowLeft, Search } from "lucide-react";
+import { Moon, Sun, Activity, Database, Info, Rocket, Keyboard, PanelsTopLeft, ArrowLeft, Search, Lock, Copy, RotateCw } from "lucide-react";
 import clsx from "clsx";
 import * as api from "@/services/tauriApi";
 import { APP_VERSION } from "../../version";
@@ -79,12 +79,16 @@ export default function Settings() {
     | "backup"
     | "retention"
     | "transparency"
+    | "extensionBridge"
     | "about"
     | null
   >(null);
   const [executableOptions, setExecutableOptions] = useState<ExecutableOption[]>([]);
   const [ignoredApps, setIgnoredAppsState] = useState<string[]>([]);
   const [excludePickerValue, setExcludePickerValue] = useState("");
+  const [extensionBridgeKey, setExtensionBridgeKey] = useState<string>("");
+  const [extensionBridgeLoading, setExtensionBridgeLoading] = useState(false);
+  const [extensionBridgeKeyRotatedAt, setExtensionBridgeKeyRotatedAt] = useState<string>("");
   const [shortcuts, setShortcutState] = useState<ShortcutSettings>({
     open_widget_center: "Alt+W",
     toggle_widget_visibility: "Alt+Shift+W",
@@ -125,6 +129,10 @@ export default function Settings() {
         setTrackWindowTitles(s.track_window_titles);
         setShortcutState(s.shortcuts);
       })
+      .catch(() => {});
+
+    api.getExtensionBridgeKey()
+      .then(setExtensionBridgeKey)
       .catch(() => {});
 
     api.getInstallChannelInfo()
@@ -360,6 +368,7 @@ export default function Settings() {
     { key: "backup", title: t("backup.title"), icon: Database, keywords: [t("backup.exportAction"), t("backup.applyAction")] },
     { key: "retention", title: t("retention.title"), icon: Rocket, keywords: [t("retention.current"), t("retention.runNow")] },
     { key: "transparency", title: t("transparency.title"), icon: Info, keywords: [t("transparency.active"), t("transparency.fields")] },
+    { key: "extensionBridge", title: t("extensionBridge.title"), icon: Lock, keywords: [t("extensionBridge.key"), "bridge", "extension"] },
     { key: "about", title: t("about.title"), icon: Info, keywords: [t("about.version"), "github"] },
   ];
   const settingSearchLower = settingSearch.trim().toLowerCase();
@@ -1132,6 +1141,58 @@ export default function Settings() {
           ))}
           {(trackingTransparency?.recent_writes ?? []).length === 0 && (
             <p className="text-xs text-text-muted">{t("transparency.noWrites")}</p>
+          )}
+        </div>
+      </Section>
+      )}
+
+      {/* Extension Bridge */}
+      {activeSection === "extensionBridge" && (
+      <Section icon={Lock} title={t("extensionBridge.title")}>
+        <Row label={t("extensionBridge.key")}>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-mono text-text-secondary break-all whitespace-normal">{extensionBridgeKey || t("extensionBridge.none")}</span>
+            {extensionBridgeKey && (
+              <>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(extensionBridgeKey);
+                    window.dispatchEvent(new CustomEvent("timelens-copy-success"));
+                  }}
+                  className="p-1.5 hover:bg-surface-hover rounded-lg transition-colors"
+                  title={t("extensionBridge.copyKey")}
+                >
+                  <Copy size={13} className="text-accent-blue" />
+                </button>
+                <button
+                  onClick={async () => {
+                    setExtensionBridgeLoading(true);
+                    try {
+                      const newKey = await api.rotateExtensionBridgeKey();
+                      setExtensionBridgeKey(newKey);
+                      setExtensionBridgeKeyRotatedAt(new Date().toISOString());
+                      window.dispatchEvent(new CustomEvent("timelens-key-rotated"));
+                    } catch (err) {
+                      console.error("Failed to rotate key:", err);
+                    } finally {
+                      setExtensionBridgeLoading(false);
+                    }
+                  }}
+                  disabled={extensionBridgeLoading}
+                  className="p-1.5 hover:bg-surface-hover rounded-lg transition-colors disabled:opacity-50"
+                  title={t("extensionBridge.rotateKey")}
+                >
+                  <RotateCw size={13} className="text-accent-blue" />
+                </button>
+              </>
+            )}
+          </div>
+        </Row>
+        <p className="text-xs text-text-muted text-right">{t("extensionBridge.hint")}</p>
+        <div className="rounded-lg border border-surface-border bg-surface-hover/40 p-3 text-xs text-text-muted space-y-1">
+          <p>{t("extensionBridge.description")}</p>
+          {extensionBridgeKeyRotatedAt && (
+            <p>{t("extensionBridge.lastRotated", { time: new Date(extensionBridgeKeyRotatedAt).toLocaleString() })}</p>
           )}
         </div>
       </Section>

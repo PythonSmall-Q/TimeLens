@@ -13,6 +13,14 @@ export interface VsCodeSessionPayload {
   language_durations?: VsCodeLanguageDuration[];
 }
 
+interface StatusProbeResponse {
+  extension_bridge_auth_required?: boolean;
+}
+
+let authRequiredCache:
+  | { apiBaseUrl: string; value: boolean; expiresAt: number }
+  | null = null;
+
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   let timeoutHandle: NodeJS.Timeout | undefined;
   const timeoutPromise = new Promise<T>((_, reject) => {
@@ -30,18 +38,63 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T
   }
 }
 
+/**
+ * Sign a request body using HMAC-SHA256
+ */
+function signRequestBody(body: string, key: string): string {
+  const crypto = require("crypto");
+  return crypto.createHmac("sha256", key).update(body).digest("hex");
+}
+
+async function shouldAttachBridgeSignature(apiBaseUrl: string): Promise<boolean> {
+  const now = Date.now();
+  if (
+    authRequiredCache &&
+    authRequiredCache.apiBaseUrl === apiBaseUrl &&
+    authRequiredCache.expiresAt > now
+  ) {
+    return authRequiredCache.value;
+  }
+
+  try {
+    const statusUrl = `${apiBaseUrl.replace(/\/$/, "")}/api/status`;
+    const resp = await withTimeout(fetch(statusUrl), 2500);
+    if (!resp.ok) {
+      authRequiredCache = { apiBaseUrl, value: false, expiresAt: now + 30_000 };
+      return false;
+    }
+    const data = (await resp.json()) as StatusProbeResponse;
+    const required = data.extension_bridge_auth_required === true;
+    authRequiredCache = { apiBaseUrl, value: required, expiresAt: now + 30_000 };
+    return required;
+  } catch {
+    authRequiredCache = { apiBaseUrl, value: false, expiresAt: now + 15_000 };
+    return false;
+  }
+}
+
 export async function postVsCodeSession(
   apiBaseUrl: string,
   payload: VsCodeSessionPayload,
+  bridgeKey?: string,
   timeoutMs = 5000
 ): Promise<void> {
   const url = `${apiBaseUrl.replace(/\/$/, "")}/api/vscode/sessions`;
+  const bodyJson = JSON.stringify(payload);
+  
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  
+  // Only attach signature when desktop API explicitly requires bridge auth.
+  if (bridgeKey && await shouldAttachBridgeSignature(apiBaseUrl)) {
+    headers["X-Extension-Signature"] = signRequestBody(bodyJson, bridgeKey);
+  }
+  
   const request = fetch(url, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
+    headers,
+    body: bodyJson,
   });
 
   const resp = await withTimeout(request, timeoutMs);
