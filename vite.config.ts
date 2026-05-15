@@ -35,8 +35,6 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           if (!id.includes("node_modules")) return undefined;
-          if (id.includes("react-router-dom")) return "react-router";
-          if (id.includes("react-dom") || id.includes("react")) return "react";
           if (id.includes("recharts")) return "recharts";
           if (id.includes("lucide-react")) return "icons";
           if (id.includes("i18next") || id.includes("react-i18next")) return "i18n";
