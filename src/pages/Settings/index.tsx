@@ -1204,6 +1204,18 @@ export default function Settings() {
         <Row label={t("about.version")}>
           <span className="text-xs font-mono text-text-secondary">v{APP_VERSION}</span>
         </Row>
+        <Row label={t("about.logs")}>
+          <button
+            onClick={async () => {
+              await api.openLogDirectory().catch((err) => {
+                console.error("Failed to open log directory:", err);
+              });
+            }}
+            className="text-xs px-3 py-1.5 rounded-lg border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
+          >
+            {t("about.openLogFolder")}
+          </button>
+        </Row>
         <Row label="GitHub">
           <a
             href="https://github.com/PythonSmall-Q/TimeLens"

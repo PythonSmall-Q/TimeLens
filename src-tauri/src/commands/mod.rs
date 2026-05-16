@@ -7,6 +7,7 @@ pub mod storage_cmd;
 pub mod widget_cmd;
 pub mod widget_permissions;
 pub mod extension_bridge_cmd;
+pub mod log_cmd;
 
 pub use app_cmd::*;
 pub use browser_cmd::*;
@@ -17,3 +18,4 @@ pub use storage_cmd::*;
 pub use widget_cmd::*;
 pub use widget_permissions::*;
 pub use extension_bridge_cmd::*;
+pub use log_cmd::*;

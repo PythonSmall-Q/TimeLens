@@ -1,7 +1,23 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { createJSONStorage, persist } from "zustand/middleware";
 import i18n from "@/i18n/config";
 import * as api from "@/services/tauriApi";
+
+const safeSettingsStorage = createJSONStorage(() => ({
+  getItem: (name: string) => {
+    try {
+      return localStorage.getItem(name);
+    } catch {
+      return null;
+    }
+  },
+  setItem: (name: string, value: string) => {
+    localStorage.setItem(name, value);
+  },
+  removeItem: (name: string) => {
+    localStorage.removeItem(name);
+  },
+}));
 
 interface SettingsState {
   language: string;
@@ -96,6 +112,12 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: "timelens-settings",
+      storage: safeSettingsStorage,
+      migrate: (persistedState) => {
+        if (persistedState && typeof persistedState === "object") return persistedState;
+        // Corrupted persisted payloads are discarded to keep app bootable.
+        return undefined;
+      },
       onRehydrateStorage: () => (state) => {
         if (state?.language) {
           i18n.changeLanguage(state.language);

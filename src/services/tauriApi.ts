@@ -376,6 +376,16 @@ export const sendNativeNotification = (
 ): Promise<void> =>
   invoke("send_native_notification", { title, body, alarm });
 
+export const openLogDirectory = (): Promise<string> =>
+  invoke("open_log_directory");
+
+export const appendFrontendLog = (
+  level: "error" | "warn" | "info" | "debug",
+  message: string,
+  context?: string
+): Promise<void> =>
+  invoke("append_frontend_log", { level, message, context });
+
 // ── Browser domain usage ──────────────────────────────────────
 
 export const getBrowserDomainStats = (

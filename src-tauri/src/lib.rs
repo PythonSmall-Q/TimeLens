@@ -162,9 +162,39 @@ fn resolve_database_path(default_db_path: &Path) -> PathBuf {
     }
 }
 
-pub fn run() {
-    env_logger::init();
+fn init_file_logger(log_dir: &Path) -> Result<(), String> {
+    std::fs::create_dir_all(log_dir)
+        .map_err(|e| format!("failed to create log directory {}: {}", log_dir.display(), e))?;
 
+    let log_file = log_dir.join("timelens.log");
+    let file = fern::log_file(&log_file)
+        .map_err(|e| format!("failed to open log file {}: {}", log_file.display(), e))?;
+
+    let mut dispatch = fern::Dispatch::new()
+        .format(|out, message, record| {
+            out.finish(format_args!(
+                "{} [{}] {} - {}",
+                chrono::Local::now().format("%Y-%m-%d %H:%M:%S%.3f"),
+                record.level(),
+                record.target(),
+                message
+            ));
+        })
+        .chain(std::io::stdout())
+        .chain(file);
+
+    dispatch = if cfg!(debug_assertions) {
+        dispatch.level(log::LevelFilter::Debug)
+    } else {
+        dispatch.level(log::LevelFilter::Info)
+    };
+
+    dispatch
+        .apply()
+        .map_err(|e| format!("failed to initialize logger: {}", e))
+}
+
+pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
@@ -172,6 +202,15 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
+            // Initialize file logger as early as possible in setup.
+            if let Ok(log_dir) = app.path().app_log_dir() {
+                if let Err(e) = init_file_logger(&log_dir) {
+                    eprintln!("TimeLens logger initialization failed: {}", e);
+                } else {
+                    log::info!("Logger initialized at {}", log_dir.join("timelens.log").display());
+                }
+            }
+
             // ── Database ──────────────────────────────────────
             let data_dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&data_dir)?;
@@ -448,8 +487,10 @@ pub fn run() {
             commands::set_track_window_titles,
             commands::set_shortcuts,
             commands::send_native_notification,
+            commands::open_log_directory,
             commands::get_extension_bridge_key,
             commands::rotate_extension_bridge_key,
+            commands::append_frontend_log,
             // Browser domain
             commands::get_browser_domain_stats,
             commands::get_browser_ignored_domains,

@@ -1,6 +1,6 @@
 [package]
 name = "timelens"
-version = "1.4.0"
+version = "1.4.1"
 description = "A screen time tracker and desktop widget manager"
 authors = ["Shan Wenxiao"]
 license = "MIT"
@@ -34,7 +34,7 @@ rusqlite = { version = "0.31", features = ["bundled"] }
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1", features = ["v4"] }
 log = "0.4"
-env_logger = "0.11"
+fern = "0.7"
 sha2 = "0.10"
 hmac = "0.12"
 hex = "0.4"

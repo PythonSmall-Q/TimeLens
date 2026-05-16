@@ -5,6 +5,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [1.4.1] - 2026-05-16
+
+### Changed
+
+#### Reliability and Diagnostics
+
+- **Startup fallback hardened** — app boot now falls back to the main window render path when Tauri window label metadata is unavailable during early initialization, reducing black-screen startup failures seen after 1.2.0 upgrades
+- **Persisted state safety guards** — settings and dashboard layout stores now tolerate malformed legacy localStorage payloads and fall back to defaults instead of breaking initial render
+- **Unified file logging pipeline** — backend runtime logs and frontend `console` / unhandled error events now flow into persistent on-disk logs for post-mortem troubleshooting
+- **Settings quick access to logs** — the About section now includes a one-click action to open the app log folder directly in the system file manager
+
+### Fixed
+
+- Fixed an issue where some upgraded environments could open to a black screen and appear unresponsive
+- Fixed missing persistent diagnostics for startup/runtime failures by writing both frontend and backend logs to file
+
 ## [1.4.0] - 2026-05-16
 
 ### Added

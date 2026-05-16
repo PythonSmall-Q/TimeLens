@@ -1,5 +1,21 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { createJSONStorage, persist } from "zustand/middleware";
+
+const safeDashboardStorage = createJSONStorage(() => ({
+  getItem: (name: string) => {
+    try {
+      return localStorage.getItem(name);
+    } catch {
+      return null;
+    }
+  },
+  setItem: (name: string, value: string) => {
+    localStorage.setItem(name, value);
+  },
+  removeItem: (name: string) => {
+    localStorage.removeItem(name);
+  },
+}));
 
 export const DASHBOARD_WINDOW_IDS = [
   "goalProgress",
@@ -130,6 +146,12 @@ export const useDashboardLayoutStore = create<DashboardLayoutState>()(
     }),
     {
       name: "timelens-dashboard-layout",
+      storage: safeDashboardStorage,
+      migrate: (persistedState) => {
+        if (persistedState && typeof persistedState === "object") return persistedState;
+        // Keep boot robust when legacy or malformed persisted values are present.
+        return undefined;
+      },
       merge: (persistedState, currentState) => {
         const persisted = persistedState as Partial<DashboardLayoutState> | undefined;
         return {

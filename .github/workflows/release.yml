@@ -229,3 +229,120 @@ jobs:
           files: src-tauri/windows/out/TimeLens-${{ steps.release_tag.outputs.msix_version }}.msix
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-windows-with-webview2:
+    name: Build and upload Windows installers (WithWebView2)
+    runs-on: windows-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve release tag
+        id: release_tag
+        shell: pwsh
+        run: |
+          if ("${{ github.event_name }}" -eq "push") {
+            $tag = "${{ github.ref_name }}"
+          } else {
+            $tag = "${{ inputs.tag }}"
+          }
+
+          if ($tag -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.]+)?$') {
+            Write-Error "Invalid tag format: $tag"
+          }
+
+          git fetch --tags --force
+          git rev-parse -q --verify "refs/tags/$tag" | Out-Null
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Tag not found: $tag"
+          }
+
+          $versionNoV = $tag.TrimStart('v')
+          "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "version=$versionNoV" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Validate version consistency
+        shell: pwsh
+        run: |
+          $tagVersion = "${{ steps.release_tag.outputs.version }}"
+          $pkgVersion = (node -p "require('./package.json').version").Trim()
+          $tauriVersion = (node -p "require('./src-tauri/tauri.conf.json').version").Trim()
+
+          Write-Host "Release tag version: $tagVersion"
+          Write-Host "package.json version: $pkgVersion"
+          Write-Host "tauri.conf.json version: $tauriVersion"
+
+          if ($tagVersion -ne $pkgVersion -or $tagVersion -ne $tauriVersion) {
+            Write-Error "Version mismatch detected. Tag version must match package.json and src-tauri/tauri.conf.json."
+          }
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Build NSIS/MSI with bundled WebView2 runtime
+        shell: pwsh
+        run: |
+          $overridePath = "src-tauri/tauri.webview2.override.json"
+          $override = @{
+            bundle = @{
+              windows = @{
+                webviewInstallMode = @{
+                  type = "offlineInstaller"
+                  silent = $true
+                }
+              }
+            }
+          }
+          $override | ConvertTo-Json -Depth 16 | Set-Content -Path $overridePath -Encoding UTF8
+
+          npx tauri build --bundles nsis,msi --config $overridePath
+
+      - name: Prepare renamed WithWebView2 artifacts
+        id: artifacts
+        shell: pwsh
+        run: |
+          $bundleRoot = "src-tauri/target/release/bundle"
+          $nsis = Get-ChildItem -Path (Join-Path $bundleRoot "nsis") -Filter "*.exe" -File | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          $msi = Get-ChildItem -Path (Join-Path $bundleRoot "msi") -Filter "*.msi" -File | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+
+          if (-not $nsis) { throw "NSIS installer not found." }
+          if (-not $msi) { throw "MSI installer not found." }
+
+          $version = "${{ steps.release_tag.outputs.version }}"
+          $outDir = Join-Path $bundleRoot "with-webview2"
+          New-Item -ItemType Directory -Path $outDir -Force | Out-Null
+
+          $nsisOut = Join-Path $outDir "TimeLens-$version-WithWebView2-Setup.exe"
+          $msiOut = Join-Path $outDir "TimeLens-$version-WithWebView2.msi"
+
+          Copy-Item -Path $nsis.FullName -Destination $nsisOut -Force
+          Copy-Item -Path $msi.FullName -Destination $msiOut -Force
+
+          "nsis_file=$nsisOut" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "msi_file=$msiOut" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Upload WithWebView2 installers to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release_tag.outputs.tag }}
+          files: |
+            ${{ steps.artifacts.outputs.nsis_file }}
+            ${{ steps.artifacts.outputs.msi_file }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

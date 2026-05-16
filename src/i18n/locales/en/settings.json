@@ -159,6 +159,8 @@
   "about": {
     "title": "About",
     "version": "Version",
+    "logs": "Logs",
+    "openLogFolder": "Open Log Folder",
     "checkUpdate": "Check for Updates",
     "checking": "Checking…",
     "upToDate": "You are on the latest version",

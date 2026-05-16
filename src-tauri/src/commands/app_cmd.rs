@@ -1,4 +1,6 @@
-use tauri::State;
+use std::process::Command;
+
+use tauri::{AppHandle, Manager, State};
 
 use crate::commands::storage_cmd::DbState;
 use crate::models::BrowserExtensionStatus;
@@ -351,4 +353,41 @@ pub fn send_native_notification(title: String, body: String, alarm: Option<bool>
         let _ = (&title, &body, &alarm);
         Err("native toast alarm is only implemented on Windows".to_string())
     }
+}
+
+#[tauri::command]
+pub fn open_log_directory(app: AppHandle) -> Result<String, String> {
+    let log_dir = app
+        .path()
+        .app_log_dir()
+        .map_err(|e| format!("resolve log dir failed: {e}"))?;
+
+    std::fs::create_dir_all(&log_dir)
+        .map_err(|e| format!("create log dir failed: {e}"))?;
+
+    #[cfg(target_os = "windows")]
+    {
+        Command::new("explorer")
+            .arg(&log_dir)
+            .spawn()
+            .map_err(|e| format!("open log dir failed: {e}"))?;
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        Command::new("open")
+            .arg(&log_dir)
+            .spawn()
+            .map_err(|e| format!("open log dir failed: {e}"))?;
+    }
+
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        Command::new("xdg-open")
+            .arg(&log_dir)
+            .spawn()
+            .map_err(|e| format!("open log dir failed: {e}"))?;
+    }
+
+    Ok(log_dir.to_string_lossy().to_string())
 }

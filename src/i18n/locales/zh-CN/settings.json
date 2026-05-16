@@ -159,6 +159,8 @@
   "about": {
     "title": "关于",
     "version": "版本",
+    "logs": "日志",
+    "openLogFolder": "打开日志文件夹",
     "checkUpdate": "检查更新",
     "checking": "检查中…",
     "upToDate": "已是最新版本",

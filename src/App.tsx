@@ -13,17 +13,18 @@ import { useSettingsStore } from "./stores/settingsStore";
  * Other labels are treated as widget windows.
  */
 export default function App() {
-  const [windowLabel, setWindowLabel] = useState<string | null>(null);
+  const [windowLabel, setWindowLabel] = useState<string>("main");
   const theme = useSettingsStore((s) => s.theme);
   const language = useSettingsStore((s) => s.language);
 
   useEffect(() => {
-    getCurrentWebviewWindow()
-      .label
-      ? setWindowLabel(getCurrentWebviewWindow().label)
-      : setWindowLabel("main");
-    // Also handle synchronous label access
-    setWindowLabel(getCurrentWebviewWindow().label);
+    try {
+      const label = getCurrentWebviewWindow().label;
+      setWindowLabel(label || "main");
+    } catch {
+      // Fall back to main window rendering if webview window metadata is unavailable at boot.
+      setWindowLabel("main");
+    }
   }, []);
 
   useEffect(() => {
@@ -53,8 +54,6 @@ export default function App() {
       // Ignore when backend is not ready; next emit will sync menu labels.
     });
   }, [language]);
-
-  if (windowLabel === null) return null;
 
   if (windowLabel !== "main") {
     return <WidgetWindow widgetId={windowLabel} />;
