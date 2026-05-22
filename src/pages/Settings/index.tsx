@@ -70,6 +70,7 @@ export default function Settings() {
   const [activeSection, setActiveSection] = useState<
     | "general"
     | "appearance"
+    | "trayIcon"
     | "tracking"
     | "startup"
     | "widgets"
@@ -365,7 +366,8 @@ export default function Settings() {
     keywords: string[];
   }> = [
     { key: "general", title: t("general"), icon: Sun, keywords: [t("language")] },
-    { key: "appearance", title: t("appearance"), icon: Moon, keywords: [t("theme.label"), t("trayIconStyle.label")] },
+    { key: "appearance", title: t("appearance"), icon: Moon, keywords: [t("theme.label")] },
+    { key: "trayIcon", title: t("trayIconStyle.label"), icon: PanelsTopLeft, keywords: [t("trayIconStyle.auto"), t("trayIconStyle.color"), t("trayIconStyle.black"), t("trayIconStyle.white")] },
     { key: "tracking", title: t("tracking.title"), icon: Activity, keywords: [t("tracking.active"), t("tracking.samplingInterval"), t("tracking.idleTimePolicy")] },
     { key: "startup", title: t("startup.title"), icon: Rocket, keywords: [t("startup.launchAtStartup"), t("startup.silentStartup"), t("startup.autoOpenWidgets")] },
     { key: "widgets", title: t("widgets.title"), icon: PanelsTopLeft, keywords: [t("widgets.fadeOnBlur")] },
@@ -467,6 +469,12 @@ export default function Settings() {
             ))}
           </div>
         </Row>
+      </Section>
+      )}
+
+      {/* Tray Icon */}
+      {activeSection === "trayIcon" && (
+      <Section icon={PanelsTopLeft} title={t("trayIconStyle.label")}>
         <Row label={t("trayIconStyle.label")}>
           <div className="flex gap-2">
             {(["auto", "color", "black", "white"] as const).map((style) => (

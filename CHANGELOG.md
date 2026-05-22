@@ -13,6 +13,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - **Black & white tray icon options** — Appearance settings now includes a Tray Icon Style selector (Color / Black / White); the chosen style is persisted and applied immediately at runtime without restart. Black/white variants are generated from the main icon via `generate-tray-icons.mjs`
 - **Auto tray icon theme matching** — tray icon style now supports `Auto`; when enabled, TimeLens switches between white/black monochrome tray icons based on the current system theme (dark/light) and updates live when the theme changes
+- **Standalone tray icon settings section** — tray/taskbar icon style controls are now exposed as an independent Settings entry instead of being nested under Appearance
 - **macOS launch at startup** — startup-on-login now supported on macOS via LaunchAgent; migrated from manual Windows registry code to `tauri-plugin-autostart` for unified cross-platform (Windows + macOS) support; the Startup settings section is now shown on both platforms
 - **Microsoft Store update routing** — when a newer TimeLens release is detected on Microsoft Store installs, TimeLens now opens the Microsoft Store updates page directly instead of only showing a reminder
 
@@ -51,6 +52,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 
 - Fixed packaged Microsoft Store/taskbar icon presentation issues caused by previous icon asset composition
+- Fixed Tauri npm/rust minor-version mismatch warning by aligning `@tauri-apps/api` and `@tauri-apps/cli` with Rust `tauri` 2.11.x
 - Fixed Browser Usage data staleness by allowing explicit refresh and focus-triggered refresh
 - Fixed VS Code extension bridge auth mismatches in session upload requests caused by non-canonical request body serialization
 - Fixed extension usability gap where users needed an easier path to reconfigure bridge key and inspect sync failures
