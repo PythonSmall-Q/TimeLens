@@ -1,6 +1,7 @@
 use std::process::Command;
 
 use tauri::{AppHandle, Manager, State};
+use tauri_plugin_autostart::ManagerExt;
 
 use crate::commands::storage_cmd::DbState;
 use crate::models::BrowserExtensionStatus;
@@ -30,6 +31,7 @@ pub struct InstallChannelInfo {
     pub platform: String,
     pub channel: String,
     pub should_trigger_update: bool,
+    pub update_url: Option<String>,
 }
 
 #[cfg(target_os = "windows")]
@@ -61,6 +63,11 @@ pub fn get_install_channel_info() -> InstallChannelInfo {
                 "direct".to_string()
             },
             should_trigger_update: !is_store,
+            update_url: if is_store {
+                Some("ms-windows-store://downloadsandupdates".to_string())
+            } else {
+                None
+            },
         };
     }
 
@@ -70,6 +77,7 @@ pub fn get_install_channel_info() -> InstallChannelInfo {
             platform: "macos".to_string(),
             channel: "direct".to_string(),
             should_trigger_update: true,
+            update_url: None,
         };
     }
 
@@ -79,6 +87,7 @@ pub fn get_install_channel_info() -> InstallChannelInfo {
             platform: "linux".to_string(),
             channel: "direct".to_string(),
             should_trigger_update: true,
+            update_url: None,
         };
     }
 
@@ -87,57 +96,8 @@ pub fn get_install_channel_info() -> InstallChannelInfo {
         platform: "unknown".to_string(),
         channel: "direct".to_string(),
         should_trigger_update: true,
+        update_url: None,
     }
-}
-
-#[cfg(target_os = "windows")]
-const RUN_KEY_PATH: &str = "Software\\Microsoft\\Windows\\CurrentVersion\\Run";
-#[cfg(target_os = "windows")]
-const RUN_VALUE_NAME: &str = "TimeLens";
-
-#[cfg(target_os = "windows")]
-fn get_windows_autostart_enabled() -> Result<bool, String> {
-    use winreg::RegKey;
-    use winreg::enums::HKEY_CURRENT_USER;
-
-    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-    let run = hkcu
-        .open_subkey(RUN_KEY_PATH)
-        .map_err(|e| format!("open Run key failed: {e}"))?;
-    let value: Result<String, _> = run.get_value(RUN_VALUE_NAME);
-    Ok(value.map(|v| !v.trim().is_empty()).unwrap_or(false))
-}
-
-#[cfg(not(target_os = "windows"))]
-fn get_windows_autostart_enabled() -> Result<bool, String> {
-    Ok(false)
-}
-
-#[cfg(target_os = "windows")]
-fn set_windows_autostart_enabled(enabled: bool) -> Result<(), String> {
-    use winreg::RegKey;
-    use winreg::enums::HKEY_CURRENT_USER;
-
-    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-    let (run, _) = hkcu
-        .create_subkey(RUN_KEY_PATH)
-        .map_err(|e| format!("create/open Run key failed: {e}"))?;
-
-    if enabled {
-        let exe = std::env::current_exe().map_err(|e| format!("current_exe failed: {e}"))?;
-        let cmd = format!("\"{}\" --autostart", exe.display());
-        run.set_value(RUN_VALUE_NAME, &cmd)
-            .map_err(|e| format!("set Run value failed: {e}"))?;
-    } else {
-        let _ = run.delete_value(RUN_VALUE_NAME);
-    }
-
-    Ok(())
-}
-
-#[cfg(not(target_os = "windows"))]
-fn set_windows_autostart_enabled(_enabled: bool) -> Result<(), String> {
-    Ok(())
 }
 
 fn default_shortcuts() -> ShortcutSettings {
@@ -150,10 +110,13 @@ fn default_shortcuts() -> ShortcutSettings {
 }
 
 #[tauri::command]
-pub fn get_app_settings(db: State<DbState>) -> Result<AppSettingsPayload, String> {
+pub fn get_app_settings(app: AppHandle, db: State<DbState>) -> Result<AppSettingsPayload, String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
 
-    let launch_at_startup = get_windows_autostart_enabled().unwrap_or(false);
+    let launch_at_startup = app
+        .autolaunch()
+        .is_enabled()
+        .unwrap_or(false);
     let silent_startup = crate::db::get_bool_setting(&conn, "silent_startup", true)
         .map_err(|e| e.to_string())?;
     let auto_open_widgets = crate::db::get_bool_setting(&conn, "auto_open_widgets", true)
@@ -236,8 +199,12 @@ pub fn set_browser_extension_enabled(enabled: bool, db: State<DbState>) -> Resul
 }
 
 #[tauri::command]
-pub fn set_launch_at_startup(enabled: bool, db: State<DbState>) -> Result<(), String> {
-    set_windows_autostart_enabled(enabled)?;
+pub fn set_launch_at_startup(app: AppHandle, enabled: bool, db: State<DbState>) -> Result<(), String> {
+    if enabled {
+        app.autolaunch().enable().map_err(|e| e.to_string())?;
+    } else {
+        app.autolaunch().disable().map_err(|e| e.to_string())?;
+    }
 
     let conn = db.lock().map_err(|e| e.to_string())?;
     crate::db::set_bool_setting(&conn, "launch_at_startup", enabled).map_err(|e| e.to_string())
@@ -390,4 +357,35 @@ pub fn open_log_directory(app: AppHandle) -> Result<String, String> {
     }
 
     Ok(log_dir.to_string_lossy().to_string())
+}
+
+// ── Tray icon style ───────────────────────────────────────────
+
+#[tauri::command]
+pub fn get_tray_icon_style(db: State<DbState>) -> Result<String, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    let style = crate::db::get_setting(&conn, "tray_icon_style")
+        .map_err(|e| e.to_string())?
+        .unwrap_or_else(|| "auto".to_string());
+    Ok(style)
+}
+
+#[tauri::command]
+pub fn set_tray_icon_style(app: AppHandle, style: String, db: State<DbState>) -> Result<(), String> {
+    let normalized = match style.as_str() {
+        "auto" | "color" | "black" | "white" => style.clone(),
+        _ => return Err("tray_icon_style must be 'auto', 'color', 'black', or 'white'".to_string()),
+    };
+
+    // Persist to DB
+    {
+        let conn = db.lock().map_err(|e| e.to_string())?;
+        crate::db::set_setting(&conn, "tray_icon_style", &normalized)
+            .map_err(|e| e.to_string())?;
+    }
+
+    // Update tray icon immediately
+    crate::apply_tray_icon_style(&app, &normalized)?;
+
+    Ok(())
 }

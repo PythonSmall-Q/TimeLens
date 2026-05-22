@@ -194,8 +194,56 @@ fn init_file_logger(log_dir: &Path) -> Result<(), String> {
         .map_err(|e| format!("failed to initialize logger: {}", e))
 }
 
+pub(crate) fn load_tray_icon(style: &str) -> Result<tauri::image::Image<'static>, String> {
+    let bytes: &'static [u8] = match style {
+        "black" => include_bytes!("../icons/tray-black.png"),
+        "white" => include_bytes!("../icons/tray-white.png"),
+        _ => include_bytes!("../icons/32x32.png"),
+    };
+    tauri::image::Image::from_bytes(bytes).map_err(|e| e.to_string())
+}
+
+fn system_theme_prefers_white_tray_icon(app: &AppHandle) -> bool {
+    // Dark system theme generally means dark tray/taskbar background,
+    // so a white monochrome icon has better contrast.
+    if let Some(main) = app.get_webview_window("main") {
+        if let Ok(theme) = main.theme() {
+            return matches!(theme, tauri::Theme::Dark);
+        }
+    }
+    true
+}
+
+pub(crate) fn resolve_tray_icon_style(app: &AppHandle, style: &str) -> &'static str {
+    match style {
+        "auto" => {
+            if system_theme_prefers_white_tray_icon(app) {
+                "white"
+            } else {
+                "black"
+            }
+        }
+        "black" => "black",
+        "white" => "white",
+        _ => "color",
+    }
+}
+
+pub(crate) fn apply_tray_icon_style(app: &AppHandle, style: &str) -> Result<(), String> {
+    if let Some(tray) = app.tray_by_id("main") {
+        let effective = resolve_tray_icon_style(app, style);
+        let icon = load_tray_icon(effective)?;
+        tray.set_icon(Some(icon)).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            Some(vec!["--autostart"]),
+        ))
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_notification::init())
@@ -401,7 +449,14 @@ pub fn run() {
             }
 
             // ── System tray ───────────────────────────────────
-            setup_tray(app, monitor_status, tray_language)?;
+            let tray_icon_style = {
+                let db_state = app.state::<DbState>();
+                let conn = db_state.lock().unwrap();
+                crate::db::get_setting(&conn, "tray_icon_style")
+                    .unwrap_or(None)
+                    .unwrap_or_else(|| "auto".to_string())
+            };
+            setup_tray(app, monitor_status, tray_language, &tray_icon_style)?;
 
             Ok(())
         })
@@ -411,6 +466,24 @@ pub fn run() {
                 if window.label() == "main" {
                     window.hide().unwrap_or_default();
                     api.prevent_close();
+                }
+            }
+
+            // Follow system theme for tray icon when tray style is set to auto.
+            if let tauri::WindowEvent::ThemeChanged(_theme) = event {
+                if window.label() == "main" {
+                    let app = window.app_handle();
+                    let style = {
+                        let db_state = app.state::<DbState>();
+                        let conn = db_state.lock().unwrap();
+                        crate::db::get_setting(&conn, "tray_icon_style")
+                            .ok()
+                            .flatten()
+                            .unwrap_or_else(|| "auto".to_string())
+                    };
+                    if style == "auto" {
+                        let _ = apply_tray_icon_style(&app, &style);
+                    }
                 }
             }
         })
@@ -479,6 +552,8 @@ pub fn run() {
             commands::get_browser_extension_status,
             commands::get_install_channel_info,
             commands::set_launch_at_startup,
+            commands::get_tray_icon_style,
+            commands::set_tray_icon_style,
             commands::set_silent_startup,
             commands::set_auto_open_widgets,
             commands::set_browser_extension_enabled,
@@ -522,6 +597,7 @@ fn setup_tray(
     app: &tauri::App,
     monitor_status: SharedMonitorStatus,
     tray_language: SharedTrayLanguage,
+    tray_icon_style: &str,
 ) -> tauri::Result<()> {
     let initial_active = monitor_status.lock().map(|s| s.active).unwrap_or(true);
     let initial_lang = tray_language
@@ -539,8 +615,13 @@ fn setup_tray(
 
     let menu = Menu::with_items(app, &[&show, &clock, &todo, &timer, &pause, &quit])?;
 
-    TrayIconBuilder::new()
-        .icon(app.default_window_icon().unwrap().clone())
+    let effective_style = resolve_tray_icon_style(&app.handle().clone(), tray_icon_style);
+    let tray_icon = load_tray_icon(effective_style)
+        .ok()
+        .unwrap_or_else(|| app.default_window_icon().unwrap().clone());
+
+    TrayIconBuilder::with_id("main")
+        .icon(tray_icon)
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_tray_icon_event(|tray, event| {

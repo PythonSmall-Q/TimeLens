@@ -32,6 +32,7 @@
   "version": "Version",
   "updateAvailableTitle": "New Version Available",
   "updateAvailableBody": "TimeLens v{{version}} is now available. You are on v{{current}}.",
+  "updateAvailableStoreBody": "TimeLens v{{version}} is now available. You are on v{{current}}. TimeLens has opened Microsoft Store updates.",
   "updateInstallReady": "TimeLens v{{version}} has been installed. Restart the app to apply updates.",
   "vscodeExtensionOfflineTitle": "VS Code extension is not connected",
   "vscodeExtensionOfflineBody": "VS Code stats have been soft-degraded because the extension is not running.",

@@ -360,6 +360,12 @@ export const setIdleTimePolicy = (policy: "count" | "exclude"): Promise<void> =>
 export const setTrackWindowTitles = (enabled: boolean): Promise<void> =>
   invoke("set_track_window_titles", { enabled });
 
+export const getTrayIconStyle = (): Promise<string> =>
+  invoke("get_tray_icon_style");
+
+export const setTrayIconStyle = (style: "auto" | "color" | "black" | "white"): Promise<void> =>
+  invoke("set_tray_icon_style", { style });
+
 export const getInstallChannelInfo = (): Promise<InstallChannelInfo> =>
   invoke("get_install_channel_info");
 

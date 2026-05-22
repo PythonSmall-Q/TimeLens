@@ -12,6 +12,13 @@
     "light": "Light",
     "system": "System"
   },
+  "trayIconStyle": {
+    "label": "Tray Icon Style",
+    "auto": "Auto",
+    "color": "Color",
+    "black": "Black",
+    "white": "White"
+  },
   "tracking": {
     "title": "Tracking",
     "active": "Screen Time Monitoring",

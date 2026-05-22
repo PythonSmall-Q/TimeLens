@@ -32,6 +32,7 @@
   "version": "版本",
   "updateAvailableTitle": "发现新版本",
   "updateAvailableBody": "TimeLens v{{version}} 已发布，当前版本为 v{{current}}。",
+  "updateAvailableStoreBody": "TimeLens v{{version}} 已发布，当前版本为 v{{current}}。已为你打开 Microsoft Store 更新页面。",
   "updateInstallReady": "TimeLens v{{version}} 已安装，请重启应用以应用更新。",
   "vscodeExtensionOfflineTitle": "VS Code 扩展未打开",
   "vscodeExtensionOfflineBody": "未检测到 VS Code 扩展连接，VS Code 统计已自动软降级。",

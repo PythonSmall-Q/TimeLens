@@ -89,6 +89,7 @@ export default function Settings() {
   const [extensionBridgeKey, setExtensionBridgeKey] = useState<string>("");
   const [extensionBridgeLoading, setExtensionBridgeLoading] = useState(false);
   const [extensionBridgeKeyRotatedAt, setExtensionBridgeKeyRotatedAt] = useState<string>("");
+  const [trayIconStyle, setTrayIconStyleState] = useState<"auto" | "color" | "black" | "white">("auto");
   const [shortcuts, setShortcutState] = useState<ShortcutSettings>({
     open_widget_center: "Alt+W",
     toggle_widget_visibility: "Alt+Shift+W",
@@ -133,6 +134,10 @@ export default function Settings() {
 
     api.getExtensionBridgeKey()
       .then(setExtensionBridgeKey)
+      .catch(() => {});
+
+    api.getTrayIconStyle()
+      .then((s) => setTrayIconStyleState(s as "auto" | "color" | "black" | "white"))
       .catch(() => {});
 
     api.getInstallChannelInfo()
@@ -351,6 +356,8 @@ export default function Settings() {
   };
 
   const showWindowsStartupSettings = installChannelInfo?.platform === "windows";
+  const showStartupSettings =
+    installChannelInfo?.platform === "windows" || installChannelInfo?.platform === "macos";
   const sectionCards: Array<{
     key: NonNullable<typeof activeSection>;
     title: string;
@@ -358,7 +365,7 @@ export default function Settings() {
     keywords: string[];
   }> = [
     { key: "general", title: t("general"), icon: Sun, keywords: [t("language")] },
-    { key: "appearance", title: t("appearance"), icon: Moon, keywords: [t("theme.label")] },
+    { key: "appearance", title: t("appearance"), icon: Moon, keywords: [t("theme.label"), t("trayIconStyle.label")] },
     { key: "tracking", title: t("tracking.title"), icon: Activity, keywords: [t("tracking.active"), t("tracking.samplingInterval"), t("tracking.idleTimePolicy")] },
     { key: "startup", title: t("startup.title"), icon: Rocket, keywords: [t("startup.launchAtStartup"), t("startup.silentStartup"), t("startup.autoOpenWidgets")] },
     { key: "widgets", title: t("widgets.title"), icon: PanelsTopLeft, keywords: [t("widgets.fadeOnBlur")] },
@@ -456,6 +463,28 @@ export default function Settings() {
                 )}
               >
                 {t(`theme.${th}`)}
+              </button>
+            ))}
+          </div>
+        </Row>
+        <Row label={t("trayIconStyle.label")}>
+          <div className="flex gap-2">
+            {(["auto", "color", "black", "white"] as const).map((style) => (
+              <button
+                key={style}
+                onClick={async () => {
+                  const prev = trayIconStyle;
+                  setTrayIconStyleState(style);
+                  await api.setTrayIconStyle(style).catch(() => setTrayIconStyleState(prev));
+                }}
+                className={clsx(
+                  "px-3 py-1.5 rounded-lg text-xs border transition-colors",
+                  trayIconStyle === style
+                    ? "border-accent-blue bg-accent-blue/15 text-accent-blue"
+                    : "border-surface-border text-text-muted hover:text-text-secondary"
+                )}
+              >
+                {t(`trayIconStyle.${style}`)}
               </button>
             ))}
           </div>
@@ -647,7 +676,7 @@ export default function Settings() {
   {/* Startup */}
       {activeSection === "startup" && (
       <Section icon={Rocket} title={t("startup.title")}>
-        {showWindowsStartupSettings && (
+        {showStartupSettings && (
           <>
             <Row label={t("startup.launchAtStartup")}>
               <button
@@ -714,7 +743,7 @@ export default function Settings() {
             />
           </button>
         </Row>
-        {showWindowsStartupSettings && (
+        {showStartupSettings && (
           <p className="text-xs text-text-muted text-right">{t("startup.silentHint")}</p>
         )}
       </Section>

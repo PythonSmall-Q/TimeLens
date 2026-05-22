@@ -12,6 +12,13 @@
     "light": "浅色",
     "system": "跟随系统"
   },
+  "trayIconStyle": {
+    "label": "托盘图标样式",
+    "auto": "自动",
+    "color": "彩色",
+    "black": "黑色",
+    "white": "白色"
+  },
   "tracking": {
     "title": "记录",
     "active": "屏幕时间监控",

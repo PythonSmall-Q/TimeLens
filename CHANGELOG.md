@@ -9,6 +9,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+#### Tray Icon and Startup
+
+- **Black & white tray icon options** — Appearance settings now includes a Tray Icon Style selector (Color / Black / White); the chosen style is persisted and applied immediately at runtime without restart. Black/white variants are generated from the main icon via `generate-tray-icons.mjs`
+- **Auto tray icon theme matching** — tray icon style now supports `Auto`; when enabled, TimeLens switches between white/black monochrome tray icons based on the current system theme (dark/light) and updates live when the theme changes
+- **macOS launch at startup** — startup-on-login now supported on macOS via LaunchAgent; migrated from manual Windows registry code to `tauri-plugin-autostart` for unified cross-platform (Windows + macOS) support; the Startup settings section is now shown on both platforms
+- **Microsoft Store update routing** — when a newer TimeLens release is detected on Microsoft Store installs, TimeLens now opens the Microsoft Store updates page directly instead of only showing a reminder
+
 #### Build and Packaging Utilities
 
 - Added multiple icon-processing and troubleshooting scripts for MSIX/taskbar icon workflows, including generation and one-off fix helpers

@@ -225,6 +225,7 @@ export interface InstallChannelInfo {
   platform: "windows" | "macos" | "linux" | "unknown";
   channel: "microsoft-store" | "direct";
   should_trigger_update: boolean;
+  update_url?: string | null;
 }
 
 export interface BackupBundleCounts {

@@ -4,6 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import { getAllWebviewWindows, getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { register as registerGlobalShortcut, unregisterAll as unregisterAllGlobalShortcuts } from "@tauri-apps/plugin-global-shortcut";
 import { isPermissionGranted, requestPermission, sendNotification } from "@tauri-apps/plugin-notification";
+import { open as openExternal } from "@tauri-apps/plugin-shell";
 import { check } from "@tauri-apps/plugin-updater";
 import MainLayout from "./components/layout/MainLayout";
 import Dashboard from "./pages/Dashboard";
@@ -248,9 +249,16 @@ export default function MainApp() {
         setUpdateInfo({ version: latest, notes: data.body ?? "", url: data.html_url ?? "" });
 
         if (!channel.should_trigger_update) {
+          const storeUpdateUrl = channel.update_url ?? "ms-windows-store://downloadsandupdates";
+          try {
+            await openExternal(storeUpdateUrl);
+          } catch {
+            // Fallback to web store homepage if URI scheme is unavailable.
+            window.open("https://apps.microsoft.com/", "_blank", "noopener,noreferrer");
+          }
           await notifyWithNavigate(
             t("common:updateAvailableTitle"),
-            t("common:updateAvailableBody", { version: latest, current: CURRENT_VERSION }),
+            t("common:updateAvailableStoreBody", { version: latest, current: CURRENT_VERSION }),
             "#/settings"
           );
           return;
