@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { t } from "./i18n";
 
 async function fetchJson<T>(url: string): Promise<T | null> {
   try {
@@ -44,6 +45,11 @@ export class DashboardSidebarViewProvider implements vscode.WebviewViewProvider 
       }
       if (msg.command === "openDashboard") {
         await vscode.commands.executeCommand("timelens.openDashboard");
+      }
+      if (msg.command === "configureBridgeKey") {
+        await vscode.commands.executeCommand("timelens.setExtensionBridgeKey");
+        // Refresh after configuring key
+        setTimeout(() => this.refresh(), 500);
       }
       if (msg.command === "toggleTracking") {
         const p = msg.payload as { enabled: boolean };
@@ -114,6 +120,7 @@ export class DashboardSidebarViewProvider implements vscode.WebviewViewProvider 
     const cfg = vscode.workspace.getConfiguration("timelens");
     const enabled = cfg.get<boolean>("enabled", true);
     const level = cfg.get<string>("trackingLevel", "standard");
+    const bridgeKey = cfg.get<string>("bridgeKey", "").trim();
     const apiBase = cfg.get<string>("apiBaseUrl", "http://127.0.0.1:49152");
 
     try {
@@ -147,39 +154,44 @@ export class DashboardSidebarViewProvider implements vscode.WebviewViewProvider 
 </head>
 <body>
   <div class="title">TimeLens</div>
-  <div class="muted">扩展主页</div>
+  <div class="muted">${t().extensionHome}</div>
 
   <div class="card">
     <div class="row">
-      <span class="muted">今日 VS Code 时长</span>
+      <span class="muted">${t().todayVsCode}</span>
       <span class="pill">${level}</span>
     </div>
     <div class="value">${formatDuration(vscodeToday?.total_seconds ?? 0)}</div>
-    <div class="muted">${vscodeToday?.session_count ?? 0} sessions</div>
+    <div class="muted">${vscodeToday?.session_count ?? 0} ${t().sessions}</div>
   </div>
 
   <div class="card">
     <div class="row">
-      <span class="muted">记录开关</span>
-      <button class="secondary" onclick="toggleTracking()">${enabled ? "关闭记录" : "开启记录"}</button>
+      <span class="muted">${t().trackingToggle}</span>
+      <button class="secondary" onclick="toggleTracking()">${enabled ? t().disableTracking : t().enableTracking}</button>
     </div>
     <div class="row">
-      <span class="muted">记录级别</span>
+      <span class="muted">${t().detailLevel}</span>
       <select id="level" onchange="setLevel(this.value)">
         <option value="basic" ${level === "basic" ? "selected" : ""}>basic</option>
         <option value="standard" ${level === "standard" ? "selected" : ""}>standard</option>
         <option value="detailed" ${level === "detailed" ? "selected" : ""}>detailed</option>
       </select>
     </div>
-    ${!status ? '<div class="warn">未连接到 TimeLens 桌面端</div>' : ""}
+    <div class="row" style="margin-top: 8px;">
+      <span class="muted">${t().apiKey}</span>
+      <button class="secondary" onclick="configureBridgeKey()">${bridgeKey ? t().changeKey : t().configureKey}</button>
+    </div>
+    ${!bridgeKey ? `<div class="warn" style="font-size:11px;">${t().noKeyWarning}</div>` : ''}
+    ${!status ? `<div class="warn">${t().notConnected}</div>` : ""}
   </div>
 
   <div class="card">
-    <div class="row"><span class="muted">今日最高应用</span><span>${topApp?.app_name ?? "-"}</span></div>
-    <div class="row"><span class="muted">桌面端版本</span><span>${status?.version ?? "-"}</span></div>
+    <div class="row"><span class="muted">${t().topApp}</span><span>${topApp?.app_name ?? "-"}</span></div>
+    <div class="row"><span class="muted">${t().desktopVersion}</span><span>${status?.version ?? "-"}</span></div>
     <div class="row">
-      <button onclick="openDashboard()">打开完整仪表盘</button>
-      <button class="secondary" onclick="refresh()">刷新</button>
+      <button onclick="openDashboard()">${t().openDashboard}</button>
+      <button class="secondary" onclick="refresh()">${t().refresh}</button>
     </div>
   </div>
 
@@ -189,6 +201,7 @@ export class DashboardSidebarViewProvider implements vscode.WebviewViewProvider 
   function openDashboard(){ vscode.postMessage({ command: 'openDashboard' }); }
   function toggleTracking(){ vscode.postMessage({ command: 'toggleTracking', payload: { enabled: ${!enabled} } }); }
   function setLevel(level){ vscode.postMessage({ command: 'setLevel', payload: { level } }); }
+  function configureBridgeKey(){ vscode.postMessage({ command: 'configureBridgeKey' }); }
 </script>
 </body>
 </html>`;
@@ -214,7 +227,7 @@ export class DashboardSidebarViewProvider implements vscode.WebviewViewProvider 
 <body>
   <div class="card">
     <div class="title">TimeLens</div>
-    <div class="muted">Loading...</div>
+    <div class="muted">${t().loading}</div>
   </div>
 </body>
 </html>`;
@@ -244,9 +257,9 @@ export class DashboardSidebarViewProvider implements vscode.WebviewViewProvider 
 <body>
   <div class="card">
     <div class="title">TimeLens</div>
-    <div class="muted">页面加载失败，请重试。</div>
+    <div class="muted">${t().loadFailed}</div>
     <div class="muted">${safe}</div>
-    <button onclick="refresh()">重试</button>
+    <button onclick="refresh()">${t().retry}</button>
   </div>
 <script>
   const vscode = acquireVsCodeApi();

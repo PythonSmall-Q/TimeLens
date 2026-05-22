@@ -2,7 +2,9 @@
   "name": "timelens",
   "private": true,
   "version": "1.4.1",
-  "authors": ["Shan Wenxiao"],
+  "authors": [
+    "Shan Wenxiao"
+  ],
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,10 +12,11 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build",
-    "tauri:build:msi": "tauri build --bundles msi",
-    "tauri:build:nsis": "tauri build --bundles nsis",
-    "tauri:build:all": "npm run tauri:build:msi && npm run tauri:build:nsis",
+    "tauri:build": "npm run generate:icons && tauri build",
+    "tauri:build:msi": "npm run generate:icons && tauri build --bundles msi",
+    "tauri:build:nsis": "npm run generate:icons && tauri build --bundles nsis",
+    "tauri:build:all": "npm run generate:icons && npm run tauri:build:msi && npm run tauri:build:nsis",
+    "generate:icons": "node generate-msix-icons.mjs",
     "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -42,6 +45,7 @@
     "react-i18next": "^14.1.0",
     "react-router-dom": "^6.22.0",
     "recharts": "^2.12.0",
+    "sharp": "^0.34.5",
     "zustand": "^4.5.0"
   },
   "devDependencies": {

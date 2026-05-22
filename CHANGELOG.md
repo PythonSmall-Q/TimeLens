@@ -5,6 +5,49 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [1.4.2] - 2026-05-22
+
+### Added
+
+#### Build and Packaging Utilities
+
+- Added multiple icon-processing and troubleshooting scripts for MSIX/taskbar icon workflows, including generation and one-off fix helpers
+- Added localized VS Code extension metadata resources for automatic language switching based on user locale
+- Added VS Code extension runtime i18n module for dynamic UI/message localization
+- Added VS Code extension setup guide for bridge-key configuration and local API connection
+- Added packaged VS Code extension artifacts for versions 0.3.0 through 0.3.3
+
+### Changed
+
+#### Windows MSIX Packaging and Assets
+
+- Updated MSIX manifest and staged asset set used for Windows packaging
+- Refreshed Store and tile icon assets in all required sizes to improve packaged app icon consistency
+- Updated staged Windows executable in MSIX output
+- Updated npm scripts and lockfile to support icon generation/build flow integration
+- Updated ignore rules to align with the current packaging/output workflow
+
+#### Browser Usage Page
+
+- Added a manual refresh control on the Browser Usage page header
+- Added auto-refresh behavior when the app window regains focus while staying on Browser Usage
+- Added refresh-related locale strings for Browser Usage in English and Chinese
+
+#### VS Code Extension: Sync, Diagnostics, and Localization
+
+- Updated extension API upload payload serialization to canonical JSON for stable signature verification against the desktop API
+- Expanded extension bridge-key UX so key configuration/update remains accessible from extension surfaces
+- Improved extension diagnostics with clearer output-channel logging and richer auth-failure prompts/actions
+- Localized extension runtime UI/messages and package-contributed labels/descriptions with automatic language selection
+- Updated extension README to match current bridge-key auth and setup flow
+
+### Fixed
+
+- Fixed packaged Microsoft Store/taskbar icon presentation issues caused by previous icon asset composition
+- Fixed Browser Usage data staleness by allowing explicit refresh and focus-triggered refresh
+- Fixed VS Code extension bridge auth mismatches in session upload requests caused by non-canonical request body serialization
+- Fixed extension usability gap where users needed an easier path to reconfigure bridge key and inspect sync failures
+
 ## [1.4.1] - 2026-05-16
 
 ### Changed

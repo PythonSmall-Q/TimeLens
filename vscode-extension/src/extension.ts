@@ -2,13 +2,20 @@ import * as vscode from "vscode";
 import { SessionTracker } from "./sessionTracker";
 import { DashboardPanel } from "./dashboardPanel";
 import { DashboardSidebarViewProvider } from "./dashboardSidebarView";
+import { t } from "./i18n";
 
 let tracker: SessionTracker | null = null;
 let statusBarItem: vscode.StatusBarItem | null = null;
 let sidebarProvider: DashboardSidebarViewProvider | null = null;
+export let outputChannel: vscode.OutputChannel | null = null;
 
 export function activate(context: vscode.ExtensionContext): void {
-  tracker = new SessionTracker(context);
+  outputChannel = vscode.window.createOutputChannel("TimeLens");
+  context.subscriptions.push(outputChannel);
+
+  outputChannel.appendLine(`[${new Date().toISOString()}] TimeLens extension activated`);
+
+  tracker = new SessionTracker(context, outputChannel);
   tracker.start();
 
   const promptSetBridgeKey = async () => {
@@ -16,8 +23,8 @@ export function activate(context: vscode.ExtensionContext): void {
       .getConfiguration("timelens")
       .get<string>("bridgeKey", "");
     const value = await vscode.window.showInputBox({
-      title: "TimeLens: Set Extension Bridge Key",
-      prompt: "Enter the extension bridge key from TimeLens Settings > Local API / Extension Bridge",
+      title: t().setKeyTitle,
+      prompt: t().setKeyPromptText,
       password: false,
       value: current,
       ignoreFocusOut: true,
@@ -27,9 +34,9 @@ export function activate(context: vscode.ExtensionContext): void {
         .getConfiguration("timelens")
         .update("bridgeKey", value, vscode.ConfigurationTarget.Global);
       if (value.trim()) {
-        void vscode.window.showInformationMessage("Extension bridge key saved successfully.");
+        void vscode.window.showInformationMessage(t().keySaved);
       } else {
-        void vscode.window.showInformationMessage("Extension bridge key cleared.");
+        void vscode.window.showWarningMessage(t().keyCleared);
       }
     }
   };
@@ -86,7 +93,7 @@ export function activate(context: vscode.ExtensionContext): void {
         .getConfiguration("timelens")
         .update("enabled", true, vscode.ConfigurationTarget.Global);
       updateStatusBar();
-      void vscode.window.showInformationMessage("TimeLens tracking enabled");
+      void vscode.window.showInformationMessage(t().trackingEnabled);
     })
   );
 
@@ -96,7 +103,7 @@ export function activate(context: vscode.ExtensionContext): void {
         .getConfiguration("timelens")
         .update("enabled", false, vscode.ConfigurationTarget.Global);
       updateStatusBar();
-      void vscode.window.showInformationMessage("TimeLens tracking disabled");
+      void vscode.window.showInformationMessage(t().trackingDisabled);
     })
   );
 
@@ -108,33 +115,33 @@ export function activate(context: vscode.ExtensionContext): void {
       const items: vscode.QuickPickItem[] = [
         {
           label: "basic",
-          description: "Session duration only",
-          detail: "No language or project information is recorded.",
+          description: t().basicDesc,
+          detail: t().basicDetail,
           picked: current === "basic",
         },
         {
           label: "standard",
-          description: "Duration + language distribution (recommended)",
-          detail: "Records which languages you use and how long.",
+          description: t().standardDesc,
+          detail: t().standardDetail,
           picked: current === "standard",
         },
         {
           label: "detailed",
-          description: "Duration + language + project path",
-          detail: "Also records the project folder path for each session.",
+          description: t().detailedDesc,
+          detail: t().detailedDetail,
           picked: current === "detailed",
         },
       ];
       const picked = await vscode.window.showQuickPick(items, {
-        title: "TimeLens: Select Detail Level",
-        placeHolder: "Choose how much data to record per session",
+        title: t().selectLevelTitle,
+        placeHolder: t().selectLevelPlaceholder,
       });
       if (picked) {
         await vscode.workspace
           .getConfiguration("timelens")
           .update("trackingLevel", picked.label, vscode.ConfigurationTarget.Global);
         updateStatusBar();
-        void vscode.window.showInformationMessage(`TimeLens detail level set to: ${picked.label}`);
+        void vscode.window.showInformationMessage(t().levelSet(picked.label));
       }
     })
   );
@@ -160,26 +167,31 @@ export function activate(context: vscode.ExtensionContext): void {
       const enabled = vscode.workspace.getConfiguration("timelens").get<boolean>("enabled", true);
       const pending = tracker?.getQueueSize() ?? 0;
       const msg = enabled
-        ? `TimeLens tracking is enabled. Pending uploads: ${pending}.`
-        : "TimeLens tracking is disabled.";
+        ? t().statusEnabled(pending)
+        : t().statusDisabled;
       void vscode.window.showInformationMessage(msg);
+      outputChannel?.show(true);
     })
   );
 
+  // Log startup configuration to output channel
+  const startupBridgeKey = vscode.workspace.getConfiguration("timelens").get<string>("bridgeKey", "").trim();
+  const startupApiBase = vscode.workspace.getConfiguration("timelens").get<string>("apiBaseUrl", "http://127.0.0.1:49152");
+  const startupEnabled = vscode.workspace.getConfiguration("timelens").get<boolean>("enabled", true);
+  const startupLevel = vscode.workspace.getConfiguration("timelens").get<string>("trackingLevel", "standard");
+  outputChannel?.appendLine(`[${new Date().toISOString()}] Config: apiBaseUrl=${startupApiBase}, enabled=${startupEnabled}, level=${startupLevel}, bridgeKey=${startupBridgeKey ? "set (" + startupBridgeKey.slice(0, 4) + "\u2026)" : "NOT SET"}`);
+
   updateStatusBar();
 
-  const bridgeKey = vscode.workspace
-    .getConfiguration("timelens")
-    .get<string>("bridgeKey", "")
-    .trim();
+  const bridgeKey = startupBridgeKey;
   if (!bridgeKey) {
     void vscode.window
       .showInformationMessage(
-        "TimeLens: Set your extension bridge key to enable authenticated sync.",
-        "Set Key"
+        t().configureKeyPrompt,
+        t().configureNow
       )
       .then((picked) => {
-        if (picked === "Set Key") {
+        if (picked === t().configureNow) {
           void promptSetBridgeKey();
         }
       });

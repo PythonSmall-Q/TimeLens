@@ -1,0 +1,12 @@
+{
+  "timelens.homeView.name": "Home",
+  "timelens.enabled.description": "Enable local VS Code usage tracking for TimeLens.",
+  "timelens.apiBaseUrl.description": "Local TimeLens API base URL.",
+  "timelens.bridgeKey.description": "Extension bridge key for authenticating with TimeLens local API. Get this from Settings > Local API / Extension Bridge.",
+  "timelens.flushIntervalSeconds.description": "How often to flush queued sessions to TimeLens API.",
+  "timelens.idleThresholdSeconds.description": "Split a session when editor activity is idle for this many seconds.",
+  "timelens.trackingLevel.description": "How much data to record per VS Code session.",
+  "timelens.trackingLevel.basic": "Only record session duration (no language or project info).",
+  "timelens.trackingLevel.standard": "Record session duration and language distribution (recommended).",
+  "timelens.trackingLevel.detailed": "Record session duration, language distribution, and project path."
+}

@@ -42,5 +42,6 @@
   "showIgnored": "Show ignored",
   "hideIgnored": "Hide ignored",
   "totalDomains": "{{count}} domain",
-  "totalDomains_plural": "{{count}} domains"
+  "totalDomains_plural": "{{count}} domains",
+  "refresh": "Refresh"
 }

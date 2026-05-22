@@ -42,5 +42,6 @@
   "showIgnored": "显示已忽略",
   "hideIgnored": "隐藏已忽略",
   "totalDomains": "{{count}} 个域名",
-  "totalDomains_plural": "{{count}} 个域名"
+  "totalDomains_plural": "{{count}} 个域名",
+  "refresh": "刷新"
 }

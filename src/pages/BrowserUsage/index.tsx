@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import { Globe, Search, EyeOff, Eye, Bell, BellOff, Trash2, Check, X, Puzzle, Settings } from "lucide-react";
+import { Globe, Search, EyeOff, Eye, Bell, BellOff, Trash2, Check, X, Puzzle, Settings, RefreshCw } from "lucide-react";
 import * as api from "@/services/tauriApi";
 import type { BrowserDomainStats, BrowserDomainLimit, BrowserExtensionStatus } from "@/types";
 import { formatDuration } from "@/utils/format";
@@ -256,6 +256,13 @@ export default function BrowserUsage() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
+  // Auto-refresh when the app window regains focus
+  useEffect(() => {
+    const onFocus = () => { void loadData(); };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [loadData]);
+
   const refreshBrowserExtensionStatus = useCallback(async () => {
     try {
       const [settings, status] = await Promise.all([
@@ -352,6 +359,14 @@ export default function BrowserUsage() {
           >
             <Settings size={13} />
             {t("settings:browser.title")}
+          </button>
+          <button
+            onClick={() => void loadData()}
+            disabled={loading}
+            title={t("browserUsage:refresh")}
+            className="p-1.5 rounded-xl border border-surface-border text-text-secondary hover:text-text-primary hover:bg-surface-hover transition-colors disabled:opacity-40"
+          >
+            <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
           </button>
           <a
             href={BROWSER_EXTENSION_DOWNLOAD_URL}

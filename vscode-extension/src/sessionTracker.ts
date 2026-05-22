@@ -6,6 +6,7 @@ import {
   type VsCodeSessionPayload,
   type VsCodeLanguageDuration,
 } from "./api/timelensApi";
+import { t } from "./i18n";
 
 interface SessionDraft {
   sessionId: string;
@@ -24,7 +25,15 @@ export class SessionTracker {
   private flushTimer: NodeJS.Timeout | null = null;
   private lastActiveAt: Date | null = null;
 
-  constructor(private readonly context: vscode.ExtensionContext) {}
+  constructor(
+    private readonly context: vscode.ExtensionContext,
+    private readonly log?: vscode.OutputChannel,
+  ) {}
+
+  private appendLog(msg: string): void {
+    const line = `[${new Date().toISOString()}] ${msg}`;
+    this.log?.appendLine(line);
+  }
 
   start(): void {
     this.stop();
@@ -218,25 +227,48 @@ export class SessionTracker {
     const apiBaseUrl = this.apiBaseUrl();
     const bridgeKey = this.getBridgeKey();
     
+    if (this.pendingQueue.length > 0) {
+      this.appendLog(`Flushing ${this.pendingQueue.length} pending session(s) to ${apiBaseUrl}`);
+      this.appendLog(`Bridge key configured: ${bridgeKey ? "yes (" + bridgeKey.slice(0, 4) + "…)" : "NO"}`);
+    }
+
     while (this.pendingQueue.length > 0) {
       const head = this.pendingQueue[0];
       try {
+        this.appendLog(`POST /api/vscode/sessions  session_id=${head.session_id}  duration=${head.duration_seconds}s`);
         await postVsCodeSession(apiBaseUrl, head, bridgeKey);
+        this.appendLog(`  → OK`);
         this.pendingQueue.shift();
       } catch (err) {
-        // Log error but don't break - might be a temporary network issue
-        if (err instanceof Error && err.message.includes("403")) {
-          // Bridge key auth failed - prompt user to set key
-          void vscode.window
-            .showErrorMessage(
-              "TimeLens: Extension bridge key authentication failed.",
-              "Update Key"
-            )
-            .then((picked) => {
-              if (picked === "Update Key") {
-                void vscode.commands.executeCommand("timelens.setExtensionBridgeKey");
-              }
-            });
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        this.appendLog(`  → ERROR: ${errorMsg}`);
+
+        const isAuthError = errorMsg.includes("401") || errorMsg.includes("403") || errorMsg.includes("authentication");
+        
+        if (isAuthError) {
+          const bridgeKeySet = !!bridgeKey;
+          const message = bridgeKeySet 
+            ? t().authFailedKeySet
+            : t().authFailedNoKey;
+          this.appendLog(`AUTH FAILURE — bridgeKey set: ${bridgeKeySet}. Prompting user.`);
+          
+          // Only show error notification once per minute
+          const lastAuthErrorTime = (this.context.globalState.get<number>("lastAuthErrorTime") ?? 0);
+          const now = Date.now();
+          if (now - lastAuthErrorTime > 60000) {
+            void this.context.globalState.update("lastAuthErrorTime", now);
+            void vscode.window
+              .showErrorMessage(message, t().configureKeyBtn, t().showLogBtn)
+              .then((picked) => {
+                if (picked === t().configureKeyBtn) {
+                  void vscode.commands.executeCommand("timelens.setExtensionBridgeKey");
+                } else if (picked === t().showLogBtn) {
+                  this.log?.show(true);
+                }
+              });
+          }
+        } else {
+          this.appendLog(`Network/server error — will retry next cycle`);
         }
         break;
       }

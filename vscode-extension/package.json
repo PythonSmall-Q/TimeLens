@@ -3,7 +3,7 @@
   "displayName": "TimeLens",
   "description": "Track VS Code session time and send local analytics to TimeLens desktop app.",
   "icon": "icons/icon.png",
-  "version": "0.2.0",
+  "version": "0.3.3",
   "publisher": "ShanWenxiao",
   "license": "MIT",
   "repository": {
@@ -44,7 +44,7 @@
       "timelens": [
         {
           "id": "timelens.homeView",
-          "name": "主页",
+          "name": "%timelens.homeView.name%",
           "type": "webview"
         }
       ]
@@ -94,42 +94,42 @@
         "timelens.enabled": {
           "type": "boolean",
           "default": true,
-          "description": "Enable local VS Code usage tracking for TimeLens."
+          "description": "%timelens.enabled.description%"
         },
         "timelens.apiBaseUrl": {
           "type": "string",
           "default": "http://127.0.0.1:49152",
-          "description": "Local TimeLens API base URL."
+          "description": "%timelens.apiBaseUrl.description%"
         },
         "timelens.bridgeKey": {
           "type": "string",
           "default": "",
-          "description": "Extension bridge key for authenticating with TimeLens local API. Get this from Settings > Local API / Extension Bridge."
+          "description": "%timelens.bridgeKey.description%"
         },
         "timelens.flushIntervalSeconds": {
           "type": "number",
           "default": 30,
           "minimum": 5,
           "maximum": 600,
-          "description": "How often to flush queued sessions to TimeLens API."
+          "description": "%timelens.flushIntervalSeconds.description%"
         },
         "timelens.idleThresholdSeconds": {
           "type": "number",
           "default": 120,
           "minimum": 30,
           "maximum": 1800,
-          "description": "Split a session when editor activity is idle for this many seconds."
+          "description": "%timelens.idleThresholdSeconds.description%"
         },
         "timelens.trackingLevel": {
           "type": "string",
           "enum": ["basic", "standard", "detailed"],
           "enumDescriptions": [
-            "Only record session duration (no language or project info).",
-            "Record session duration and language distribution (recommended).",
-            "Record session duration, language distribution, and project path."
+            "%timelens.trackingLevel.basic%",
+            "%timelens.trackingLevel.standard%",
+            "%timelens.trackingLevel.detailed%"
           ],
           "default": "standard",
-          "description": "Controls how much detail is recorded per coding session."
+          "description": "%timelens.trackingLevel.description%"
         }
       }
     }

@@ -80,12 +80,28 @@ export async function postVsCodeSession(
   timeoutMs = 5000
 ): Promise<void> {
   const url = `${apiBaseUrl.replace(/\/$/, "")}/api/vscode/sessions`;
-  const bodyJson = JSON.stringify(payload);
-  
+
+  // Build canonical JSON matching serde_json's re-serialization of VsCodeSessionInput.
+  // The server verifies the signature against serde_json::to_string(&deserialized_payload),
+  // which always includes optional fields as explicit null and uses the struct field order.
+  // Without this normalization the HMAC never matches.
+  const canonical = {
+    session_id: payload.session_id,
+    started_at: payload.started_at,
+    ended_at: payload.ended_at,
+    duration_seconds: payload.duration_seconds,
+    project_name: payload.project_name ?? null,
+    project_path: payload.project_path ?? null,
+    language_durations: payload.language_durations
+      ? payload.language_durations.map((l) => ({ language: l.language, seconds: l.seconds }))
+      : null,
+  };
+  const bodyJson = JSON.stringify(canonical);
+
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
-  
+
   // Only attach signature when desktop API explicitly requires bridge auth.
   if (bridgeKey && await shouldAttachBridgeSignature(apiBaseUrl)) {
     headers["X-Extension-Signature"] = signRequestBody(bodyJson, bridgeKey);
@@ -99,6 +115,9 @@ export async function postVsCodeSession(
 
   const resp = await withTimeout(request, timeoutMs);
   if (!resp.ok) {
+    if (resp.status === 401 || resp.status === 403) {
+      throw new Error(`TimeLens API error ${resp.status} - authentication failed`);
+    }
     throw new Error(`TimeLens API error: ${resp.status}`);
   }
 }
