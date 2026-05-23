@@ -16,10 +16,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Typography refresh** - upgraded the global font stack for better readability in both Chinese and English UI surfaces
 - **Full-width page layout for key modules** - removed fixed max-width constraints on Categories, Goals, and Focus Mode pages so content fills the available main area without a large right-side blank zone
 
+#### Localization and Language Coverage
+
+- **Traditional Chinese (zh-TW) localization pass** - completed a full zh-TW locale rollout for core desktop-app namespaces (`common`, `dashboard`, `widgets`, `settings`, `limits`, `categories`, `goals`, `focus`, `browserUsage`) and refined wording toward native traditional Chinese usage
+- **Expanded desktop language options** - language selector and startup locale resolution now include `zh-TW`, `ja`, `ko`, `fr`, `de`, and `es`, with safe fallback behavior for untranslated locales
+- **Browser extension zh-TW support** - added zh-TW runtime strings and locale mapping, plus a dedicated Chromium extension locale package under `_locales/zh_TW`
+- **VS Code extension zh-TW runtime localization** - added a dedicated zh-TW message branch with locale-aware routing (`zh-TW`/`zh-HK`/`zh-Hant`) while preserving existing fallback behavior
+
 ### Fixed
 
 - **Hourly distribution overflow bug** - fixed per-hour aggregation so usage segments are split across hour boundaries, preventing impossible values such as single-hour totals over 60 minutes
 - **UWP app identification on Windows** - improved foreground window resolution to avoid reporting UWP apps as `ApplicationFrameHost` or `Unknown` by resolving the real process behind the frame host window
+- **Microsoft Store taskbar icon blue background** - fixed packaged MSIX taskbar icon rendering by generating `Square44x44Logo.targetsize-*` and `Square44x44Logo.altform-unplated_targetsize-*` assets in the icon pipeline, preventing Windows from applying an automatic colored plate behind the icon
 
 ## [1.4.2] - 2026-05-22
 

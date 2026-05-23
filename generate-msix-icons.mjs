@@ -11,6 +11,7 @@ import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const workspaceRoot = __dirname;
 
 const ICON_SPECS = [
     { name: 'Square44x44Logo.png', size: 44 },
@@ -21,32 +22,11 @@ const ICON_SPECS = [
     { name: 'StoreLogo.png', size: 50 }
 ];
 
-async function processIcon(sourceData, metadata, spec) {
-    // Copy the data to avoid mutating the original
-    const data = Buffer.from(sourceData);
-    
-    // Process pixels - remove blue background
-    for (let i = 0; i < data.length; i += 4) {
-        const r = data[i];
-        const g = data[i + 1];
-        const b = data[i + 2];
-        
-        // If this pixel is part of the blue background, make it transparent
-        if (b > r + 20 && b > g + 20 && (r + g + b) < 300) {
-            data[i + 3] = 0;  // Set alpha to 0 (transparent)
-        } else {
-            data[i + 3] = 255;  // Set alpha to 255 (opaque)
-        }
-    }
-    
-    // Create processed image
-    let image = sharp(data, {
-        raw: {
-            width: metadata.width,
-            height: metadata.height,
-            channels: 4
-        }
-    });
+const TASKBAR_TARGET_SIZES = [16, 20, 24, 30, 32, 36, 40, 44, 48, 60, 64, 72, 80, 96, 256];
+
+async function processIcon(sourceIconPath, spec) {
+    // Preserve original icon style; only resize on a transparent background.
+    let image = sharp(sourceIconPath);
     
     // Resize based on spec
     if (spec.width && spec.height) {
@@ -67,7 +47,6 @@ async function processIcon(sourceData, metadata, spec) {
 }
 
 async function main() {
-    const workspaceRoot = 'c:\\Users\\seans\\Documents\\GitHub\\TimeLens';
     const sourceIcon = path.join(workspaceRoot, 'src-tauri', 'icons', 'icon.png');
     const outputDir = path.join(workspaceRoot, 'src-tauri', 'windows', 'msix-staging', 'Assets');
     
@@ -86,7 +65,6 @@ async function main() {
         // Read source icon
         const image = sharp(sourceIcon);
         const metadata = await image.metadata();
-        const { data } = await image.raw().toBuffer({ resolveWithObject: true });
         
         console.log(`Source image: ${metadata.width}x${metadata.height}`);
         
@@ -95,7 +73,7 @@ async function main() {
         for (const spec of ICON_SPECS) {
             const outputPath = path.join(outputDir, spec.name);
             try {
-                const processedImage = await processIcon(data, metadata, spec);
+                const processedImage = await processIcon(sourceIcon, spec);
                 await processedImage.toFile(outputPath);
                 
                 const displayName = spec.width ? 
@@ -108,9 +86,35 @@ async function main() {
                 console.error(`✗ ${spec.name}: ${err.message}`);
             }
         }
+
+        for (const size of TASKBAR_TARGET_SIZES) {
+            const names = [
+                `Square44x44Logo.targetsize-${size}.png`,
+                `Square44x44Logo.altform-unplated_targetsize-${size}.png`
+            ];
+
+            for (const name of names) {
+                const outputPath = path.join(outputDir, name);
+                try {
+                    await sharp(sourceIcon)
+                        .resize(size, size, {
+                            fit: 'inside',
+                            background: { r: 0, g: 0, b: 0, alpha: 0 }
+                        })
+                        .png()
+                        .toFile(outputPath);
+
+                    console.log(`✓ ${name} (${size}x${size})`);
+                    successCount++;
+                } catch (err) {
+                    console.error(`✗ ${name}: ${err.message}`);
+                }
+            }
+        }
         
-        console.log(`\n✓ Successfully generated ${successCount}/${ICON_SPECS.length} MSIX icons`);
-        console.log('✓ All icons now have transparent backgrounds');
+        const expectedCount = ICON_SPECS.length + (TASKBAR_TARGET_SIZES.length * 2);
+        console.log(`\n✓ Successfully generated ${successCount}/${expectedCount} MSIX icons`);
+        console.log('✓ Generated base and unplated targetsize icons with transparent backgrounds');
         console.log('\nThe taskbar and Start menu will display correctly without blue backgrounds.');
         
     } catch (error) {

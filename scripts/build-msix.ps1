@@ -170,6 +170,17 @@ $OutDir = Join-Path $WindowsDir "out"
 $MsixPath = Join-Path $OutDir "TimeLens-$Version.msix"
 $SourceIcon = Join-Path $RepoRoot "src-tauri\icons\icon.png"
 
+$baseAssetNames = @(
+  "StoreLogo.png",
+  "Square44x44Logo.png",
+  "Square71x71Logo.png",
+  "Square150x150Logo.png",
+  "Wide310x150Logo.png",
+  "Square310x310Logo.png"
+)
+
+$PreservedAssetsDir = Join-Path $OutDir "_preserved-assets"
+
 # Define publisher and display name first
 $publisher = $TauriConfig.bundle.publisher
 if ([string]::IsNullOrWhiteSpace($publisher)) {
@@ -223,6 +234,20 @@ if (!(Test-Path $ExePath)) {
 }
 
 Write-Host "[2/5] Preparing staging directory..."
+if (Test-Path $PreservedAssetsDir) {
+  Remove-Item -Recurse -Force $PreservedAssetsDir
+}
+
+if (Test-Path $AssetsDir) {
+  New-Item -ItemType Directory -Path $PreservedAssetsDir -Force | Out-Null
+  foreach ($name in $baseAssetNames) {
+    $assetPath = Join-Path $AssetsDir $name
+    if (Test-Path $assetPath) {
+      Copy-Item $assetPath (Join-Path $PreservedAssetsDir $name) -Force
+    }
+  }
+}
+
 if (Test-Path $StagingDir) { Remove-Item -Recurse -Force $StagingDir }
 New-Item -ItemType Directory -Path $StagingDir | Out-Null
 New-Item -ItemType Directory -Path $AssetsDir -Force | Out-Null
@@ -247,34 +272,94 @@ $assetMap = @(
   @{ Name = "Square310x310Logo.png"; Width = 310; Height = 310 }
 )
 
-$srcImg = [System.Drawing.Image]::FromFile($SourceIcon)
-try {
-  foreach ($asset in $assetMap) {
-    $bmp = New-Object System.Drawing.Bitmap($asset.Width, $asset.Height)
-    try {
-      $g = [System.Drawing.Graphics]::FromImage($bmp)
+# Taskbar/jump-list icons: unplated targetsize variants avoid Windows adding a background plate.
+$taskbarTargetSizes = @(16, 20, 24, 30, 32, 36, 40, 44, 48, 60, 64, 72, 80, 96, 256)
+
+$hasPreservedBaseAssets = $true
+foreach ($name in $baseAssetNames) {
+  if (!(Test-Path (Join-Path $PreservedAssetsDir $name))) {
+    $hasPreservedBaseAssets = $false
+    break
+  }
+}
+
+if ($hasPreservedBaseAssets) {
+  Write-Host "[2.5/5] Reusing existing MSIX base assets to preserve icon style..."
+  foreach ($name in $baseAssetNames) {
+    Copy-Item (Join-Path $PreservedAssetsDir $name) (Join-Path $AssetsDir $name) -Force
+  }
+} else {
+  Write-Host "[2.5/5] Generating MSIX base assets from src-tauri/icons/icon.png..."
+  $srcImg = [System.Drawing.Image]::FromFile($SourceIcon)
+  try {
+    foreach ($asset in $assetMap) {
+      $bmp = New-Object System.Drawing.Bitmap($asset.Width, $asset.Height)
       try {
-        $g.Clear([System.Drawing.Color]::Transparent)
-        $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
-        $g.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
-        $g.CompositingQuality = [System.Drawing.Drawing2D.CompositingQuality]::HighQuality
-        $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
-        $g.DrawImage($srcImg, 0, 0, $asset.Width, $asset.Height)
+        $g = [System.Drawing.Graphics]::FromImage($bmp)
+        try {
+          $g.Clear([System.Drawing.Color]::Transparent)
+          $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+          $g.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
+          $g.CompositingQuality = [System.Drawing.Drawing2D.CompositingQuality]::HighQuality
+          $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
+          $g.DrawImage($srcImg, 0, 0, $asset.Width, $asset.Height)
+        }
+        finally {
+          $g.Dispose()
+        }
+
+        $outPath = Join-Path $AssetsDir $asset.Name
+        $bmp.Save($outPath, [System.Drawing.Imaging.ImageFormat]::Png)
       }
       finally {
-        $g.Dispose()
+        $bmp.Dispose()
       }
-
-      $outPath = Join-Path $AssetsDir $asset.Name
-      $bmp.Save($outPath, [System.Drawing.Imaging.ImageFormat]::Png)
     }
-    finally {
-      $bmp.Dispose()
+  }
+  finally {
+    $srcImg.Dispose()
+  }
+}
+
+$taskbarSourceIcon = Join-Path $AssetsDir "Square44x44Logo.png"
+if (!(Test-Path $taskbarSourceIcon)) {
+  throw "Taskbar source icon not found: $taskbarSourceIcon"
+}
+
+$taskbarSrcImg = [System.Drawing.Image]::FromFile($taskbarSourceIcon)
+try {
+  foreach ($size in $taskbarTargetSizes) {
+    foreach ($name in @("Square44x44Logo.targetsize-$size.png", "Square44x44Logo.altform-unplated_targetsize-$size.png")) {
+      $bmp = New-Object System.Drawing.Bitmap($size, $size)
+      try {
+        $g = [System.Drawing.Graphics]::FromImage($bmp)
+        try {
+          $g.Clear([System.Drawing.Color]::Transparent)
+          $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+          $g.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
+          $g.CompositingQuality = [System.Drawing.Drawing2D.CompositingQuality]::HighQuality
+          $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
+          $g.DrawImage($taskbarSrcImg, 0, 0, $size, $size)
+        }
+        finally {
+          $g.Dispose()
+        }
+
+        $outPath = Join-Path $AssetsDir $name
+        $bmp.Save($outPath, [System.Drawing.Imaging.ImageFormat]::Png)
+      }
+      finally {
+        $bmp.Dispose()
+      }
     }
   }
 }
 finally {
-  $srcImg.Dispose()
+  $taskbarSrcImg.Dispose()
+}
+
+if (Test-Path $PreservedAssetsDir) {
+  Remove-Item -Recurse -Force $PreservedAssetsDir
 }
 
 Write-Host "[3/5] Resolving MakeAppx.exe..."

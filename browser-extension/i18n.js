@@ -61,13 +61,48 @@ const TRANSLATIONS = {
     bridgeKeySaved: "扩展网桥密钥已保存。",
     bridgeKeyCleared: "扩展网桥密钥已清除。",
   },
+  "zh-TW": {
+    connection: "桌面端連線",
+    checking: "檢查中",
+    connected: "已連線",
+    offline: "離線",
+    today: "TimeLens 今日資料",
+    refresh: "重新整理",
+    recentSessions: "最近分頁工作階段",
+    noActiveTab: "目前沒有活動分頁",
+    noData: "暫無資料",
+    noUsage: "本機 API 尚未回傳應用程式使用資料",
+    noSessions: "尚無瀏覽器工作階段記錄",
+    browserCompanion: "瀏覽器夥伴",
+    subtitle: "不需開啟桌面端，也能查看本機狀態與最近瀏覽器工作階段。",
+    reachable: "桌面端已可透過 localhost 連線。{{version}}，{{focus}}。",
+    unreachable: "目前無法連線到 127.0.0.1:49152 上的 TimeLens 桌面端。",
+    focusOn: "專注模式已開啟",
+    focusOff: "專注模式已關閉",
+    unknownVersion: "未知版本",
+    untitledTab: "未命名分頁",
+    activeTab: "活動分頁",
+    unknownSite: "未知網站",
+    extensionDisabled: "桌面端已關閉瀏覽器同步。",
+    extensionBridgeKey: "擴充功能橋接金鑰",
+    bridgeKeyHint: "從 TimeLens 設定 > 本機 API / 擴充功能橋接取得金鑰。",
+    bridgeKeyPlaceholder: "貼上從 TimeLens 設定取得的擴充功能橋接金鑰",
+    save: "儲存",
+    saveOrUpdate: "儲存/更新",
+    bridgeKeySaved: "擴充功能橋接金鑰已儲存。",
+    bridgeKeyCleared: "擴充功能橋接金鑰已清除。",
+  },
 };
 
 export function getLocale() {
   const raw = (globalThis.chrome?.i18n?.getUILanguage?.() || navigator.language || "en").toLowerCase();
-  if (raw.startsWith("zh")) {
-    return "zh-CN";
-  }
+  if (raw === "zh-tw" || raw === "zh-hk" || raw === "zh-mo" || raw === "zh-hant") return "zh-TW";
+  if (raw.startsWith("zh")) return "zh-CN";
+  if (raw.startsWith("ja")) return "ja";
+  if (raw.startsWith("ko")) return "ko";
+  if (raw.startsWith("fr")) return "fr";
+  if (raw.startsWith("de")) return "de";
+  if (raw.startsWith("es")) return "es";
   return "en";
 }
 

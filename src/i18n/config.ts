@@ -23,6 +23,17 @@ import zhGoals from "./locales/zh-CN/goals.json";
 import zhFocus from "./locales/zh-CN/focus.json";
 import zhBrowserUsage from "./locales/zh-CN/browserUsage.json";
 
+// ZH-TW
+import zhTWCommon from "./locales/zh-TW/common.json";
+import zhTWDashboard from "./locales/zh-TW/dashboard.json";
+import zhTWWidgets from "./locales/zh-TW/widgets.json";
+import zhTWSettings from "./locales/zh-TW/settings.json";
+import zhTWLimits from "./locales/zh-TW/limits.json";
+import zhTWCategories from "./locales/zh-TW/categories.json";
+import zhTWGoals from "./locales/zh-TW/goals.json";
+import zhTWFocus from "./locales/zh-TW/focus.json";
+import zhTWBrowserUsage from "./locales/zh-TW/browserUsage.json";
+
 /**
  * To add a new language:
  * 1. Create src/i18n/locales/<lang-code>/ directory
@@ -34,15 +45,36 @@ import zhBrowserUsage from "./locales/zh-CN/browserUsage.json";
 export const SUPPORTED_LANGUAGES = [
   { code: "en", label: "English", nativeLabel: "English" },
   { code: "zh-CN", label: "Chinese (Simplified)", nativeLabel: "简体中文" },
-  // NEW LANGUAGES: add an entry here, e.g.:
-  // { code: "ja", label: "Japanese", nativeLabel: "日本語" },
+  { code: "zh-TW", label: "Chinese (Traditional)", nativeLabel: "繁體中文" },
+  { code: "ja", label: "Japanese", nativeLabel: "日本語" },
+  { code: "ko", label: "Korean", nativeLabel: "한국어" },
+  { code: "fr", label: "French", nativeLabel: "Français" },
+  { code: "de", label: "German", nativeLabel: "Deutsch" },
+  { code: "es", label: "Spanish", nativeLabel: "Español" },
 ];
 
 function resolveInitialLanguage(): string {
   const saved = localStorage.getItem("timelens-language");
-  if (saved) return saved;
+  if (saved && SUPPORTED_LANGUAGES.some((lang) => lang.code === saved)) return saved;
   const sys = (navigator.language || "en").toLowerCase();
-  const initial = sys.startsWith("zh") ? "zh-CN" : "en";
+
+  let initial = "en";
+  if (sys === "zh-tw" || sys === "zh-hk" || sys === "zh-mo" || sys === "zh-hant") {
+    initial = "zh-TW";
+  } else if (sys.startsWith("zh")) {
+    initial = "zh-CN";
+  } else if (sys.startsWith("ja")) {
+    initial = "ja";
+  } else if (sys.startsWith("ko")) {
+    initial = "ko";
+  } else if (sys.startsWith("fr")) {
+    initial = "fr";
+  } else if (sys.startsWith("de")) {
+    initial = "de";
+  } else if (sys.startsWith("es")) {
+    initial = "es";
+  }
+
   localStorage.setItem("timelens-language", initial);
   return initial;
 }
@@ -72,6 +104,72 @@ i18n
         goals: zhGoals,
         focus: zhFocus,
         browserUsage: zhBrowserUsage,
+      },
+      "zh-TW": {
+        common: zhTWCommon,
+        dashboard: zhTWDashboard,
+        widgets: zhTWWidgets,
+        settings: zhTWSettings,
+        limits: zhTWLimits,
+        categories: zhTWCategories,
+        goals: zhTWGoals,
+        focus: zhTWFocus,
+        browserUsage: zhTWBrowserUsage,
+      },
+      ja: {
+        common: enCommon,
+        dashboard: enDashboard,
+        widgets: enWidgets,
+        settings: enSettings,
+        limits: enLimits,
+        categories: enCategories,
+        goals: enGoals,
+        focus: enFocus,
+        browserUsage: enBrowserUsage,
+      },
+      ko: {
+        common: enCommon,
+        dashboard: enDashboard,
+        widgets: enWidgets,
+        settings: enSettings,
+        limits: enLimits,
+        categories: enCategories,
+        goals: enGoals,
+        focus: enFocus,
+        browserUsage: enBrowserUsage,
+      },
+      fr: {
+        common: enCommon,
+        dashboard: enDashboard,
+        widgets: enWidgets,
+        settings: enSettings,
+        limits: enLimits,
+        categories: enCategories,
+        goals: enGoals,
+        focus: enFocus,
+        browserUsage: enBrowserUsage,
+      },
+      de: {
+        common: enCommon,
+        dashboard: enDashboard,
+        widgets: enWidgets,
+        settings: enSettings,
+        limits: enLimits,
+        categories: enCategories,
+        goals: enGoals,
+        focus: enFocus,
+        browserUsage: enBrowserUsage,
+      },
+      es: {
+        common: enCommon,
+        dashboard: enDashboard,
+        widgets: enWidgets,
+        settings: enSettings,
+        limits: enLimits,
+        categories: enCategories,
+        goals: enGoals,
+        focus: enFocus,
+        browserUsage: enBrowserUsage,
       },
     },
     lng: resolveInitialLanguage(),

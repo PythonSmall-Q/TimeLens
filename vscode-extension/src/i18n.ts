@@ -4,6 +4,11 @@ function isZh(): boolean {
   return vscode.env.language.toLowerCase().startsWith("zh");
 }
 
+function isZhTwLike(): boolean {
+  const lang = vscode.env.language.toLowerCase();
+  return lang === "zh-tw" || lang === "zh-hk" || lang === "zh-mo" || lang === "zh-hant";
+}
+
 interface Messages {
   extensionHome: string;
   todayVsCode: string;
@@ -145,6 +150,56 @@ const zh: Messages = {
   showLogBtn: "查看日志",
 };
 
+const zhTw: Messages = {
+  // Sidebar webview
+  extensionHome: "擴充功能首頁",
+  todayVsCode: "今日 VS Code 時長",
+  sessions: "個工作階段",
+  trackingToggle: "記錄開關",
+  disableTracking: "關閉記錄",
+  enableTracking: "開啟記錄",
+  detailLevel: "記錄層級",
+  apiKey: "API 金鑰",
+  changeKey: "🔑 修改金鑰",
+  configureKey: "⚙️ 設定金鑰",
+  noKeyWarning: "⚠ 未設定 API 金鑰，資料無法同步",
+  notConnected: "尚未連線到 TimeLens 桌面端",
+  topApp: "今日最高應用",
+  desktopVersion: "桌面端版本",
+  openDashboard: "開啟完整儀表板",
+  refresh: "重新整理",
+  loading: "載入中...",
+  loadFailed: "頁面載入失敗，請重試。",
+  retry: "重試",
+  // extension.ts
+  configureKeyPrompt: "TimeLens: 請設定擴充橋接金鑰以啟用資料同步，詳情請查看側邊欄。",
+  configureNow: "立即設定",
+  setKeyTitle: "TimeLens: 設定擴充橋接金鑰",
+  setKeyPromptText: "請輸入 TimeLens「設定 > 本機 API / 擴充橋接」中的橋接金鑰",
+  keySaved: "✓ 擴充橋接金鑰已儲存，工作階段資料將自動同步。",
+  keyCleared: "⚠ 擴充橋接金鑰已清除，工作階段資料將在本機排隊等待。",
+  trackingEnabled: "TimeLens 記錄已啟用",
+  trackingDisabled: "TimeLens 記錄已停用",
+  basicDesc: "僅記錄工作階段時長",
+  basicDetail: "不記錄語言或專案資訊。",
+  standardDesc: "時長 + 語言分布（建議）",
+  standardDetail: "記錄使用語言及對應時長。",
+  detailedDesc: "時長 + 語言 + 專案路徑",
+  detailedDetail: "同時記錄每個工作階段的專案資料夾路徑。",
+  selectLevelTitle: "TimeLens: 選擇記錄層級",
+  selectLevelPlaceholder: "選擇每個工作階段要記錄的資料量",
+  levelSet: (label: string): string => `TimeLens 記錄層級已設定為: ${label}`,
+  statusEnabled: (pending: number): string => `TimeLens 記錄已啟用，待上傳工作階段: ${pending}。`,
+  statusDisabled: "TimeLens 記錄已停用。",
+  // sessionTracker.ts
+  authFailedKeySet: "TimeLens: 擴充橋接金鑰驗證失敗。",
+  authFailedNoKey: "TimeLens: 尚未設定擴充橋接金鑰，請先設定 API 金鑰。",
+  configureKeyBtn: "設定金鑰",
+  showLogBtn: "檢視日誌",
+};
+
 export function t(): Messages {
-  return isZh() ? zh : en;
+  if (isZhTwLike()) return zhTw;
+  if (isZh()) return zh;
+  return en;
 }

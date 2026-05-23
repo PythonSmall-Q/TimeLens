@@ -1,0 +1,23 @@
+{
+  "title": "應用程式分類",
+  "subtitle": "為應用程式打標簽，按活動類型查看使用洞察",
+  "addRule": "新增分類規則",
+  "exePlaceholder": "選擇最近使用的應用程式…",
+  "categoryLabel": "分類",
+  "noRules": "暫無分類規則，請在上方新增應用程式。",
+  "suggestedCategory": "建議分類：{{cat}} — 點選應用程式",
+  "applySuggestion": "應用程式建議分類",
+  "presets": {
+    "Work": "工作",
+    "Social": "社交",
+    "Entertainment": "娛樂",
+    "Development": "開發",
+    "Productivity": "效率",
+    "Education": "學習",
+    "Gaming": "游戲",
+    "Browsing": "瀏覽",
+    "Communication": "溝通",
+    "System": "系統",
+    "uncategorized": "未分類"
+  }
+}

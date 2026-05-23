@@ -1,0 +1,22 @@
+{
+  "title": "使用目標",
+  "subtitle": "為應用程式或分類設定時間目標，培養健康習慣",
+  "addGoal": "新增目標",
+  "newGoal": "新建目標",
+  "noGoals": "暫無目標，點選「新增目標」建立。",
+  "allApps": "全部應用程式",
+  "period_daily": "每天",
+  "period_weekly": "每周",
+  "op_at_most": "不超過",
+  "op_at_least": "至少",
+  "minutes": "分鐘",
+  "scopeValuePlaceholder": "目標值",
+  "scopeValueLabel": "目標值",
+  "scopeTypeLabel": "目標類型",
+  "scopeType_app": "軟體",
+  "scopeType_category": "分類",
+  "searchAppPlaceholder": "搜尋並選擇軟體",
+  "periodLabel": "周期",
+  "operatorLabel": "條件",
+  "minutesLabel": "目標分鐘數"
+}

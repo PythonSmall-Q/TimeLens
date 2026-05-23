@@ -1,0 +1,13 @@
+{
+  "title": "專注模式",
+  "subtitle": "屏蔽干擾，追蹤深度工作時間",
+  "activeTitle": "專注會話進行中",
+  "inactiveTitle": "專注模式已關閉",
+  "hint": "開啟專注會話，屏蔽干擾應用程式，保持專注",
+  "start": "開始專注",
+  "stop": "結束會話",
+  "history": "會話歷史",
+  "noHistory": "暫無已完成的會話",
+  "triggerManual": "手動觸發",
+  "triggerAuto": "自動觸發"
+}

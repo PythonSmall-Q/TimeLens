@@ -1,0 +1,20 @@
+{
+  "extensionName": {
+    "message": "TimeLens 瀏覽器夥伴翸"
+  },
+  "extensionDescription": {
+    "message": "TimeLens 瀏覽器夥伴。追蹤活躍分頁工作階段，偵測閒置狀態，並將瀏覽器使用資料同步到本機桌面應用程式。翸"
+  },
+  "extensionActionTitle": {
+    "message": "TimeLens 瀏覽器夥伴翸"
+  },
+  "extensionBridgeKey": {
+    "message": "擴充功能橋接金鑰"
+  },
+  "bridgeKeyHint": {
+    "message": "從 TimeLens 設定 > 本機 API / 擴充功能橋接取得金鑰。凫"
+  },
+  "save": {
+    "message": "儲存"
+  }
+}
