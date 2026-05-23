@@ -45,11 +45,11 @@ export default function HourlyTimeline() {
   );
 
   return (
-    <div className="glass-card p-5">
+    <div className="glass-card p-5 h-full min-h-[298px]">
       <h3 className="text-sm font-medium text-text-secondary mb-4">
         {t("hourlyDistribution")}
       </h3>
-      <ResponsiveContainer width="100%" height={160}>
+      <ResponsiveContainer width="100%" height={220}>
         <AreaChart data={data} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
           <defs>
             <linearGradient id="blueGrad" x1="0" y1="0" x2="0" y2="1">

@@ -75,15 +75,71 @@ fn friendly_windows_app_name(process_stem: &str, window_title: &str) -> String {
 }
 
 #[cfg(target_os = "windows")]
+fn get_process_exe_path(pid: u32) -> Option<String> {
+    use windows::core::PWSTR;
+    use windows::Win32::System::Threading::{
+        OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_FORMAT,
+        PROCESS_QUERY_LIMITED_INFORMATION,
+    };
+
+    unsafe {
+        let handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid).ok()?;
+        let mut path_buf = [0u16; 1024];
+        let mut len: u32 = path_buf.len() as u32;
+        let ok = QueryFullProcessImageNameW(
+            handle,
+            PROCESS_NAME_FORMAT(0),
+            PWSTR(path_buf.as_mut_ptr()),
+            &mut len,
+        )
+        .is_ok();
+        let _ = windows::Win32::Foundation::CloseHandle(handle);
+        if !ok || len == 0 {
+            return None;
+        }
+        Some(String::from_utf16_lossy(&path_buf[..len as usize]))
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn resolve_uwp_real_pid(frame_hwnd: windows::Win32::Foundation::HWND, host_pid: u32) -> Option<u32> {
+    use windows::Win32::Foundation::{BOOL, HWND, LPARAM};
+    use windows::Win32::UI::WindowsAndMessaging::{EnumChildWindows, GetWindowThreadProcessId};
+
+    struct Probe {
+        host_pid: u32,
+        target_pid: u32,
+    }
+
+    unsafe extern "system" fn enum_child(hwnd: HWND, lparam: LPARAM) -> BOOL {
+        let probe = &mut *(lparam.0 as *mut Probe);
+        let mut pid = 0u32;
+        GetWindowThreadProcessId(hwnd, Some(&mut pid));
+        if pid != 0 && pid != probe.host_pid {
+            probe.target_pid = pid;
+            return BOOL(0);
+        }
+        BOOL(1)
+    }
+
+    let mut probe = Probe {
+        host_pid,
+        target_pid: 0,
+    };
+
+    unsafe {
+        let _ = EnumChildWindows(frame_hwnd, Some(enum_child), LPARAM(&mut probe as *mut Probe as isize));
+    }
+
+    (probe.target_pid != 0).then_some(probe.target_pid)
+}
+
+#[cfg(target_os = "windows")]
 fn get_foreground_window_info() -> Option<(String, String, String)> {
     use windows::Win32::Foundation::HWND;
     use windows::Win32::UI::WindowsAndMessaging::{
         GetForegroundWindow, GetWindowTextW, GetWindowThreadProcessId,
     };
-    use windows::Win32::System::Threading::{
-        OpenProcess, PROCESS_QUERY_INFORMATION, PROCESS_VM_READ,
-    };
-    use windows::Win32::System::ProcessStatus::GetModuleFileNameExW;
 
     unsafe {
         let hwnd: HWND = GetForegroundWindow();
@@ -107,21 +163,22 @@ fn get_foreground_window_info() -> Option<(String, String, String)> {
             return Some(("Unknown".into(), title, String::new()));
         }
 
-        let handle = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, false, pid)
-            .unwrap_or_default();
-        if handle.is_invalid() {
-            return Some(("Unknown".into(), title, String::new()));
+        let mut resolved_pid = pid;
+        if let Some(host_exe) = get_process_exe_path(pid) {
+            let is_app_frame_host = std::path::Path::new(&host_exe)
+                .file_stem()
+                .map(|s| s.to_string_lossy().eq_ignore_ascii_case("ApplicationFrameHost"))
+                .unwrap_or(false);
+            if is_app_frame_host {
+                if let Some(uwp_pid) = resolve_uwp_real_pid(hwnd, pid) {
+                    resolved_pid = uwp_pid;
+                }
+            }
         }
 
-        let mut path_buf = [0u16; 260];
-        let path_len = GetModuleFileNameExW(handle, None, &mut path_buf);
-        let _ = windows::Win32::Foundation::CloseHandle(handle);
-
-        if path_len == 0 {
+        let Some(exe_path) = get_process_exe_path(resolved_pid) else {
             return Some(("Unknown".into(), title, String::new()));
-        }
-
-        let exe_path = String::from_utf16_lossy(&path_buf[..path_len as usize]);
+        };
         let app_name = {
             let stem = std::path::Path::new(&exe_path)
                 .file_stem()

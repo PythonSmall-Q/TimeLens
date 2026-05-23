@@ -5,6 +5,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [1.4.3] - 2026-05-23
+
+### Changed
+
+#### Dashboard and Global UI Polish
+
+- **Balanced dashboard chart cards** - aligned the Hourly Distribution card and Top Apps card heights for a cleaner two-column layout
+- **Refined app-wide visual style** - added layered ambient background gradients, enhanced glass-card depth/hover behavior, and shell-level decorative light effects across main pages
+- **Typography refresh** - upgraded the global font stack for better readability in both Chinese and English UI surfaces
+- **Full-width page layout for key modules** - removed fixed max-width constraints on Categories, Goals, and Focus Mode pages so content fills the available main area without a large right-side blank zone
+
+### Fixed
+
+- **Hourly distribution overflow bug** - fixed per-hour aggregation so usage segments are split across hour boundaries, preventing impossible values such as single-hour totals over 60 minutes
+- **UWP app identification on Windows** - improved foreground window resolution to avoid reporting UWP apps as `ApplicationFrameHost` or `Unknown` by resolving the real process behind the frame host window
+
 ## [1.4.2] - 2026-05-22
 
 ### Added

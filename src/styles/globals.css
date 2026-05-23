@@ -49,8 +49,8 @@ html.theme-light {
 }
 
 html {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
-    Arial, sans-serif;
+  font-family: "Manrope", "Noto Sans SC", "Segoe UI Variable Text", "PingFang SC",
+    "Microsoft YaHei", sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -60,6 +60,10 @@ body {
   margin: 0;
   padding: 0;
   background: var(--app-bg);
+  background-image:
+    radial-gradient(900px 480px at -12% -18%, rgba(78, 165, 160, 0.16), transparent 62%),
+    radial-gradient(860px 440px at 112% -24%, rgba(224, 144, 80, 0.14), transparent 60%),
+    linear-gradient(170deg, rgba(108, 142, 191, 0.08), transparent 42%);
   color: var(--text-primary);
   height: 100%;
   overflow: hidden;
@@ -75,6 +79,58 @@ body {
   background: var(--glass-bg);
   -webkit-backdrop-filter: blur(16px);
   backdrop-filter: blur(16px);
+  box-shadow:
+    0 14px 36px rgba(10, 17, 30, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  transition: transform 160ms ease, box-shadow 220ms ease, border-color 220ms ease;
+}
+
+.glass-card:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    0 20px 44px rgba(10, 17, 30, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.app-shell {
+  position: relative;
+  isolation: isolate;
+}
+
+.app-shell::before,
+.app-shell::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  pointer-events: none;
+  filter: blur(48px);
+}
+
+.app-shell::before {
+  width: 420px;
+  height: 420px;
+  top: -160px;
+  right: -120px;
+  border-radius: 999px;
+  background: radial-gradient(circle at center, rgba(78, 165, 160, 0.22), transparent 68%);
+}
+
+.app-shell::after {
+  width: 380px;
+  height: 380px;
+  bottom: -150px;
+  left: -120px;
+  border-radius: 999px;
+  background: radial-gradient(circle at center, rgba(224, 144, 80, 0.2), transparent 70%);
+}
+
+.app-main {
+  position: relative;
+}
+
+.app-main > * {
+  animation: fadeIn 260ms ease-out;
 }
 
 .glass-card-light {
@@ -305,7 +361,7 @@ body {
 
 /* ── Utility ────────────────────────────────────────────────── */
 .text-gradient {
-  background: linear-gradient(135deg, #6c8ebf, #8b6cbf);
+  background: linear-gradient(135deg, #4ea5a0, #6c8ebf 58%, #e09050);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;

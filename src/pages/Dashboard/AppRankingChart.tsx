@@ -35,14 +35,14 @@ export default function AppRankingChart() {
 
   if (top.length === 0) {
     return (
-      <div className="glass-card p-5 flex items-center justify-center h-48 text-text-muted text-sm">
+      <div className="glass-card p-5 h-full min-h-[298px] flex items-center justify-center text-text-muted text-sm">
         {t("noActivity")}
       </div>
     );
   }
 
   return (
-    <div className="glass-card p-5">
+    <div className="glass-card p-5 h-full min-h-[298px]">
       <h3 className="text-sm font-medium text-text-secondary mb-4">{t("topApps")}</h3>
       <ResponsiveContainer width="100%" height={220}>
         <BarChart

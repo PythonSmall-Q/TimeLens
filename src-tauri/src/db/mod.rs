@@ -1,5 +1,6 @@
 use rusqlite::{params, Connection, Result};
 use std::path::Path;
+use chrono::Timelike;
 
 const SYSTEM_INTERACTIVE_EXE_WHITELIST_SQL: &str = "
     lower(COALESCE(exe_path, '')) LIKE '%\\explorer.exe'
@@ -415,22 +416,73 @@ pub fn get_app_totals_in_range(
 /// Get hourly distribution (hour 0-23, seconds) for a given date.
 pub fn get_hourly_distribution(conn: &Connection, date: &str) -> Result<Vec<(i32, i64)>> {
     let ignore_system = get_bool_setting(conn, "ignore_system_processes", false)? as i32;
+    let day_start = match chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d") {
+        Ok(d) => d.and_hms_opt(0, 0, 0),
+        Err(_) => None,
+    };
+    let Some(day_start) = day_start else {
+        return Ok(Vec::new());
+    };
+    let day_end = day_start + chrono::Duration::days(1);
+
     let sql = format!(
-        "SELECT CAST(strftime('%H', first_seen_at) AS INTEGER) as hour,
-                SUM(active_seconds) as seconds
+        "SELECT first_seen_at,
+                active_seconds
          FROM app_usage
          WHERE date = ?1
            AND lower(COALESCE(exe_path, '')) NOT IN (SELECT exe_path FROM ignored_apps)
            AND {}
-         GROUP BY hour
-         ORDER BY hour",
+         ORDER BY first_seen_at",
         system_process_filter_sql_with_param(2)
     );
     let mut stmt = conn.prepare(&sql)?;
     let rows = stmt.query_map(params![date, ignore_system], |row| {
-        Ok((row.get::<_, i32>(0)?, row.get::<_, i64>(1)?))
+        Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
     })?;
-    rows.collect()
+
+    let mut buckets = [0i64; 24];
+
+    for row in rows {
+        let (first_seen_at, active_seconds) = row?;
+        if active_seconds <= 0 {
+            continue;
+        }
+
+        let Ok(start_raw) = chrono::NaiveDateTime::parse_from_str(&first_seen_at, "%Y-%m-%dT%H:%M:%S") else {
+            continue;
+        };
+        let seg_end_raw = start_raw + chrono::Duration::seconds(active_seconds);
+
+        let seg_start = if start_raw < day_start { day_start } else { start_raw };
+        let seg_end = if seg_end_raw > day_end { day_end } else { seg_end_raw };
+        if seg_end <= seg_start {
+            continue;
+        }
+
+        let mut cursor = seg_start;
+        while cursor < seg_end {
+            let hour_start = cursor
+                .date()
+                .and_hms_opt(cursor.time().hour(), 0, 0)
+                .unwrap_or(cursor);
+            let next_hour = hour_start + chrono::Duration::hours(1);
+            let chunk_end = if next_hour < seg_end { next_hour } else { seg_end };
+            let chunk_secs = (chunk_end - cursor).num_seconds();
+            if chunk_secs > 0 {
+                let hour_idx = cursor.time().hour() as usize;
+                if hour_idx < 24 {
+                    buckets[hour_idx] += chunk_secs;
+                }
+            }
+            cursor = chunk_end;
+        }
+    }
+
+    Ok(buckets
+        .iter()
+        .enumerate()
+        .filter_map(|(hour, secs)| (*secs > 0).then_some((hour as i32, *secs)))
+        .collect())
 }
 
 /// Get total seconds for each of the past N days.

@@ -75,7 +75,7 @@ export default function FocusModePage() {
   const pastSessions = sessions.filter((s) => s.ended_at != null);
 
   return (
-    <div className="p-6 space-y-6 max-w-2xl">
+    <div className="p-6 space-y-6 w-full">
       <div>
         <h1 className="text-2xl font-bold text-text-primary flex items-center gap-2">
           <Focus size={22} className="text-accent-purple" />

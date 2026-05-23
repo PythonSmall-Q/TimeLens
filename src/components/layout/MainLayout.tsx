@@ -21,10 +21,10 @@ export default function MainLayout({ children }: Props) {
   }, []);
 
   return (
-    <div className="flex h-screen w-screen bg-surface text-text-primary overflow-hidden">
+    <div className="app-shell flex h-screen w-screen bg-surface text-text-primary overflow-hidden">
       <GlobalSearch open={searchOpen} onClose={() => setSearchOpen(false)} />
       <Sidebar onOpenSearch={() => setSearchOpen(true)} />
-      <main className="flex-1 overflow-y-auto">
+      <main className="app-main flex-1 overflow-y-auto">
         {children}
       </main>
     </div>
