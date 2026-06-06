@@ -96,6 +96,74 @@ struct TrackingEnabledResponse {
     tracking_level: String,
 }
 
+fn write_api_audit_log(
+    conn: &rusqlite::Connection,
+    client_id: &str,
+    endpoint: &str,
+    method: &str,
+    status_code: i64,
+    detail: &str,
+) {
+    let now = chrono::Local::now().to_rfc3339();
+    let _ = db::insert_api_audit_log(conn, &now, client_id, endpoint, method, status_code, detail);
+}
+
+fn enforce_api_write_governance(
+    conn: &rusqlite::Connection,
+    headers: &HeaderMap,
+) -> Result<String, axum::http::StatusCode> {
+    let client_id = headers
+        .get("X-Client-Id")
+        .and_then(|h| h.to_str().ok())
+        .unwrap_or("")
+        .trim()
+        .to_string();
+
+    let allowlist_enforced = db::get_bool_setting(conn, "local_api_allowlist_enforced", false)
+        .unwrap_or(false);
+    if allowlist_enforced {
+        if client_id.is_empty() {
+            return Err(axum::http::StatusCode::FORBIDDEN);
+        }
+        let allowed = db::is_api_client_allowed(conn, &client_id).unwrap_or(false);
+        if !allowed {
+            return Err(axum::http::StatusCode::FORBIDDEN);
+        }
+    }
+
+    let rate_limit_per_min = db::get_setting(conn, "local_api_rate_limit_per_min")
+        .ok()
+        .flatten()
+        .and_then(|v| v.parse::<i64>().ok())
+        .unwrap_or(240);
+    if rate_limit_per_min > 0 && !client_id.is_empty() {
+        let since = (chrono::Local::now() - chrono::Duration::minutes(1)).to_rfc3339();
+        let used = db::count_api_audit_log_since(conn, &client_id, &since).unwrap_or(0);
+        if used >= rate_limit_per_min {
+            return Err(axum::http::StatusCode::TOO_MANY_REQUESTS);
+        }
+    }
+
+    let token_required = db::get_bool_setting(conn, "local_api_token_required", false)
+        .unwrap_or(false);
+    if token_required {
+        let token = headers
+            .get("X-Api-Token")
+            .and_then(|h| h.to_str().ok())
+            .map(|v| v.trim())
+            .unwrap_or("");
+        if token.is_empty() {
+            return Err(axum::http::StatusCode::FORBIDDEN);
+        }
+        let ok = extension_bridge_cmd::verify_api_token(conn, token, &client_id).unwrap_or(false);
+        if !ok {
+            return Err(axum::http::StatusCode::FORBIDDEN);
+        }
+    }
+
+    Ok(client_id)
+}
+
 async fn get_today(State(s): State<ApiState>) -> impl IntoResponse {
     let today = chrono::Local::now().format("%Y-%m-%d").to_string();
     match s.db.lock() {
@@ -186,8 +254,18 @@ async fn post_browser_session(
     headers: HeaderMap,
     Json(payload): Json<BrowserSessionInput>,
 ) -> impl IntoResponse {
+    let endpoint = "/api/browser/session";
+    let method = "POST";
     let Ok(conn) = s.db.lock() else {
         return axum::http::StatusCode::INTERNAL_SERVER_ERROR;
+    };
+
+    let client_id = match enforce_api_write_governance(&conn, &headers) {
+        Ok(client_id) => client_id,
+        Err(code) => {
+            write_api_audit_log(&conn, "", endpoint, method, code.as_u16() as i64, "governance_check_failed");
+            return code;
+        }
     };
 
     // Check if extension bridge key is set up and validate signature if provided
@@ -201,19 +279,25 @@ async fn post_browser_session(
             // Verify signature
             let body_json = match serde_json::to_string(&payload) {
                 Ok(j) => j,
-                Err(_) => return axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                Err(_) => {
+                    write_api_audit_log(&conn, &client_id, endpoint, method, 500, "payload_serialization_failed");
+                    return axum::http::StatusCode::INTERNAL_SERVER_ERROR;
+                }
             };
             if !extension_bridge_cmd::verify_request_signature(body_json.as_bytes(), sig, &key) {
+                write_api_audit_log(&conn, &client_id, endpoint, method, 403, "invalid_extension_signature");
                 return axum::http::StatusCode::FORBIDDEN;
             }
         } else {
             // Key is set but no signature provided
+            write_api_audit_log(&conn, &client_id, endpoint, method, 403, "missing_extension_signature");
             return axum::http::StatusCode::FORBIDDEN;
         }
     }
 
     let enabled = db::get_bool_setting(&conn, "browser_extension_enabled", true).unwrap_or(true);
     if !enabled {
+        write_api_audit_log(&conn, &client_id, endpoint, method, 403, "browser_extension_disabled");
         return axum::http::StatusCode::FORBIDDEN;
     }
 
@@ -232,11 +316,13 @@ async fn post_browser_session(
     };
 
     if db::insert_browser_session(&conn, &session).is_err() {
+        write_api_audit_log(&conn, &client_id, endpoint, method, 500, "insert_browser_session_failed");
         return axum::http::StatusCode::INTERNAL_SERVER_ERROR;
     }
     let _ = db::set_setting(&conn, "browser_extension_last_sync_at", &synced_at);
     let _ = db::set_setting(&conn, "browser_extension_last_browser_name", &payload.browser_name);
     let _ = db::set_setting(&conn, "browser_extension_last_locale", &payload.locale);
+    write_api_audit_log(&conn, &client_id, endpoint, method, 204, "ok");
     axum::http::StatusCode::NO_CONTENT
 }
 
@@ -245,8 +331,18 @@ async fn post_vscode_session(
     headers: HeaderMap,
     Json(payload): Json<VsCodeSessionInput>,
 ) -> impl IntoResponse {
+    let endpoint = "/api/vscode/sessions";
+    let method = "POST";
     let Ok(conn) = s.db.lock() else {
         return axum::http::StatusCode::INTERNAL_SERVER_ERROR;
+    };
+
+    let client_id = match enforce_api_write_governance(&conn, &headers) {
+        Ok(client_id) => client_id,
+        Err(code) => {
+            write_api_audit_log(&conn, "", endpoint, method, code.as_u16() as i64, "governance_check_failed");
+            return code;
+        }
     };
 
     // Check if extension bridge key is set up and validate signature if provided
@@ -260,23 +356,30 @@ async fn post_vscode_session(
             // Verify signature
             let body_json = match serde_json::to_string(&payload) {
                 Ok(j) => j,
-                Err(_) => return axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                Err(_) => {
+                    write_api_audit_log(&conn, &client_id, endpoint, method, 500, "payload_serialization_failed");
+                    return axum::http::StatusCode::INTERNAL_SERVER_ERROR;
+                }
             };
             if !extension_bridge_cmd::verify_request_signature(body_json.as_bytes(), sig, &key) {
+                write_api_audit_log(&conn, &client_id, endpoint, method, 403, "invalid_extension_signature");
                 return axum::http::StatusCode::FORBIDDEN;
             }
         } else {
             // Key is set but no signature provided
+            write_api_audit_log(&conn, &client_id, endpoint, method, 403, "missing_extension_signature");
             return axum::http::StatusCode::FORBIDDEN;
         }
     }
 
     let enabled = db::get_bool_setting(&conn, "vscode_tracking_enabled", true).unwrap_or(true);
     if !enabled {
+        write_api_audit_log(&conn, &client_id, endpoint, method, 403, "vscode_tracking_disabled");
         return axum::http::StatusCode::FORBIDDEN;
     }
 
     if payload.session_id.trim().is_empty() {
+        write_api_audit_log(&conn, &client_id, endpoint, method, 400, "empty_session_id");
         return axum::http::StatusCode::BAD_REQUEST;
     }
 
@@ -305,9 +408,11 @@ async fn post_vscode_session(
     };
 
     if db::upsert_vscode_session(&conn, &session).is_err() {
+        write_api_audit_log(&conn, &client_id, endpoint, method, 500, "upsert_vscode_session_failed");
         return axum::http::StatusCode::INTERNAL_SERVER_ERROR;
     }
 
+    write_api_audit_log(&conn, &client_id, endpoint, method, 204, "ok");
     axum::http::StatusCode::NO_CONTENT
 }
 

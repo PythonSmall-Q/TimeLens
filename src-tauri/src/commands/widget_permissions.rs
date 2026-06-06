@@ -2,6 +2,7 @@ use std::fs;
 use tauri::{AppHandle, Manager, State};
 
 use crate::commands::storage_cmd::DbState;
+use crate::models::{WidgetPermissionAuditEntry, WidgetPermissionEntry};
 use crate::widget_registry::{load_third_party_widget_from_manifest_path, WidgetRegistryItem};
 
 // ── Permission CRUD ───────────────────────────────────────────
@@ -19,19 +20,53 @@ pub fn get_widget_permissions(
 pub fn set_widget_permissions(
     widget_id: String,
     permissions: Vec<String>,
+    actor: Option<String>,
     db: State<'_, DbState>,
 ) -> Result<(), String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
-    crate::db::set_widget_permissions(&conn, &widget_id, &permissions).map_err(|e| e.to_string())
+    crate::db::set_widget_permissions(&conn, &widget_id, &permissions, actor.as_deref())
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub fn revoke_all_widget_permissions(
     widget_id: String,
+    actor: Option<String>,
     db: State<'_, DbState>,
 ) -> Result<(), String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
-    crate::db::revoke_all_widget_permissions(&conn, &widget_id).map_err(|e| e.to_string())
+    crate::db::revoke_all_widget_permissions(&conn, &widget_id, actor.as_deref())
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_widget_permission_audit_log(
+    widget_id: String,
+    limit: Option<i64>,
+    db: State<'_, DbState>,
+) -> Result<Vec<WidgetPermissionAuditEntry>, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    crate::db::get_widget_permission_audit_log(&conn, &widget_id, limit.unwrap_or(50))
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_widget_permission_matrix(
+    widget_id: String,
+    db: State<'_, DbState>,
+) -> Result<Vec<WidgetPermissionEntry>, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    crate::db::get_widget_permission_entries(&conn, &widget_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn record_widget_permission_access(
+    widget_id: String,
+    permission: String,
+    db: State<'_, DbState>,
+) -> Result<(), String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    crate::db::touch_widget_permission_access(&conn, &widget_id, &permission).map_err(|e| e.to_string())
 }
 
 // ── Import local widget ───────────────────────────────────────

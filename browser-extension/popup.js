@@ -175,13 +175,20 @@ function renderRecentSessions(sessions) {
   recentList.innerHTML = sessions.map((session) => {
     const title = escapeHtml(session.title || session.host || session.url || t("untitledTab", {}, locale));
     const host = escapeHtml(session.host || t("unknownSite", {}, locale));
+    const path = session.path ? escapeHtml(session.path) : "";
+    const flags = [
+      session.incognito ? "incognito" : "",
+      session.pinned ? "pinned" : "",
+      session.audible ? "audio" : "",
+    ].filter(Boolean).join(" · ");
     const duration = formatDuration(Math.round((session.durationMs || 0) / 1000));
     const endedAt = session.endedAt ? new Date(session.endedAt).toLocaleTimeString() : "active";
     return `
       <li class="session-item">
         <span class="session-title">${title}</span>
         <span class="session-host">${host}</span>
-        <span class="session-meta">${duration} · ${endedAt}</span>
+        <span class="session-meta">${duration} · ${endedAt}${flags ? ` · ${escapeHtml(flags)}` : ""}</span>
+        ${path ? `<span class="session-meta">${path}</span>` : ""}
       </li>
     `;
   }).join("");

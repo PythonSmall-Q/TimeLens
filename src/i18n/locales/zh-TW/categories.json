@@ -4,6 +4,7 @@
   "addRule": "新增分類規則",
   "exePlaceholder": "選擇最近使用的應用程式…",
   "categoryLabel": "分類",
+  "drilldownHint": "已定位到 {{app}} 的下鑽上下文，可直接新增或調整分類規則。",
   "noRules": "暫無分類規則，請在上方新增應用程式。",
   "suggestedCategory": "建議分類：{{cat}} — 點選應用程式",
   "applySuggestion": "應用程式建議分類",

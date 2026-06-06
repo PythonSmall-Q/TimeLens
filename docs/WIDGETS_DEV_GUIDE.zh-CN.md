@@ -100,11 +100,28 @@ export function createWidget() {
 - `getTodayAppTotals()`
 - `getAppTotalsInRange(startDate, endDate)`
 - `getCategoryTotalsInRange(startDate, endDate)`
+- `getHourlyForDate(date)`
+- `getRecentDailyTotalsRange(startDate, endDate)`
+- `getAppCategoryMap()`
 - `onActiveWindowChanged(callback)`
+- `getTodos()`
+- `addTodo(content)`
+- `toggleTodo(id)`
+- `deleteTodo(id)`
+- `setFocusModeActive(active)`
+- `setMonitoringActive(active)`
+- `getUsageGoals()`
+- `listFocusSessions(startAt?, endAt?)`
 
 ## 权限模型（雏形）
 
-manifest 中的 `permissions` 会进入注册表元数据。当前里程碑尚未完成强制拦截，主要用于后续“安装时授权 UI”准备。
+manifest 中的 `permissions` 会进入注册表元数据，并在运行时进行强制拦截：
+
+- 第三方小组件添加流程会弹出安装时授权 UI。
+- 未授权权限对应的 channel 方法会被拒绝调用。
+- 权限调用会记录 `last_access_at`，用于权限矩阵审计展示。
+- 小组件中心权限矩阵支持“撤销全部”并提供二次确认。
+- 授权/撤销操作会写入权限时间线审计（`actor`、`occurred_at`、`action`）。
 
 建议权限字符串：
 

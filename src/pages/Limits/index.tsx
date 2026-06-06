@@ -1,10 +1,11 @@
 import { useState, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { Bell, Plus, Trash2, AlertTriangle } from "lucide-react";
+import { Bell, Plus, Trash2 } from "lucide-react";
 import * as api from "@/services/tauriApi";
 import type { AppLimit, AppUsageSummary, ExecutableOption } from "@/types";
 import { formatDuration } from "@/utils/format";
 import ExePickerInput from "@/components/ExePickerInput";
+import AsyncStateCard from "@/components/AsyncStateCard";
 import clsx from "clsx";
 
 const STORAGE_KEY = "timelens-app-limits";
@@ -323,10 +324,7 @@ export default function Limits() {
           </div>
         </div>
       ) : (
-        <div className="glass-card p-8 text-center">
-          <AlertTriangle size={28} className="text-text-muted mx-auto mb-3" />
-          <p className="text-sm text-text-muted">{t("limits:noLimits")}</p>
-        </div>
+        <AsyncStateCard variant="empty" title={t("limits:noLimits")} />
       )}
     </div>
   );

@@ -5,6 +5,31 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [2.0.0] - 2026-06-06
+
+### Changed
+
+- Consolidated roadmap governance into a single canonical local-first source at `docs/ROADMAP_v2.0.0.md`.
+- Archived the parallel roadmap track to avoid split planning ownership and version drift.
+- Normalized core desktop release metadata to `2.0.0` across npm, Tauri, and Windows MSIX manifest sources.
+- Added advanced Browser Usage date-range exploration with local saved views (custom range, save/apply/delete presets).
+- Added Dashboard "what changed" summary card for recent period comparison (top increase/decrease, new/stopped active apps, total delta).
+- Added Dashboard "Unified Insight Workspace" narrative panel (daily review, weekly reflection, goal health) powered by local suggestions and anomaly detection.
+- Added local notification automation controls in Tracking settings (quiet hours + reminder cooldown) and wired them into all in-app alert dispatches.
+- Added Dashboard "Unified Timeline" panel with cross-source feed (desktop focus sessions, browser sessions, interruption markers) and local source/search filters.
+- Moved "What Changed" summary, Unified Insight Workspace, and Unified Timeline into a dedicated Dashboard Insights page to reduce homepage density and improve analysis flow.
+- Added cross-module drill-down actions from Dashboard summaries/timeline into Categories, Browser Usage, and Focus Mode, with URL-parameter context handoff.
+- Fixed interruption marker detail drill-down target: `Open Detail` now routes to a dedicated interruption detail view with hour window, switch count, and fragment score context instead of Focus Mode landing.
+- Added a unified Privacy & Permission Center entry in Settings to aggregate local-only boundary, tracking state, API governance, backup, and data health with one-click deep links.
+- Added reusable async state cards (loading/empty/error) and applied them to core pages for consistent platform-level UX.
+- Expanded async state card adoption to Goals, Dashboard, and Widget Center to reduce duplicated state UI logic.
+- Added Focus Mode rule automation panel with local rule management, simulation, and one-click apply-to-start behavior.
+- Hardened third-party widget permission enforcement by mapping `settings:write` to runtime channel interception and fixing install-time permission dialog state reset / instance targeting.
+- Upgraded Widget permission matrix from read-only audit view to manageable controls with one-click permission revoke.
+- Added secondary confirmation and success/failure feedback for widget permission revoke actions to reduce accidental operations.
+- Added per-widget permission change timeline (grant/revoke actor + timestamp) for third-party widget governance audits.
+- Completed i18n coverage for newly added Widget permission matrix and Browser Usage/Dashboard incremental features across `en` / `zh-CN` / `zh-TW`.
+
 ## [1.4.4] - 2026-06-06
 
 ### Added

@@ -7,10 +7,13 @@ import clsx from "clsx";
 import * as api from "@/services/tauriApi";
 import { APP_VERSION } from "../../version";
 import type {
+  ApiAuditLogEntry,
+  ApiTokenMetadata,
   BackupPreview,
   DataHealthSummary,
   ExecutableOption,
   InstallChannelInfo,
+  LocalApiSecuritySettings,
   RepairAssistantResult,
   RetentionPolicyInfo,
   RetentionRunResult,
@@ -73,6 +76,7 @@ export default function Settings() {
     | "general"
     | "appearance"
     | "trayIcon"
+    | "privacyCenter"
     | "tracking"
     | "startup"
     | "widgets"
@@ -92,6 +96,21 @@ export default function Settings() {
   const [extensionBridgeKey, setExtensionBridgeKey] = useState<string>("");
   const [extensionBridgeLoading, setExtensionBridgeLoading] = useState(false);
   const [extensionBridgeKeyRotatedAt, setExtensionBridgeKeyRotatedAt] = useState<string>("");
+  const [localApiSecurity, setLocalApiSecurity] = useState<LocalApiSecuritySettings>({
+    token_required: false,
+    allowlist_enforced: false,
+    rate_limit_per_min: 240,
+  });
+  const [apiAllowlistText, setApiAllowlistText] = useState("");
+  const [apiTokens, setApiTokens] = useState<ApiTokenMetadata[]>([]);
+  const [apiAuditLogs, setApiAuditLogs] = useState<ApiAuditLogEntry[]>([]);
+  const [newTokenLabel, setNewTokenLabel] = useState("vscode-local-client");
+  const [newTokenScopes, setNewTokenScopes] = useState("session:write,usage:read");
+  const [lastIssuedToken, setLastIssuedToken] = useState<string | null>(null);
+  const [apiGovernanceBusy, setApiGovernanceBusy] = useState<
+    null | "issue" | "refresh" | "allowlist" | "settings"
+  >(null);
+  const [apiGovernanceMessage, setApiGovernanceMessage] = useState<string | null>(null);
   const [trayIconStyle, setTrayIconStyleState] = useState<"auto" | "color" | "black" | "white">("auto");
   const [backupBusy, setBackupBusy] = useState<"export" | "validate" | "apply" | "import" | null>(null);
   const [backupMessage, setBackupMessage] = useState<{ type: "success" | "error" | "info"; text: string } | null>(null);
@@ -126,6 +145,14 @@ export default function Settings() {
     setWeekStartDay,
     excludeTimelens,
     setExcludeTimelens,
+    notificationQuietHoursEnabled,
+    notificationQuietStart,
+    notificationQuietEnd,
+    notificationCooldownMin,
+    setNotificationQuietHoursEnabled,
+    setNotificationQuietStart,
+    setNotificationQuietEnd,
+    setNotificationCooldownMin,
     autoCheckUpdates,
     setAutoCheckUpdates,
   } = useSettingsStore();
@@ -145,6 +172,22 @@ export default function Settings() {
 
     api.getExtensionBridgeKey()
       .then(setExtensionBridgeKey)
+      .catch(() => {});
+
+    api.getLocalApiSecuritySettings()
+      .then(setLocalApiSecurity)
+      .catch(() => {});
+
+    api.getApiClientAllowlist()
+      .then((list) => setApiAllowlistText(list.join("\n")))
+      .catch(() => {});
+
+    api.listApiTokens()
+      .then(setApiTokens)
+      .catch(() => {});
+
+    api.getApiAuditLog(40, 0)
+      .then(setApiAuditLogs)
       .catch(() => {});
 
     api.getTrayIconStyle()
@@ -266,6 +309,79 @@ export default function Settings() {
       setTrackingTransparency(transparency);
     } catch {
       // keep silent to preserve current settings behavior
+    }
+  };
+
+  const refreshApiGovernancePanels = async () => {
+    setApiGovernanceBusy("refresh");
+    try {
+      const [settings, allowlist, tokens, logs] = await Promise.all([
+        api.getLocalApiSecuritySettings(),
+        api.getApiClientAllowlist(),
+        api.listApiTokens(),
+        api.getApiAuditLog(40, 0),
+      ]);
+      setLocalApiSecurity(settings);
+      setApiAllowlistText(allowlist.join("\n"));
+      setApiTokens(tokens);
+      setApiAuditLogs(logs);
+      setApiGovernanceMessage(t("apiSecurity.msgRefreshed"));
+    } catch (error) {
+      setApiGovernanceMessage(error instanceof Error ? error.message : t("apiSecurity.msgRefreshFailed"));
+    } finally {
+      setApiGovernanceBusy(null);
+    }
+  };
+
+  const saveApiSecuritySettings = async (patch: Partial<LocalApiSecuritySettings>) => {
+    setApiGovernanceBusy("settings");
+    setApiGovernanceMessage(null);
+    try {
+      await api.setLocalApiSecuritySettings(patch);
+      const next = { ...localApiSecurity, ...patch };
+      setLocalApiSecurity(next);
+      setApiGovernanceMessage(t("apiSecurity.msgSettingsUpdated"));
+    } catch (error) {
+      setApiGovernanceMessage(error instanceof Error ? error.message : t("apiSecurity.msgSettingsFailed"));
+    } finally {
+      setApiGovernanceBusy(null);
+    }
+  };
+
+  const issueScopedToken = async () => {
+    setApiGovernanceBusy("issue");
+    setApiGovernanceMessage(null);
+    try {
+      const scopes = newTokenScopes
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const issued = await api.issueApiToken(newTokenLabel.trim(), scopes);
+      setLastIssuedToken(issued.token);
+      const tokens = await api.listApiTokens();
+      setApiTokens(tokens);
+      setApiGovernanceMessage(t("apiSecurity.msgTokenIssued"));
+    } catch (error) {
+      setApiGovernanceMessage(error instanceof Error ? error.message : t("apiSecurity.msgTokenIssueFailed"));
+    } finally {
+      setApiGovernanceBusy(null);
+    }
+  };
+
+  const persistAllowlist = async () => {
+    setApiGovernanceBusy("allowlist");
+    setApiGovernanceMessage(null);
+    try {
+      const list = apiAllowlistText
+        .split(/\r?\n/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+      await api.setApiClientAllowlist(list);
+      setApiGovernanceMessage(t("apiSecurity.msgAllowlistSaved", { count: list.length }));
+    } catch (error) {
+      setApiGovernanceMessage(error instanceof Error ? error.message : t("apiSecurity.msgAllowlistFailed"));
+    } finally {
+      setApiGovernanceBusy(null);
     }
   };
 
@@ -484,6 +600,7 @@ export default function Settings() {
   const showWindowsStartupSettings = installChannelInfo?.platform === "windows";
   const showStartupSettings =
     installChannelInfo?.platform === "windows" || installChannelInfo?.platform === "macos";
+  const activeApiTokenCount = apiTokens.filter((token) => !token.revoked_at).length;
   const sectionCards: Array<{
     key: NonNullable<typeof activeSection>;
     title: string;
@@ -493,6 +610,7 @@ export default function Settings() {
     { key: "general", title: t("general"), icon: Sun, keywords: [t("language")] },
     { key: "appearance", title: t("appearance"), icon: Moon, keywords: [t("theme.label")] },
     { key: "trayIcon", title: t("trayIconStyle.label"), icon: PanelsTopLeft, keywords: [t("trayIconStyle.auto"), t("trayIconStyle.color"), t("trayIconStyle.black"), t("trayIconStyle.white")] },
+    { key: "privacyCenter", title: t("privacyCenter.title"), icon: Lock, keywords: [t("privacyCenter.subtitle"), t("apiSecurity.title"), t("backup.title"), t("transparency.title")] },
     { key: "tracking", title: t("tracking.title"), icon: Activity, keywords: [t("tracking.active"), t("tracking.samplingInterval"), t("tracking.idleTimePolicy")] },
     { key: "startup", title: t("startup.title"), icon: Rocket, keywords: [t("startup.launchAtStartup"), t("startup.silentStartup"), t("startup.autoOpenWidgets")] },
     { key: "widgets", title: t("widgets.title"), icon: PanelsTopLeft, keywords: [t("widgets.fadeOnBlur")] },
@@ -622,6 +740,98 @@ export default function Settings() {
             ))}
           </div>
         </Row>
+      </Section>
+      )}
+
+      {/* Tracking */}
+      {activeSection === "privacyCenter" && (
+      <Section icon={Lock} title={t("privacyCenter.title")}>
+        <p className="text-xs text-text-muted">{t("privacyCenter.subtitle")}</p>
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="rounded-lg border border-surface-border bg-surface-hover/40 p-3">
+            <p className="text-[11px] text-text-muted">{t("privacyCenter.localOnlyLabel")}</p>
+            <p className="text-sm font-semibold text-accent-green">{t("privacyCenter.localOnlyValue")}</p>
+          </div>
+          <div className="rounded-lg border border-surface-border bg-surface-hover/40 p-3">
+            <p className="text-[11px] text-text-muted">{t("privacyCenter.monitoringLabel")}</p>
+            <p className={clsx("text-sm font-semibold", monitoringActive ? "text-accent-green" : "text-yellow-300")}>
+              {monitoringActive ? t("privacyCenter.monitoringOn") : t("privacyCenter.monitoringOff")}
+            </p>
+          </div>
+          <div className="rounded-lg border border-surface-border bg-surface-hover/40 p-3">
+            <p className="text-[11px] text-text-muted">{t("privacyCenter.quietHoursLabel")}</p>
+            <p className="text-sm font-semibold text-text-primary">
+              {notificationQuietHoursEnabled
+                ? t("privacyCenter.quietHoursOnRange", { start: notificationQuietStart, end: notificationQuietEnd })
+                : t("privacyCenter.quietHoursOff")}
+            </p>
+          </div>
+          <div className="rounded-lg border border-surface-border bg-surface-hover/40 p-3">
+            <p className="text-[11px] text-text-muted">{t("privacyCenter.apiTokenLabel")}</p>
+            <p className={clsx("text-sm font-semibold", localApiSecurity.token_required ? "text-accent-green" : "text-yellow-300")}>
+              {localApiSecurity.token_required ? t("privacyCenter.enabled") : t("privacyCenter.disabled")}
+            </p>
+          </div>
+          <div className="rounded-lg border border-surface-border bg-surface-hover/40 p-3">
+            <p className="text-[11px] text-text-muted">{t("privacyCenter.allowlistLabel")}</p>
+            <p className={clsx("text-sm font-semibold", localApiSecurity.allowlist_enforced ? "text-accent-green" : "text-yellow-300")}>
+              {localApiSecurity.allowlist_enforced ? t("privacyCenter.enabled") : t("privacyCenter.disabled")}
+            </p>
+          </div>
+          <div className="rounded-lg border border-surface-border bg-surface-hover/40 p-3">
+            <p className="text-[11px] text-text-muted">{t("privacyCenter.activeTokensLabel")}</p>
+            <p className="text-sm font-semibold text-text-primary">{activeApiTokenCount}</p>
+          </div>
+          <div className="rounded-lg border border-surface-border bg-surface-hover/40 p-3">
+            <p className="text-[11px] text-text-muted">{t("privacyCenter.auditLogLabel")}</p>
+            <p className="text-sm font-semibold text-text-primary">{apiAuditLogs.length}</p>
+          </div>
+          <div className="rounded-lg border border-surface-border bg-surface-hover/40 p-3">
+            <p className="text-[11px] text-text-muted">{t("privacyCenter.dataHealthLabel")}</p>
+            <p className={clsx("text-sm font-semibold", dataHealth?.integrity_ok ? "text-accent-green" : "text-yellow-300")}>
+              {dataHealth?.integrity_ok ? t("privacyCenter.healthy") : t("privacyCenter.risk")}
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <p className="text-xs text-text-secondary">{t("privacyCenter.quickActions")}</p>
+          <div className="flex flex-wrap gap-2 justify-end">
+            <button
+              onClick={() => setActiveSection("tracking")}
+              className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
+            >
+              {t("privacyCenter.openTracking")}
+            </button>
+            <button
+              onClick={() => setActiveSection("extensionBridge")}
+              className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
+            >
+              {t("privacyCenter.openApiSecurity")}
+            </button>
+            <button
+              onClick={() => setActiveSection("backup")}
+              className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
+            >
+              {t("privacyCenter.openBackup")}
+            </button>
+            <button
+              onClick={() => setActiveSection("dataHealth")}
+              className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
+            >
+              {t("privacyCenter.openDataHealth")}
+            </button>
+            <button
+              onClick={() => {
+                void refreshReliabilityPanels();
+                void refreshApiGovernancePanels();
+              }}
+              className="text-xs px-3 py-1.5 rounded-lg border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
+            >
+              {t("privacyCenter.refresh")}
+            </button>
+          </div>
+        </div>
       </Section>
       )}
 
@@ -802,6 +1012,65 @@ export default function Settings() {
           </div>
         </Row>
         <p className="text-xs text-text-muted text-right">{t("tracking.idleTimePolicyHint")}</p>
+
+        <Row label={t("tracking.quietHoursEnabled")}>
+          <button
+            onClick={() => setNotificationQuietHoursEnabled(!notificationQuietHoursEnabled)}
+            title={t("tracking.quietHoursEnabled")}
+            className={clsx(
+              "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+              notificationQuietHoursEnabled ? "bg-accent-blue" : "bg-surface-hover"
+            )}
+          >
+            <span
+              className={clsx(
+                "inline-block h-4 w-4 rounded-full bg-white shadow transition-transform",
+                notificationQuietHoursEnabled ? "translate-x-6" : "translate-x-1"
+              )}
+            />
+          </button>
+        </Row>
+
+        {notificationQuietHoursEnabled && (
+          <Row label={t("tracking.quietHoursRange")}>
+            <div className="flex items-center gap-2">
+              <input
+                type="time"
+                value={notificationQuietStart}
+                onChange={(e) => setNotificationQuietStart(e.target.value)}
+                className="ui-field !w-28"
+              />
+              <span className="text-xs text-text-muted">-</span>
+              <input
+                type="time"
+                value={notificationQuietEnd}
+                onChange={(e) => setNotificationQuietEnd(e.target.value)}
+                className="ui-field !w-28"
+              />
+            </div>
+          </Row>
+        )}
+        <p className="text-xs text-text-muted text-right">{t("tracking.quietHoursHint")}</p>
+
+        <Row label={t("tracking.notificationCooldown")}>
+          <div className="flex items-center gap-2">
+            <input
+              type="range"
+              min={0}
+              max={120}
+              step={5}
+              value={notificationCooldownMin}
+              onChange={(e) => setNotificationCooldownMin(Number(e.target.value))}
+              className="ui-range"
+              title={t("tracking.notificationCooldown")}
+              aria-label={t("tracking.notificationCooldown")}
+            />
+            <span className="text-xs text-text-secondary w-16 text-right">
+              {notificationCooldownMin}{t("tracking.minuteUnit")}
+            </span>
+          </div>
+        </Row>
+        <p className="text-xs text-text-muted text-right">{t("tracking.notificationCooldownHint")}</p>
 
     </Section>
       )}
@@ -1400,6 +1669,191 @@ export default function Settings() {
           <p>{t("extensionBridge.description")}</p>
           {extensionBridgeKeyRotatedAt && (
             <p>{t("extensionBridge.lastRotated", { time: new Date(extensionBridgeKeyRotatedAt).toLocaleString() })}</p>
+          )}
+        </div>
+
+        <div className="rounded-lg border border-surface-border bg-surface-hover/40 p-3 space-y-3">
+          <div className="text-xs font-semibold text-text-primary">{t("apiSecurity.title")}</div>
+          <div className="grid gap-2 sm:grid-cols-3">
+            <label className="text-xs text-text-secondary rounded-lg border border-surface-border px-3 py-2 flex items-center justify-between">
+              <span>{t("apiSecurity.requireToken")}</span>
+              <input
+                type="checkbox"
+                className="ui-checkbox"
+                checked={localApiSecurity.token_required}
+                onChange={(e) => {
+                  const next = e.target.checked;
+                  setLocalApiSecurity((prev) => ({ ...prev, token_required: next }));
+                  void saveApiSecuritySettings({ token_required: next });
+                }}
+              />
+            </label>
+            <label className="text-xs text-text-secondary rounded-lg border border-surface-border px-3 py-2 flex items-center justify-between">
+              <span>{t("apiSecurity.enforceAllowlist")}</span>
+              <input
+                type="checkbox"
+                className="ui-checkbox"
+                checked={localApiSecurity.allowlist_enforced}
+                onChange={(e) => {
+                  const next = e.target.checked;
+                  setLocalApiSecurity((prev) => ({ ...prev, allowlist_enforced: next }));
+                  void saveApiSecuritySettings({ allowlist_enforced: next });
+                }}
+              />
+            </label>
+            <label className="text-xs text-text-secondary rounded-lg border border-surface-border px-3 py-2 space-y-1">
+              <span className="block">{t("apiSecurity.rateLimitPerMin")}</span>
+              <input
+                type="number"
+                min={10}
+                max={10000}
+                value={localApiSecurity.rate_limit_per_min}
+                onChange={(e) => {
+                  const next = Number(e.target.value || "0");
+                  setLocalApiSecurity((prev) => ({ ...prev, rate_limit_per_min: next }));
+                }}
+                onBlur={() => {
+                  void saveApiSecuritySettings({ rate_limit_per_min: localApiSecurity.rate_limit_per_min });
+                }}
+                className="ui-field w-full"
+              />
+            </label>
+          </div>
+
+          <div className="grid gap-2 sm:grid-cols-2">
+            <label className="text-xs text-text-secondary space-y-1">
+              <span>{t("apiSecurity.newTokenLabel")}</span>
+              <input
+                value={newTokenLabel}
+                onChange={(e) => setNewTokenLabel(e.target.value)}
+                className="ui-field w-full"
+                placeholder="vscode-local-client"
+              />
+            </label>
+            <label className="text-xs text-text-secondary space-y-1">
+              <span>{t("apiSecurity.scopes")}</span>
+              <input
+                value={newTokenScopes}
+                onChange={(e) => setNewTokenScopes(e.target.value)}
+                className="ui-field w-full"
+                placeholder={t("apiSecurity.scopesPlaceholder")}
+              />
+            </label>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 justify-end">
+            <button
+              onClick={() => void issueScopedToken()}
+              disabled={apiGovernanceBusy !== null}
+              className="text-xs px-3 py-1.5 rounded-lg border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
+            >
+              {apiGovernanceBusy === "issue" ? t("apiSecurity.issuing") : t("apiSecurity.issueToken")}
+            </button>
+            <button
+              onClick={() => void refreshApiGovernancePanels()}
+              disabled={apiGovernanceBusy !== null}
+              className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
+            >
+              {apiGovernanceBusy === "refresh" ? t("apiSecurity.refreshing") : t("apiSecurity.refreshGovernance")}
+            </button>
+          </div>
+
+          {lastIssuedToken && (
+            <div className="rounded-lg border border-accent-blue/30 bg-accent-blue/10 px-3 py-2 text-xs text-text-secondary">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-text-primary">{t("apiSecurity.lastIssuedToken")}</span>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(lastIssuedToken);
+                    setApiGovernanceMessage(t("apiSecurity.msgTokenCopied"));
+                  }}
+                  className="p-1 rounded hover:bg-surface-hover"
+                  title={t("apiSecurity.copyToken")}
+                >
+                  <Copy size={12} className="text-accent-blue" />
+                </button>
+              </div>
+              <p className="font-mono break-all mt-1">{lastIssuedToken}</p>
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <p className="text-xs text-text-secondary">{t("apiSecurity.allowlistHint")}</p>
+            <textarea
+              value={apiAllowlistText}
+              onChange={(e) => setApiAllowlistText(e.target.value)}
+              className="ui-field w-full min-h-20"
+                placeholder={t("apiSecurity.allowlistPlaceholder")}
+            />
+            <div className="flex justify-end">
+              <button
+                onClick={() => void persistAllowlist()}
+                disabled={apiGovernanceBusy !== null}
+                className="text-xs px-3 py-1.5 rounded-lg border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
+              >
+                {apiGovernanceBusy === "allowlist" ? t("apiSecurity.saving") : t("apiSecurity.saveAllowlist")}
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-xs text-text-secondary">{t("apiSecurity.issuedTokens")}</p>
+            <div className="max-h-44 overflow-y-auto space-y-1">
+              {apiTokens.map((token) => (
+                <div key={token.id} className="rounded-lg border border-surface-border px-3 py-2 text-xs text-text-muted">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-text-primary truncate">{token.label}</span>
+                    <div className="flex items-center gap-2">
+                      <span className={clsx("px-1.5 py-0.5 rounded-full border", token.revoked_at ? "border-red-300/40 text-red-300" : "border-accent-green/40 text-accent-green")}>
+                        {token.revoked_at ? t("apiSecurity.revoked") : t("apiSecurity.active")}
+                      </span>
+                      {!token.revoked_at && (
+                        <button
+                          onClick={async () => {
+                            await api.revokeApiToken(token.id);
+                            await refreshApiGovernancePanels();
+                          }}
+                          className="text-xs px-2 py-0.5 rounded border border-surface-border hover:bg-surface-hover"
+                        >
+                          {t("apiSecurity.revoke")}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <p className="mt-1">{t("apiSecurity.scopesLabel", { scopes: token.scopes.join(", ") || t("apiSecurity.none") })}</p>
+                  <p>{t("apiSecurity.createdAt", { value: new Date(token.created_at).toLocaleString() })}</p>
+                  {token.last_used_at && <p>{t("apiSecurity.lastUsedAt", { value: new Date(token.last_used_at).toLocaleString() })}</p>}
+                </div>
+              ))}
+              {apiTokens.length === 0 && <p className="text-xs text-text-muted">{t("apiSecurity.noTokens")}</p>}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-xs text-text-secondary">{t("apiSecurity.auditLog")}</p>
+            <div className="max-h-48 overflow-y-auto space-y-1">
+              {apiAuditLogs.map((entry) => (
+                <div key={entry.id} className="rounded-lg border border-surface-border px-3 py-2 text-xs text-text-muted">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-text-primary">{entry.method} {entry.endpoint}</span>
+                    <span className={clsx(
+                      "px-1.5 py-0.5 rounded-full border",
+                      entry.status_code >= 400 ? "border-red-300/40 text-red-300" : "border-accent-green/40 text-accent-green"
+                    )}>
+                      {entry.status_code}
+                    </span>
+                  </div>
+                  <p>{t("apiSecurity.client", { value: entry.client_id || t("apiSecurity.none") })}</p>
+                  <p>{t("apiSecurity.time", { value: new Date(entry.occurred_at).toLocaleString() })}</p>
+                  <p>{t("apiSecurity.detail", { value: entry.detail })}</p>
+                </div>
+              ))}
+              {apiAuditLogs.length === 0 && <p className="text-xs text-text-muted">{t("apiSecurity.noAuditLogs")}</p>}
+            </div>
+          </div>
+
+          {apiGovernanceMessage && (
+            <p className="text-xs text-accent-blue">{apiGovernanceMessage}</p>
           )}
         </div>
       </Section>

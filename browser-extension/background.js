@@ -233,13 +233,39 @@ function normalizeTab(tab) {
   if (!/^https?:/i.test(tab.url)) return null;   // skip chrome://, about:, etc.
 
   let host = "";
+  let path = "";
+  let query = "";
+  let hash = "";
+  let protocol = "";
   try { host = new URL(tab.url).host; } catch { host = ""; }
+  try {
+    const parsed = new URL(tab.url);
+    path = parsed.pathname || "";
+    query = parsed.search || "";
+    hash = parsed.hash || "";
+    protocol = parsed.protocol || "";
+  } catch {
+    path = "";
+    query = "";
+    hash = "";
+    protocol = "";
+  }
 
   return {
     tabId: tab.id,
+    windowId: tab.windowId,
     url: tab.url,
     title: tab.title || host || t("untitledTab"),
     host,
+    path,
+    query,
+    hash,
+    protocol,
+    incognito: Boolean(tab.incognito),
+    pinned: Boolean(tab.pinned),
+    audible: Boolean(tab.audible),
+    muted: Boolean(tab.mutedInfo?.muted),
+    discarded: Boolean(tab.discarded),
     favIconUrl: tab.favIconUrl || "",
   };
 }
@@ -285,6 +311,17 @@ async function syncSessionToDesktop(session) {
       ended_at: new Date(session.endedAt).toISOString(),
       duration_seconds: Math.max(0, Math.round((session.durationMs || 0) / 1000)),
       locale: session.locale || getLocale(),
+      window_id: Number.isFinite(session.windowId) ? session.windowId : null,
+      tab_id: Number.isFinite(session.tabId) ? session.tabId : null,
+      path: session.path || "",
+      query: session.query || "",
+      hash: session.hash || "",
+      protocol: session.protocol || "",
+      incognito: Boolean(session.incognito),
+      pinned: Boolean(session.pinned),
+      audible: Boolean(session.audible),
+      muted: Boolean(session.muted),
+      discarded: Boolean(session.discarded),
     });
 
     const headers = {

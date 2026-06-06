@@ -100,11 +100,28 @@ Current channel methods:
 - `getTodayAppTotals()`
 - `getAppTotalsInRange(startDate, endDate)`
 - `getCategoryTotalsInRange(startDate, endDate)`
+- `getHourlyForDate(date)`
+- `getRecentDailyTotalsRange(startDate, endDate)`
+- `getAppCategoryMap()`
 - `onActiveWindowChanged(callback)`
+- `getTodos()`
+- `addTodo(content)`
+- `toggleTodo(id)`
+- `deleteTodo(id)`
+- `setFocusModeActive(active)`
+- `setMonitoringActive(active)`
+- `getUsageGoals()`
+- `listFocusSessions(startAt?, endAt?)`
 
 ## Permissions Model (Prototype)
 
-Manifest permissions are discoverable in registry metadata. In this milestone, permission strings are not fully enforced yet; they are designed for upcoming install-time authorization UI.
+Manifest permissions are surfaced in registry metadata and are enforced at runtime:
+
+- Add flow shows install-time authorization UI for third-party widgets.
+- Un-granted permissions are blocked by channel method interception.
+- Permission usage writes `last_access_at` for the permission matrix.
+- Widget Center permission matrix supports revoke-all with secondary confirmation.
+- Permission grant/revoke operations are written to an audit timeline (`actor`, `occurred_at`, `action`).
 
 Recommended strings:
 

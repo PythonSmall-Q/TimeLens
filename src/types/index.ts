@@ -141,6 +141,24 @@ export interface WidgetRegistryResponse {
   errors: WidgetRegistryLoadError[];
 }
 
+export interface WidgetPermissionEntry {
+  permission: string;
+  capability: "read_metrics" | "write_data" | "automation_trigger" | "local_api_call" | string;
+  risk_label: "low" | "medium" | "high" | string;
+  granted_at: string;
+  last_access_at: string | null;
+}
+
+export interface WidgetPermissionAuditEntry {
+  id: number;
+  widget_id: string;
+  permission: string;
+  action: "grant" | "revoke" | string;
+  actor: string;
+  occurred_at: string;
+  detail: string;
+}
+
 export type DesktopPetStateKey = "idle" | "focus" | "rest";
 
 export interface DesktopPetPackState {
@@ -219,6 +237,13 @@ export interface BrowserExtensionStatus {
   last_locale: string | null;
   recent_session_count: number;
   recent_sessions: BrowserSession[];
+}
+
+export interface BrowserHourDomainStats {
+  host: string;
+  total_seconds: number;
+  visit_count: number;
+  last_visited_at: string;
 }
 
 export interface InstallChannelInfo {
@@ -412,4 +437,65 @@ export interface InterruptionPeriod {
   hour: number;
   switch_count: number;
   fragment_score: number;
+}
+
+export interface FocusWindowSuggestion {
+  start_hour: number;
+  end_hour: number;
+  confidence: number;
+  reason: string;
+}
+
+export interface GoalAdjustmentSuggestion {
+  goal_id: number;
+  scope_type: string;
+  scope_value: string;
+  recommendation: "increase_target" | "decrease_target" | "keep_target" | string;
+  reason: string;
+}
+
+export interface UsageAnomalyMarker {
+  date: string;
+  current_seconds: number;
+  baseline_seconds: number;
+  delta_seconds: number;
+  delta_ratio: number;
+  direction: "spike" | "drop" | string;
+  reason: string;
+}
+
+export interface ApiTokenMetadata {
+  id: string;
+  label: string;
+  scopes: string[];
+  created_at: string;
+  expires_at: string | null;
+  revoked_at: string | null;
+  last_used_at: string | null;
+  last_client_id: string | null;
+}
+
+export interface IssuedApiToken {
+  id: string;
+  token: string;
+  label: string;
+  scopes: string[];
+  created_at: string;
+  expires_at: string | null;
+}
+
+export interface ApiAuditLogEntry {
+  id: number;
+  occurred_at: string;
+  client_id: string;
+  endpoint: string;
+  method: string;
+  status_code: number;
+  detail: string;
+}
+
+export interface LocalApiSecuritySettings {
+  token_required: boolean;
+  allowlist_enforced: boolean;
+  rate_limit_per_min: number;
 }

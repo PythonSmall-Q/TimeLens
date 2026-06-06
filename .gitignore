@@ -51,3 +51,4 @@ browser-extension.zip
 src-tauri/windows/msix-staging/timelens.exe
 vscode-extension/timelens-vscode-extension-0.1.0.vsix
 src-tauri/windows/msix-staging/timelens.exe
+src-tauri/target-check/

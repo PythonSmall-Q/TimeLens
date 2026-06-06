@@ -157,4 +157,4 @@ TimeLens/
 
 ## 📄 许可证
 
-MIT © 2024 TimeLens Contributors
+MIT © 2026 TimeLens Contributors

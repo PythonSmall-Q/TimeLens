@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Target, Trash2, Plus, Edit2, Check, X } from "lucide-react";
 import * as api from "@/services/tauriApi";
 import ExePickerInput from "@/components/ExePickerInput";
+import AsyncStateCard from "@/components/AsyncStateCard";
 import type { AppCategoryRule, ExecutableOption, UsageGoal } from "@/types";
 import clsx from "clsx";
 
@@ -384,9 +385,9 @@ export default function GoalsPage() {
 
       <div className="glass-card divide-y divide-surface-border">
         {loading ? (
-          <div className="p-6 text-center text-text-muted text-sm">{t("common:loading")}</div>
+          <AsyncStateCard variant="loading" title={t("common:loading")} compact />
         ) : goals.length === 0 ? (
-          <div className="p-6 text-center text-text-muted text-sm">{t("goals:noGoals")}</div>
+          <AsyncStateCard variant="empty" title={t("goals:noGoals")} compact />
         ) : (
           goals.map((goal) => (
             <GoalRow

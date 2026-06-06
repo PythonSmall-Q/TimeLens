@@ -1,14 +1,24 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Clock, List, Timer, ExternalLink, Trash2, Plus, StickyNote, Activity,
   Layers, Puzzle, FolderOpen, ShieldCheck, PawPrint, Ruler, Upload,
 } from "lucide-react";
 import { useWidgetStore } from "@/stores/widgetStore";
-import type { DesktopPetPackManifest, WidgetConfig, WidgetRegistryItem, WidgetRegistryLoadError } from "@/types";
+import type {
+  DesktopPetPackManifest,
+  WidgetConfig,
+  WidgetPermissionEntry,
+  WidgetPermissionAuditEntry,
+  WidgetRegistryItem,
+  WidgetRegistryLoadError,
+} from "@/types";
 import * as api from "@/services/tauriApi";
 import clsx from "clsx";
+import AsyncStateCard from "@/components/AsyncStateCard";
 import WidgetPermissionDialog from "./WidgetPermissionDialog";
+
+type InlineMessage = { kind: "ok" | "err"; text: string };
 
 const ICONS = {
   clock: Clock,
@@ -28,13 +38,27 @@ const TYPE_LABELS: Record<string, string> = {
   pet: "widgets:pet.title",
 };
 
-function WidgetCard({ config }: { config: WidgetConfig }) {
+function WidgetCard({
+  config,
+  permissionEntries,
+  permissionAuditEntries,
+  onPermissionsChanged,
+  onNotify,
+}: {
+  config: WidgetConfig;
+  permissionEntries: WidgetPermissionEntry[];
+  permissionAuditEntries: WidgetPermissionAuditEntry[];
+  onPermissionsChanged: () => void;
+  onNotify: (message: InlineMessage) => void;
+}) {
   const { t } = useTranslation("widgets");
   const { openWidget, closeWidget, removeWidget, updateWidgetConfig } = useWidgetStore();
   const Icon = ICONS[config.widget_type as keyof typeof ICONS] ?? Clock;
   const petPackInputRef = useRef<HTMLInputElement | null>(null);
   const [petWidth, setPetWidth] = useState(String(Math.round(config.width)));
   const [petHeight, setPetHeight] = useState(String(Math.round(config.height)));
+  const [revokingPermissions, setRevokingPermissions] = useState(false);
+  const [confirmingRevoke, setConfirmingRevoke] = useState(false);
 
   useEffect(() => {
     setPetWidth(String(Math.round(config.width)));
@@ -77,6 +101,24 @@ function WidgetCard({ config }: { config: WidgetConfig }) {
       // Keep silent in the card itself; Widget Center already has visible import flow.
     } finally {
       event.target.value = "";
+    }
+  };
+
+  const handleRevokePermissions = async () => {
+    if (revokingPermissions) return;
+    const revokeCount = permissionEntries.length;
+    if (revokeCount <= 0) return;
+    setRevokingPermissions(true);
+    try {
+      await api.revokeAllWidgetPermissions(config.id, "widget-center");
+      onPermissionsChanged();
+      onNotify({ kind: "ok", text: t("permissionMatrix.revokeSuccess", { count: revokeCount }) });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      onNotify({ kind: "err", text: t("permissionMatrix.revokeError", { message }) });
+    } finally {
+      setRevokingPermissions(false);
+      setConfirmingRevoke(false);
     }
   };
 
@@ -184,6 +226,83 @@ function WidgetCard({ config }: { config: WidgetConfig }) {
           </div>
         </div>
       )}
+
+      {permissionEntries.length > 0 && (
+        <div className="mt-1 rounded-xl border border-surface-border bg-surface-hover/40 p-3 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[11px] font-semibold text-text-secondary uppercase tracking-wider">{t("permissionMatrix.title")}</p>
+            {!confirmingRevoke ? (
+              <button
+                onClick={() => setConfirmingRevoke(true)}
+                disabled={revokingPermissions}
+                className="text-[10px] px-2 py-1 rounded-md border border-surface-border text-text-muted hover:text-accent-red disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {revokingPermissions ? t("permissionMatrix.revoking") : t("permissionMatrix.revokeAll")}
+              </button>
+            ) : (
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={handleRevokePermissions}
+                  disabled={revokingPermissions}
+                  className="text-[10px] px-2 py-1 rounded-md border border-accent-red/30 text-accent-red hover:bg-accent-red/10 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {t("permissionMatrix.confirm")}
+                </button>
+                <button
+                  onClick={() => setConfirmingRevoke(false)}
+                  disabled={revokingPermissions}
+                  className="text-[10px] px-2 py-1 rounded-md border border-surface-border text-text-muted hover:text-text-primary disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {t("permissionMatrix.cancel")}
+                </button>
+              </div>
+            )}
+          </div>
+          {confirmingRevoke && (
+            <p className="text-[11px] text-yellow-600">{t("permissionMatrix.confirmRevokeHint")}</p>
+          )}
+          {permissionEntries.map((entry) => (
+            <div key={entry.permission} className="rounded-lg border border-surface-border px-2 py-1.5 text-[11px] text-text-muted">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-text-primary truncate">{entry.permission}</span>
+                <span className={clsx(
+                  "px-1.5 py-0.5 rounded-full border",
+                  entry.risk_label === "high" ? "border-red-300/40 text-red-300" : entry.risk_label === "medium" ? "border-yellow-300/40 text-yellow-300" : "border-accent-green/40 text-accent-green"
+                )}>
+                  {entry.risk_label}
+                </span>
+              </div>
+                  <p>{t("permissionMatrix.capability", { value: entry.capability })}</p>
+                  <p>{t("permissionMatrix.grantedAt", { value: new Date(entry.granted_at).toLocaleString() })}</p>
+                  <p>{t("permissionMatrix.lastAccessAt", { value: entry.last_access_at ? new Date(entry.last_access_at).toLocaleString() : t("permissionMatrix.never") })}</p>
+            </div>
+          ))}
+
+          <div className="pt-1">
+            <p className="text-[11px] font-semibold text-text-secondary uppercase tracking-wider mb-1.5">
+              {t("permissionMatrix.timelineTitle")}
+            </p>
+            {permissionAuditEntries.length === 0 ? (
+              <p className="text-[11px] text-text-muted">{t("permissionMatrix.noAudit")}</p>
+            ) : (
+              <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                {permissionAuditEntries.slice(0, 20).map((entry) => (
+                  <div key={entry.id} className="rounded-lg border border-surface-border px-2 py-1.5 text-[11px] text-text-muted">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className={entry.action === "grant" ? "text-accent-green" : "text-accent-red"}>
+                        {entry.action === "grant" ? t("permissionMatrix.actionGrant") : t("permissionMatrix.actionRevoke")}
+                      </span>
+                      <span>{new Date(entry.occurred_at).toLocaleString()}</span>
+                    </div>
+                    <p className="text-text-primary truncate" title={entry.permission}>{entry.permission}</p>
+                    <p>{t("permissionMatrix.actor", { value: entry.actor || "system" })}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -285,6 +404,8 @@ export default function WidgetCenter() {
   const [tab, setTab] = useState<"mine" | "selfAdd">("mine");
   const [registryItems, setRegistryItems] = useState<WidgetRegistryItem[]>([]);
   const [registryErrors, setRegistryErrors] = useState<WidgetRegistryLoadError[]>([]);
+  const [permissionMatrixByWidget, setPermissionMatrixByWidget] = useState<Record<string, WidgetPermissionEntry[]>>({});
+  const [permissionAuditByWidget, setPermissionAuditByWidget] = useState<Record<string, WidgetPermissionAuditEntry[]>>({});
 
   // Permission dialog state
   const [permDialog, setPermDialog] = useState<{
@@ -294,7 +415,25 @@ export default function WidgetCenter() {
   }>({ open: false, widgetType: "", permissions: [] });
 
   // Import feedback
-  const [importMsg, setImportMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+  const [importMsg, setImportMsg] = useState<InlineMessage | null>(null);
+
+  const refreshPermissionData = useCallback(async () => {
+    const rows = await Promise.all(
+      widgets.map(async (w) => {
+        try {
+          const [entries, audits] = await Promise.all([
+            api.getWidgetPermissionMatrix(w.id),
+            api.getWidgetPermissionAuditLog(w.id, 50),
+          ]);
+          return [w.id, entries, audits] as [string, WidgetPermissionEntry[], WidgetPermissionAuditEntry[]];
+        } catch {
+          return [w.id, [], []] as [string, WidgetPermissionEntry[], WidgetPermissionAuditEntry[]];
+        }
+      })
+    );
+    setPermissionMatrixByWidget(Object.fromEntries(rows.map(([id, entries]) => [id, entries])));
+    setPermissionAuditByWidget(Object.fromEntries(rows.map(([id, , audits]) => [id, audits])));
+  }, [widgets]);
 
   const refreshRegistry = () => {
     api.getWidgetRegistry()
@@ -314,6 +453,25 @@ export default function WidgetCenter() {
     fetchWidgets();
     refreshRegistry();
   }, [fetchWidgets]);
+
+  useEffect(() => {
+    let disposed = false;
+    if (widgets.length === 0) {
+      setPermissionMatrixByWidget({});
+      setPermissionAuditByWidget({});
+      return;
+    }
+    void refreshPermissionData();
+    const timer = window.setInterval(() => {
+      if (!disposed) {
+        void refreshPermissionData();
+      }
+    }, 4000);
+    return () => {
+      disposed = true;
+      window.clearInterval(timer);
+    };
+  }, [widgets, refreshPermissionData]);
 
   const countByType = (type: string) =>
     widgets.filter((w) => w.widget_type === type).length;
@@ -353,17 +511,29 @@ export default function WidgetCenter() {
   const handlePermConfirm = async (granted: string[]) => {
     const { widgetType } = permDialog;
     setPermDialog({ open: false, widgetType: "", permissions: [] });
+
+    const beforeIds = new Set(
+      useWidgetStore
+        .getState()
+        .widgets
+        .filter((w) => w.widget_type === widgetType)
+        .map((w) => w.id)
+    );
+
     await createWidget(widgetType);
-    // After creation, find the newest widget of this type and set its permissions
-    const state = useWidgetStore.getState();
-    const newest = [...state.widgets]
-      .filter((w) => w.widget_type === widgetType)
-      .sort((a, b) => b.id.localeCompare(a.id))[0];
-    if (newest && granted.length > 0) {
+
+    // Only bind permissions to the newly created widget instance.
+    const created = useWidgetStore
+      .getState()
+      .widgets
+      .find((w) => w.widget_type === widgetType && !beforeIds.has(w.id));
+
+    if (created && granted.length > 0) {
       try {
-        await api.setWidgetPermissions(newest.id, granted);
+        await api.setWidgetPermissions(created.id, granted, "widget-center");
       } catch (_) { /* non-fatal */ }
     }
+    void refreshPermissionData();
     setTab("mine");
   };
 
@@ -432,19 +602,21 @@ export default function WidgetCenter() {
       {tab === "mine" && (
         <>
           {loading && (
-            <p className="text-text-muted text-sm text-center py-6">Loading…</p>
+            <AsyncStateCard variant="loading" title={t("loading")} compact />
           )}
           {!loading && widgets.length === 0 && (
-            <div className="glass-card p-10 text-center space-y-2">
-              <Layers size={32} className="mx-auto text-text-muted opacity-40" />
-              <p className="text-text-secondary text-sm font-medium">{t("noWidgets")}</p>
-              <button
-                onClick={() => setTab("selfAdd")}
-                className="mt-2 text-xs text-accent-blue underline underline-offset-2"
-              >
-                {t("selfAdd")} →
-              </button>
-            </div>
+            <AsyncStateCard
+              variant="empty"
+              title={t("noWidgets")}
+              action={(
+                <button
+                  onClick={() => setTab("selfAdd")}
+                  className="text-xs text-accent-blue underline underline-offset-2"
+                >
+                  {t("selfAdd")} →
+                </button>
+              )}
+            />
           )}
           {!loading && widgets.length > 0 && (
             <div className="flex justify-end">
@@ -462,7 +634,19 @@ export default function WidgetCenter() {
               widgets.length === 1 ? "grid-cols-1" : "grid-cols-2"
             )}>
               {widgets.map((w) => (
-                <WidgetCard key={w.id} config={w} />
+                <WidgetCard
+                  key={w.id}
+                  config={w}
+                  permissionEntries={permissionMatrixByWidget[w.id] ?? []}
+                  permissionAuditEntries={permissionAuditByWidget[w.id] ?? []}
+                  onPermissionsChanged={() => {
+                    void refreshPermissionData();
+                  }}
+                  onNotify={(message) => {
+                    setImportMsg(message);
+                    setTimeout(() => setImportMsg(null), 4000);
+                  }}
+                />
               ))}
             </div>
           )}
@@ -518,10 +702,7 @@ export default function WidgetCenter() {
             </div>
 
             {thirdPartyEntries.length === 0 && (
-              <div className="glass-card p-6 text-center text-text-muted text-xs space-y-1">
-                <Puzzle size={24} className="mx-auto opacity-30" />
-                <p>{t("thirdParty.noWidgets")}</p>
-              </div>
+              <AsyncStateCard variant="empty" title={t("thirdParty.noWidgets")} compact />
             )}
             <div className="space-y-3">
               {thirdPartyEntries.map(({ type, icon, description, title, source, permissions }) => (

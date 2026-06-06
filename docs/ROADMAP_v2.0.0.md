@@ -1,6 +1,11 @@
 # TimeLens Roadmap to v2.0.0 (Local-First)
 
-Last updated: 2026-05-10
+Last updated: 2026-06-06
+
+## Canonical Source
+
+This file is the single source of truth for the TimeLens local-first roadmap.
+Legacy planning notes from `docs/ROADMAP_FROM_1.4.3.md` are merged into the post-v2.0 outlook section in this document.
 
 ## Vision
 
@@ -253,6 +258,32 @@ Target window: 2027 Q1
 - Migration from supported 1.x versions passes integrity checks.
 - End-to-end privacy checklist is publicly documented.
 
+## Post-v2.0 Outlook (Merged)
+
+### v2.2.0 (2026 Q3) - Widget Workflow Expansion
+
+- Upgrade Widget Center into a high-frequency workflow entry surface.
+- Add scenario presets and one-click layout switching.
+- Add widget performance observability with local fallback strategies.
+
+### v2.4.0 (2026 Q4) - Focus and Goal Execution
+
+- Convert insights into executable daily plans.
+- Add goal coaching, session review summaries, and anti-distraction policies.
+- Expand official workflow widgets for planning and review loops.
+
+### v2.6.0 (2027 Q1) - Developer Ecosystem and Governance
+
+- Improve third-party widget developer workflow with SDK and local debugging.
+- Strengthen permission governance and localhost API auditing.
+- Introduce widget quality scoring for startup, stability, and resource usage.
+
+### v3.0.0 (2027 Q2) - Local-First Productivity Platform
+
+- Complete the loop of insight, planning, execution, and reflection.
+- Expand local automation and long-term data lifecycle controls.
+- Finish accessibility and localization quality coverage.
+
 ## Governance and Decision Rules
 
 - Any new feature proposal must include a local-first data flow design.
@@ -279,5 +310,4 @@ Target window: 2027 Q1
 ## Communication Plan
 
 - Publish roadmap updates every minor release.
-- Mark each item with status: Planned, In Progress, Completed, Deferred.
 - Keep changelog and roadmap cross-referenced for traceability.

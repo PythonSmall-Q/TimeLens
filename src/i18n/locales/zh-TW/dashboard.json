@@ -12,6 +12,14 @@
   "periodMonth": "月",
   "avgDailyUsage": "平均單日使用時長（{{mode}}）",
   "weeklyCompare": "與上周相比",
+  "whatChangedTitle": "近期變化摘要",
+  "whatChangedDelta": "總變化：{{sign}}{{value}}",
+  "whatChangedTopIncrease": "增長最多",
+  "whatChangedTopDecrease": "下降最多",
+  "whatChangedNewApps": "新增活躍應用程式",
+  "whatChangedStoppedApps": "不再活躍應用程式",
+  "openTopIncreaseCategory": "在分類頁打開增長最多應用程式",
+  "openRangeInBrowser": "在瀏覽器使用頁打開該時間範圍",
   "screenTime": "屏幕時間",
   "noActivity": "今日暫無記錄",
   "activeFor": "已活躍 {{duration}}",
@@ -97,5 +105,62 @@
   "trackingLevel_basic": "基礎",
   "trackingLevel_standard": "標準",
   "trackingLevel_detailed": "詳細",
-  "trackingLevelHidden": "目前記錄級別未采集此資料"
+  "trackingLevelHidden": "目前記錄級別未采集此資料",
+  "insightWorkspace": {
+    "title": "深度洞察中心",
+    "subtitle": "{{mode}}敘事視圖",
+    "loading": "正在產生本機洞察...",
+    "dailyReviewTitle": "每日復盤",
+    "dailySpike": "相較基線，使用時長約上升 {{ratio}}%。",
+    "dailyDrop": "相較基線，使用時長約下降 {{ratio}}%。",
+    "dailyStable": "今日沒有明顯異常，行為位於基線範圍內。",
+    "baseline": "目前：{{current}} | 基線：{{baseline}}",
+    "weeklyReflectionTitle": "週反思",
+    "bestFocusWindow": "最佳專注時段通常在 {{start}} - {{end}}。",
+    "confidence": "信心值：{{value}}%",
+    "notEnoughData": "本機歷史資料不足，暫無法推斷穩定模式。",
+    "goalHealthTitle": "目標健康",
+    "scope": "範圍：{{scopeType}} / {{scopeValue}}",
+    "noGoals": "暫無活躍目標。",
+    "goalRecommendation": {
+      "increase": "目前目標可能偏容易，建議適度提高。",
+      "decrease": "目前目標可能偏困難，建議適度下調。",
+      "keep": "目前目標較為平衡，建議維持。"
+    }
+  },
+  "timeline": {
+    "title": "統一時間線",
+    "range": "範圍：{{start}} 至 {{end}}",
+    "loading": "正在載入時間線...",
+    "empty": "此範圍內暫無時間線記錄。",
+    "searchPlaceholder": "搜尋時間線...",
+    "openDetail": "查看詳情",
+    "focusSession": "桌面專注會話",
+    "focusSessionDetail": "觸發：{{trigger}} | 原因：{{reason}} | 時長：{{duration}}",
+    "browserSession": "瀏覽器會話",
+    "browserSessionDetail": "網域：{{host}} | 時長：{{duration}}",
+    "interruptionMarker": "中斷標記",
+    "interruptionDetail": "切換次數：{{count}} | 碎片分：{{score}}",
+    "filter": {
+      "all": "全部",
+      "desktop": "桌面",
+      "browser": "瀏覽器",
+      "interrupt": "中斷"
+    }
+  },
+  "timelineDetail": {
+    "timeWindow": "時間視窗",
+    "fragmentScore": "碎片分",
+    "sameDayHours": "同日中斷時段",
+    "topAppsInHour": "該小時高頻應用程式",
+    "topDomainsInHour": "該小時高頻網域",
+    "noAppDataInHour": "該小時暫無可用應用程式明細",
+    "noDomainDataInHour": "該小時暫無可用網域明細"
+  },
+  "insightFilters": {
+    "day": "日預設",
+    "week": "週預設",
+    "month": "月預設",
+    "backToToday": "一鍵回到今天"
+  }
 }

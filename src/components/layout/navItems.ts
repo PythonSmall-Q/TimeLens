@@ -8,10 +8,12 @@ import {
   Focus,
   Globe,
   Code2,
+  Sparkles,
 } from "lucide-react";
 
 export const NAV_ITEMS = [
   { to: "/dashboard", icon: LayoutDashboard, labelKey: "dashboard:title" },
+  { to: "/dashboard-insights", icon: Sparkles, labelKey: "dashboard:insightWorkspace.title" },
   { to: "/widgets", icon: Layers, labelKey: "widgets:widgetCenter" },
   { to: "/limits", icon: Bell, labelKey: "limits:title" },
   { to: "/browser", icon: Globe, labelKey: "browserUsage:title" },

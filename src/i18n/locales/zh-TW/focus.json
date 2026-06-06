@@ -9,5 +9,23 @@
   "history": "會話歷史",
   "noHistory": "暫無已完成的會話",
   "triggerManual": "手動觸發",
-  "triggerAuto": "自動觸發"
+  "triggerAuto": "自動觸發",
+  "automation": {
+    "title": "規則自動化",
+    "hint": "建立本機規則，用於模擬專注會話自動觸發。",
+    "ruleNamePlaceholder": "規則名稱（例如：晨間深度工作）",
+    "minRecentFocus": "近 7 天最少專注分鐘",
+    "addRule": "新增規則",
+    "empty": "尚無自動化規則。",
+    "ruleMeta": "{{start}} - {{end}} | 近期門檻：{{min}}分",
+    "enabled": "已啟用",
+    "disabledShort": "已停用",
+    "disabled": "規則已停用。",
+    "simulate": "模擬",
+    "applyNow": "立即套用",
+    "outOfWindow": "目前時間不在規則時段內（{{start}} - {{end}}）。",
+    "notEnoughFocus": "近期專注 {{recent}} 分，低於要求 {{required}} 分。",
+    "alreadyActive": "規則已匹配，且專注模式已啟用。",
+    "readyToStart": "規則已匹配，可立即開始專注會話。"
+  }
 }

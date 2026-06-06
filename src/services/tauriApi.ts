@@ -20,6 +20,7 @@ import type {
   ActiveWindowInfo,
   AppSettingsPayload,
   BrowserExtensionStatus,
+  BrowserHourDomainStats,
   BrowserDomainStats,
   BrowserDomainLimit,
   VsCodeLanguageStats,
@@ -41,6 +42,15 @@ import type {
   WidgetRegistryItem,
   ProductivityScore,
   InterruptionPeriod,
+  FocusWindowSuggestion,
+  GoalAdjustmentSuggestion,
+  UsageAnomalyMarker,
+  ApiTokenMetadata,
+  IssuedApiToken,
+  ApiAuditLogEntry,
+  LocalApiSecuritySettings,
+  WidgetPermissionEntry,
+  WidgetPermissionAuditEntry,
 } from "@/types";
 
 const LOCAL_API_BASE_URL = "http://127.0.0.1:49152";
@@ -400,6 +410,13 @@ export const getBrowserDomainStats = (
 ): Promise<BrowserDomainStats[]> =>
   invoke("get_browser_domain_stats", { startDate, endDate });
 
+export const getBrowserDomainStatsForHour = (
+  date: string,
+  hour: number,
+  limit = 5
+): Promise<BrowserHourDomainStats[]> =>
+  invoke("get_browser_domain_stats_for_hour", { date, hour, limit });
+
 export const getBrowserIgnoredDomains = (): Promise<string[]> =>
   invoke("get_browser_ignored_domains");
 
@@ -435,11 +452,30 @@ export const getAppCategoryMap = (): Promise<Record<string, string>> =>
 export const getWidgetPermissions = (widgetId: string): Promise<string[]> =>
   invoke("get_widget_permissions", { widgetId });
 
-export const setWidgetPermissions = (widgetId: string, permissions: string[]): Promise<void> =>
-  invoke("set_widget_permissions", { widgetId, permissions });
+export const setWidgetPermissions = (
+  widgetId: string,
+  permissions: string[],
+  actor?: string
+): Promise<void> =>
+  invoke("set_widget_permissions", { widgetId, permissions, actor });
 
-export const revokeAllWidgetPermissions = (widgetId: string): Promise<void> =>
-  invoke("revoke_all_widget_permissions", { widgetId });
+export const getWidgetPermissionMatrix = (widgetId: string): Promise<WidgetPermissionEntry[]> =>
+  invoke("get_widget_permission_matrix", { widgetId });
+
+export const getWidgetPermissionAuditLog = (
+  widgetId: string,
+  limit = 50
+): Promise<WidgetPermissionAuditEntry[]> =>
+  invoke("get_widget_permission_audit_log", { widgetId, limit });
+
+export const recordWidgetPermissionAccess = (
+  widgetId: string,
+  permission: string
+): Promise<void> =>
+  invoke("record_widget_permission_access", { widgetId, permission });
+
+export const revokeAllWidgetPermissions = (widgetId: string, actor?: string): Promise<void> =>
+  invoke("revoke_all_widget_permissions", { widgetId, actor });
 
 export const importLocalWidget = (srcDir: string): Promise<WidgetRegistryItem> =>
   invoke("import_local_widget", { srcDir });
@@ -454,6 +490,18 @@ export const getProductivityScoreRange = (startDate: string, endDate: string): P
 
 export const getInterruptionPeriods = (date: string): Promise<InterruptionPeriod[]> =>
   invoke("get_interruption_periods", { date });
+
+export const suggestFocusWindows = (lookbackDays?: number): Promise<FocusWindowSuggestion[]> =>
+  invoke("suggest_focus_windows", { lookbackDays });
+
+export const suggestGoalAdjustments = (): Promise<GoalAdjustmentSuggestion[]> =>
+  invoke("suggest_goal_adjustments");
+
+export const detectUsageAnomalies = (
+  date: string,
+  baselineDays?: number
+): Promise<UsageAnomalyMarker[]> =>
+  invoke("detect_usage_anomalies", { date, baselineDays });
 
 // ── VS Code local API channel ────────────────────────────────
 
@@ -509,3 +557,48 @@ export const getExtensionBridgeKey = (): Promise<string> =>
 
 export const rotateExtensionBridgeKey = (): Promise<string> =>
   invoke<string>("rotate_extension_bridge_key");
+
+export const issueApiToken = (
+  label: string,
+  scopes: string[],
+  expiresAt?: string
+): Promise<IssuedApiToken> =>
+  invoke("issue_api_token", { label, scopes, expiresAt });
+
+export const rotateApiToken = (
+  tokenId: string,
+  expiresAt?: string
+): Promise<IssuedApiToken> =>
+  invoke("rotate_api_token", { tokenId, expiresAt });
+
+export const revokeApiToken = (tokenId: string): Promise<void> =>
+  invoke("revoke_api_token", { tokenId });
+
+export const listApiTokens = (): Promise<ApiTokenMetadata[]> =>
+  invoke("list_api_tokens");
+
+export const getApiAuditLog = (
+  limit = 100,
+  offset = 0,
+  clientId?: string,
+  endpoint?: string
+): Promise<ApiAuditLogEntry[]> =>
+  invoke("get_api_audit_log", { limit, offset, clientId, endpoint });
+
+export const getApiClientAllowlist = (): Promise<string[]> =>
+  invoke("get_api_client_allowlist");
+
+export const setApiClientAllowlist = (clientIds: string[]): Promise<void> =>
+  invoke("set_api_client_allowlist", { clientIds });
+
+export const getLocalApiSecuritySettings = (): Promise<LocalApiSecuritySettings> =>
+  invoke("get_local_api_security_settings");
+
+export const setLocalApiSecuritySettings = (
+  patch: Partial<LocalApiSecuritySettings>
+): Promise<void> =>
+  invoke("set_local_api_security_settings", {
+    tokenRequired: patch.token_required,
+    allowlistEnforced: patch.allowlist_enforced,
+    rateLimitPerMin: patch.rate_limit_per_min,
+  });

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ShieldCheck, X } from "lucide-react";
 
@@ -29,6 +29,12 @@ export default function WidgetPermissionDialog({
   const [checked, setChecked] = useState<Set<string>>(
     new Set(requestedPermissions)
   );
+
+  useEffect(() => {
+    if (open) {
+      setChecked(new Set(requestedPermissions));
+    }
+  }, [open, requestedPermissions, widgetType]);
 
   if (!open) return null;
 

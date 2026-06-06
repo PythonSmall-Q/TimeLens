@@ -1,10 +1,12 @@
 import { useEffect, useState, useCallback } from "react";
 import { useTranslation } from "react-i18next";
+import { useSearchParams } from "react-router-dom";
 import { Tag, Trash2, Wand2, Plus } from "lucide-react";
 import * as api from "@/services/tauriApi";
 import type { AppCategoryRule, CategorySuggestion, ExecutableOption } from "@/types";
 import clsx from "clsx";
 import ExePickerInput from "@/components/ExePickerInput";
+import AsyncStateCard from "@/components/AsyncStateCard";
 
 const PRESET_CATEGORIES = [
   "Work", "Social", "Entertainment", "Development", "Productivity",
@@ -38,6 +40,7 @@ interface RuleWithSuggestion extends AppCategoryRule {
 
 export default function CategoriesPage() {
   const { t } = useTranslation(["categories", "common"]);
+  const [searchParams] = useSearchParams();
   const [rules, setRules] = useState<RuleWithSuggestion[]>([]);
   const [loading, setLoading] = useState(true);
   const [recentApps, setRecentApps] = useState<ExecutableOption[]>([]);
@@ -46,6 +49,7 @@ export default function CategoriesPage() {
   const [newCategory, setNewCategory] = useState(PRESET_CATEGORIES[0]);
   const [saving, setSaving] = useState(false);
   const [suggestions, setSuggestions] = useState<Record<string, CategorySuggestion>>({});
+  const [drilldownHint, setDrilldownHint] = useState<string | null>(null);
 
   const loadRules = useCallback(async () => {
     setLoading(true);
@@ -62,6 +66,28 @@ export default function CategoriesPage() {
   }, []);
 
   useEffect(() => { loadRules(); }, [loadRules]);
+
+  useEffect(() => {
+    const appName = searchParams.get("appName") ?? "";
+    const exePath = searchParams.get("exePath") ?? "";
+    const category = searchParams.get("category") ?? "";
+
+    if (appName || exePath) {
+      setNewAppInputValue(appName || exePath);
+      if (exePath) {
+        setNewApp({ app_name: appName || exePath, exe_path: exePath });
+      }
+      setDrilldownHint(
+        t("categories:drilldownHint", {
+          app: appName || exePath,
+        })
+      );
+    }
+
+    if (category && PRESET_CATEGORIES.includes(category)) {
+      setNewCategory(category);
+    }
+  }, [searchParams, t]);
 
   const fetchSuggestion = async (appName: string, exePath: string) => {
     if (suggestions[exePath]) return;
@@ -120,6 +146,11 @@ export default function CategoriesPage() {
       {/* Add rule */}
       <div className="glass-card p-4 space-y-3">
         <h2 className="text-sm font-semibold text-text-primary">{t("categories:addRule")}</h2>
+        {drilldownHint && (
+          <p className="text-xs text-accent-blue bg-accent-blue/10 border border-accent-blue/20 rounded-lg px-2.5 py-1.5">
+            {drilldownHint}
+          </p>
+        )}
         <div className="flex gap-2">
           <ExePickerInput
             options={recentApps}
@@ -158,9 +189,9 @@ export default function CategoriesPage() {
       {/* Rules list */}
       <div className="glass-card divide-y divide-surface-border">
         {loading ? (
-          <div className="p-6 text-center text-text-muted text-sm">{t("common:loading")}</div>
+          <AsyncStateCard variant="loading" title={t("common:loading")} compact />
         ) : rules.length === 0 ? (
-          <div className="p-6 text-center text-text-muted text-sm">{t("categories:noRules")}</div>
+          <AsyncStateCard variant="empty" title={t("categories:noRules")} compact />
         ) : (
           rules.map((rule) => {
             const suggestion = suggestions[rule.exe_path];

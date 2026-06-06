@@ -9,5 +9,23 @@
   "history": "Session History",
   "noHistory": "No completed sessions yet",
   "triggerManual": "Manual",
-  "triggerAuto": "Auto-triggered"
+  "triggerAuto": "Auto-triggered",
+  "automation": {
+    "title": "Rule Automation",
+    "hint": "Create local rules to simulate auto-start behavior for focus sessions.",
+    "ruleNamePlaceholder": "Rule name (e.g. Morning deep work)",
+    "minRecentFocus": "Min focus minutes in last 7 days",
+    "addRule": "Add rule",
+    "empty": "No automation rules yet.",
+    "ruleMeta": "{{start}} - {{end}} | min recent focus: {{min}}m",
+    "enabled": "Enabled",
+    "disabledShort": "Disabled",
+    "disabled": "Rule is disabled.",
+    "simulate": "Simulate",
+    "applyNow": "Apply now",
+    "outOfWindow": "Current time is outside the configured window ({{start}} - {{end}}).",
+    "notEnoughFocus": "Recent focus is {{recent}}m, below required {{required}}m.",
+    "alreadyActive": "Rule matches, and focus mode is already active.",
+    "readyToStart": "Rule matches. You can start a focus session now."
+  }
 }

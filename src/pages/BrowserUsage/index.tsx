@@ -1,13 +1,24 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useTranslation } from "react-i18next";
+import { useSearchParams } from "react-router-dom";
 import { Globe, Search, EyeOff, Eye, Bell, BellOff, Trash2, Check, X, Puzzle, Settings, RefreshCw } from "lucide-react";
 import * as api from "@/services/tauriApi";
 import type { BrowserDomainStats, BrowserDomainLimit, BrowserExtensionStatus } from "@/types";
 import { formatDuration } from "@/utils/format";
 import { todayString, daysAgo } from "@/utils/format";
 import clsx from "clsx";
+import AsyncStateCard from "@/components/AsyncStateCard";
 
-type DatePreset = "today" | "week" | "month" | "all";
+type DatePreset = "today" | "week" | "month" | "all" | "custom";
+const SAVED_VIEWS_KEY = "timelens.browserUsage.savedViews.v1";
+
+interface BrowserUsageSavedView {
+  id: string;
+  name: string;
+  startDate: string;
+  endDate: string;
+  createdAt: string;
+}
 
 // ── Limit edit inline form ────────────────────────────────────
 
@@ -213,8 +224,23 @@ function DomainRow({
 
 export default function BrowserUsage() {
   const { t } = useTranslation(["browserUsage", "common", "settings"]);
+  const [searchParams] = useSearchParams();
 
   const [preset, setPreset] = useState<DatePreset>("today");
+  const [customStartDate, setCustomStartDate] = useState(daysAgo(6));
+  const [customEndDate, setCustomEndDate] = useState(todayString());
+  const [viewName, setViewName] = useState("");
+  const [savedViews, setSavedViews] = useState<BrowserUsageSavedView[]>(() => {
+    try {
+      const raw = localStorage.getItem(SAVED_VIEWS_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw) as BrowserUsageSavedView[];
+      if (!Array.isArray(parsed)) return [];
+      return parsed.filter((v) => Boolean(v?.id && v?.name && v?.startDate && v?.endDate));
+    } catch {
+      return [];
+    }
+  });
   const [search, setSearch] = useState("");
   const [showIgnored, setShowIgnored] = useState(false);
 
@@ -228,14 +254,49 @@ export default function BrowserUsage() {
   const [browserExtensionStatus, setBrowserExtensionStatus] = useState<BrowserExtensionStatus | null>(null);
   const [showExtensionSettings, setShowExtensionSettings] = useState(false);
 
-  // Compute date range from preset
+  useEffect(() => {
+    const q = searchParams.get("q");
+    const presetFromQuery = searchParams.get("preset");
+    const start = searchParams.get("start");
+    const end = searchParams.get("end");
+
+    if (q) {
+      setSearch(q);
+    }
+
+    if (start || end) {
+      setPreset("custom");
+      setCustomStartDate(start ?? end ?? todayString());
+      setCustomEndDate(end ?? start ?? todayString());
+      return;
+    }
+
+    if (
+      presetFromQuery
+      && ["today", "week", "month", "all", "custom"].includes(presetFromQuery)
+    ) {
+      setPreset(presetFromQuery as DatePreset);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    localStorage.setItem(SAVED_VIEWS_KEY, JSON.stringify(savedViews));
+  }, [savedViews]);
+
+  // Compute date range from preset/custom range
   const { startDate, endDate } = useMemo(() => {
     const today = todayString();
+    if (preset === "custom") {
+      const start = customStartDate || today;
+      const end = customEndDate || today;
+      if (start <= end) return { startDate: start, endDate: end };
+      return { startDate: end, endDate: start };
+    }
     if (preset === "all") return { startDate: "1970-01-01", endDate: today };
     if (preset === "today") return { startDate: today, endDate: today };
     if (preset === "week") return { startDate: daysAgo(6), endDate: today };
     return { startDate: daysAgo(29), endDate: today };
-  }, [preset]);
+  }, [preset, customStartDate, customEndDate]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -330,7 +391,53 @@ export default function BrowserUsage() {
     setLimits((prev) => prev.filter((l) => l.host !== host));
   }, []);
 
-  const PRESETS: DatePreset[] = ["today", "week", "month", "all"];
+  const handleSaveView = useCallback(() => {
+    const name = viewName.trim();
+    if (!name) return;
+    const next: BrowserUsageSavedView = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      name,
+      startDate,
+      endDate,
+      createdAt: new Date().toISOString(),
+    };
+    setSavedViews((prev) => [next, ...prev].slice(0, 12));
+    setViewName("");
+  }, [viewName, startDate, endDate]);
+
+  const handleApplySavedView = useCallback((view: BrowserUsageSavedView) => {
+    setPreset("custom");
+    setCustomStartDate(view.startDate);
+    setCustomEndDate(view.endDate);
+    setSearch("");
+  }, []);
+
+  const handleDeleteSavedView = useCallback((id: string) => {
+    setSavedViews((prev) => prev.filter((v) => v.id !== id));
+  }, []);
+
+  const handlePresetChange = useCallback((next: DatePreset) => {
+    setPreset(next);
+    setEditingHost(null);
+    if (next !== "custom") {
+      setSearch("");
+      setViewName("");
+    }
+  }, []);
+
+  const handleSaveTodayView = useCallback(() => {
+    const today = todayString();
+    const next: BrowserUsageSavedView = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      name: `${t("browserUsage:today")} ${today}`,
+      startDate: today,
+      endDate: today,
+      createdAt: new Date().toISOString(),
+    };
+    setSavedViews((prev) => [next, ...prev].slice(0, 12));
+  }, [t]);
+
+  const PRESETS: DatePreset[] = ["today", "week", "month", "all", "custom"];
   const BROWSER_EXTENSION_DOWNLOAD_URL = "https://microsoftedge.microsoft.com/addons/detail/ggpfddncgjgicapbhiifkcffbfjcdcpi";
   const browserLinkPayload = JSON.stringify(
     {
@@ -383,7 +490,7 @@ export default function BrowserUsage() {
             {PRESETS.map((p) => (
               <button
                 key={p}
-                onClick={() => setPreset(p)}
+                onClick={() => handlePresetChange(p)}
                 className={clsx(
                   "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors",
                   preset === p
@@ -517,6 +624,102 @@ export default function BrowserUsage() {
       )}
 
       {/* Search + ignored toggle */}
+      <div className="glass-card p-4 space-y-3">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <h2 className="text-sm font-semibold text-text-primary">{t("browserUsage:savedViewsTitle")}</h2>
+          <p className="text-xs text-text-muted">
+            {t("browserUsage:rangeHint", { startDate, endDate })}
+          </p>
+        </div>
+        {preset === "custom" ? (
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_1.2fr_auto] gap-2">
+            <label className="text-xs text-text-secondary flex flex-col gap-1">
+              {t("browserUsage:customStart")}
+              <input
+                type="date"
+                value={customStartDate}
+                onChange={(e) => {
+                  setPreset("custom");
+                  setCustomStartDate(e.target.value);
+                }}
+                className="px-3 py-2 bg-surface-hover border border-surface-border rounded-xl text-text-primary outline-none focus:border-accent-blue"
+              />
+            </label>
+            <label className="text-xs text-text-secondary flex flex-col gap-1">
+              {t("browserUsage:customEnd")}
+              <input
+                type="date"
+                value={customEndDate}
+                onChange={(e) => {
+                  setPreset("custom");
+                  setCustomEndDate(e.target.value);
+                }}
+                className="px-3 py-2 bg-surface-hover border border-surface-border rounded-xl text-text-primary outline-none focus:border-accent-blue"
+              />
+            </label>
+            <label className="text-xs text-text-secondary flex flex-col gap-1">
+              {t("browserUsage:savedViewName")}
+              <input
+                type="text"
+                value={viewName}
+                onChange={(e) => setViewName(e.target.value)}
+                placeholder={t("browserUsage:savedViewNamePlaceholder")}
+                className="px-3 py-2 bg-surface-hover border border-surface-border rounded-xl text-text-primary placeholder:text-text-muted outline-none focus:border-accent-blue"
+              />
+            </label>
+            <div className="flex items-end">
+              <button
+                onClick={handleSaveView}
+                disabled={!viewName.trim()}
+                className="w-full px-3 py-2 rounded-xl border border-accent-blue/40 text-accent-blue text-xs font-medium hover:bg-accent-blue/10 transition-colors disabled:opacity-40"
+              >
+                {t("browserUsage:saveCurrentView")}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex justify-end">
+            <button
+              onClick={handleSaveTodayView}
+              className="px-3 py-2 rounded-xl border border-accent-blue/40 text-accent-blue text-xs font-medium hover:bg-accent-blue/10 transition-colors"
+            >
+              {t("browserUsage:saveTodayData")}
+            </button>
+          </div>
+        )}
+        <div className="flex items-center gap-2 flex-wrap">
+          {savedViews.length === 0 && (
+            <p className="text-xs text-text-muted">{t("browserUsage:noSavedViews")}</p>
+          )}
+          {savedViews.map((view) => (
+            <div
+              key={view.id}
+              className={clsx(
+                "inline-flex items-center gap-1 rounded-xl border px-2.5 py-1.5 text-xs",
+                view.startDate === startDate && view.endDate === endDate
+                  ? "border-accent-blue/50 text-accent-blue bg-accent-blue/10"
+                  : "border-surface-border text-text-secondary bg-surface-hover/40"
+              )}
+            >
+              <button
+                onClick={() => handleApplySavedView(view)}
+                className="hover:text-text-primary transition-colors"
+                title={t("browserUsage:applyView")}
+              >
+                {view.name}
+              </button>
+              <button
+                onClick={() => handleDeleteSavedView(view.id)}
+                className="text-text-muted hover:text-accent-red transition-colors"
+                title={t("browserUsage:deleteView")}
+              >
+                <X size={12} />
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+
       <div className="flex gap-3 items-center flex-wrap">
         <div className="relative flex-1 min-w-40">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
@@ -544,34 +747,23 @@ export default function BrowserUsage() {
 
       {/* Content */}
       {loading ? (
-        <div className="glass-card p-8 text-center text-text-muted text-sm">
-          {t("common:loading")}
-        </div>
+        <AsyncStateCard variant="loading" title={t("common:loading")} />
       ) : filteredStats.length === 0 ? (
-        <div className="glass-card p-10 text-center space-y-2">
-          <Globe size={32} className="mx-auto text-text-muted opacity-40" />
-          <p className="text-text-secondary text-sm font-medium">
-            {search ? t("browserUsage:noResults") : t("browserUsage:noBrowserData")}
-          </p>
-          {!search && (
-            <>
-              <p className="text-text-muted text-xs">{t("browserUsage:noBrowserDataHint")}</p>
-              <div className="flex items-center justify-center gap-2 flex-wrap">
-                <p className="text-accent-blue text-xs font-medium">
-                  {t("browserUsage:noBrowserDataEdgeAddon")}
-                </p>
-                <a
-                  href={BROWSER_EXTENSION_DOWNLOAD_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-3 py-1.5 rounded-lg text-xs font-medium border border-accent-blue/40 text-accent-blue hover:bg-accent-blue/10 transition-colors"
-                >
-                  {t("browserUsage:downloadEdgeAddon")}
-                </a>
-              </div>
-            </>
-          )}
-        </div>
+        <AsyncStateCard
+          variant="empty"
+          title={search ? t("browserUsage:noResults") : t("browserUsage:noBrowserData")}
+          hint={!search ? t("browserUsage:noBrowserDataHint") : undefined}
+          action={!search ? (
+            <a
+              href={BROWSER_EXTENSION_DOWNLOAD_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3 py-1.5 rounded-lg text-xs font-medium border border-accent-blue/40 text-accent-blue hover:bg-accent-blue/10 transition-colors"
+            >
+              {t("browserUsage:downloadEdgeAddon")}
+            </a>
+          ) : undefined}
+        />
       ) : (
         <div className="glass-card divide-y divide-surface-border">
           {filteredStats.map((stat) => (

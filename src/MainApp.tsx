@@ -17,6 +17,8 @@ import FocusMode from "./pages/FocusMode";
 import BrowserUsage from "./pages/BrowserUsage";
 import HomeCustomize from "./pages/HomeCustomize";
 import VsCodeInsights from "./pages/VsCodeInsights";
+import DashboardInsights from "./pages/DashboardInsights";
+import InterruptionDetail from "./pages/InterruptionDetail";
 import { useStatsStore } from "./stores/statsStore";
 import { useSettingsStore } from "./stores/settingsStore";
 import type { ActiveWindowInfo, AppLimit } from "./types";
@@ -29,6 +31,27 @@ import { APP_VERSION } from "./version";
 const CURRENT_VERSION = APP_VERSION;
 const LIMIT_WARNED_KEY = "timelens-limit-warned";
 const LIMIT_STORAGE_KEY = "timelens-app-limits";
+const NOTIFICATION_COOLDOWN_KEY = "timelens-notification-cooldown.v1";
+
+function parseHmToMinutes(hm: string): number | null {
+  const m = /^(\d{2}):(\d{2})$/.exec(hm);
+  if (!m) return null;
+  const h = Number(m[1]);
+  const mm = Number(m[2]);
+  if (h < 0 || h > 23 || mm < 0 || mm > 59) return null;
+  return h * 60 + mm;
+}
+
+function isWithinQuietHours(nowMinutes: number, startHm: string, endHm: string): boolean {
+  const start = parseHmToMinutes(startHm);
+  const end = parseHmToMinutes(endHm);
+  if (start === null || end === null) return false;
+  if (start === end) return true;
+  if (start < end) {
+    return nowMinutes >= start && nowMinutes < end;
+  }
+  return nowMinutes >= start || nowMinutes < end;
+}
 
 function normalizeExePath(path: string): string {
   return path.trim().toLowerCase().replace(/\//g, "\\");
@@ -57,7 +80,14 @@ export default function MainApp() {
     selectedDate,
     periodMode,
   } = useStatsStore();
-  const { setMonitoringActive, autoCheckUpdates } = useSettingsStore();
+  const {
+    setMonitoringActive,
+    autoCheckUpdates,
+    notificationQuietHoursEnabled,
+    notificationQuietStart,
+    notificationQuietEnd,
+    notificationCooldownMin,
+  } = useSettingsStore();
   const { t } = useTranslation(["common", "limits", "browserUsage"]);
 
   const [updateInfo, setUpdateInfo] = useState<{ version: string; notes: string; url: string } | null>(null);
@@ -71,7 +101,34 @@ export default function MainApp() {
 
   const notifyWithNavigate = useCallback(
     async (title: string, body: string, hash: string, alarm = false) => {
-      void hash;
+      const now = new Date();
+      const nowMinutes = now.getHours() * 60 + now.getMinutes();
+
+      if (
+        notificationQuietHoursEnabled
+        && isWithinQuietHours(nowMinutes, notificationQuietStart, notificationQuietEnd)
+      ) {
+        return;
+      }
+
+      const cooldownMs = Math.max(0, notificationCooldownMin) * 60_000;
+      if (cooldownMs > 0) {
+        const dedupeKey = `${hash}|${title}`;
+        try {
+          const raw = localStorage.getItem(NOTIFICATION_COOLDOWN_KEY);
+          const map = raw ? (JSON.parse(raw) as Record<string, number>) : {};
+          const lastTs = map[dedupeKey] ?? 0;
+          const nowTs = now.getTime();
+          if (nowTs - lastTs < cooldownMs) {
+            return;
+          }
+          map[dedupeKey] = nowTs;
+          localStorage.setItem(NOTIFICATION_COOLDOWN_KEY, JSON.stringify(map));
+        } catch {
+          // Ignore cooldown storage failures and continue with notifications.
+        }
+      }
+
       let permission = "default";
       try {
         permission = (await isPermissionGranted()) ? "granted" : await requestPermission();
@@ -90,7 +147,7 @@ export default function MainApp() {
         }
       }
     },
-    []
+    [notificationCooldownMin, notificationQuietEnd, notificationQuietHoursEnabled, notificationQuietStart]
   );
 
   const toggleWidgetsVisibility = useCallback(async () => {
@@ -366,15 +423,17 @@ export default function MainApp() {
         <Routes>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/dashboard-insights" element={<DashboardInsights />} />
           <Route path="/vscode" element={<VsCodeInsights />} />
           <Route path="/dashboard-customize" element={<HomeCustomize />} />
           <Route path="/widgets" element={<WidgetCenter />} />
           <Route path="/settings" element={<Settings />} />
-                  <Route path="/limits" element={<Limits />} />
+          <Route path="/limits" element={<Limits />} />
           <Route path="/categories" element={<Categories />} />
           <Route path="/goals" element={<Goals />} />
           <Route path="/focus" element={<FocusMode />} />
           <Route path="/browser" element={<BrowserUsage />} />
+          <Route path="/interruptions/detail" element={<InterruptionDetail />} />
         </Routes>
       </MainLayout>
 

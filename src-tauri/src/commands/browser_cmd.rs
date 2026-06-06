@@ -1,6 +1,6 @@
 use tauri::State;
 use crate::commands::storage_cmd::DbState;
-use crate::models::{BrowserDomainStats, BrowserDomainLimit};
+use crate::models::{BrowserDomainStats, BrowserDomainLimit, BrowserHourDomainStats};
 
 #[tauri::command]
 pub fn get_browser_domain_stats(
@@ -57,4 +57,16 @@ pub fn save_browser_domain_limit(
 pub fn remove_browser_domain_limit(db: State<DbState>, host: String) -> Result<(), String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
     crate::db::remove_browser_domain_limit(&conn, &host).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_browser_domain_stats_for_hour(
+    db: State<DbState>,
+    date: String,
+    hour: i32,
+    limit: Option<i64>,
+) -> Result<Vec<BrowserHourDomainStats>, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    crate::db::get_browser_domain_stats_for_hour(&conn, &date, hour, limit.unwrap_or(5))
+        .map_err(|e| e.to_string())
 }

@@ -226,6 +226,14 @@ pub struct BrowserDomainStats {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct BrowserHourDomainStats {
+    pub host: String,
+    pub total_seconds: i64,
+    pub visit_count: i64,
+    pub last_visited_at: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct BrowserDomainLimit {
     pub host: String,
     pub daily_limit_seconds: i64,
@@ -240,4 +248,64 @@ pub struct ActiveWindowInfo {
     pub exe_path: String,
     pub window_title: String,
     pub timestamp: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ApiTokenMetadata {
+    pub id: String,
+    pub label: String,
+    pub scopes: Vec<String>,
+    pub created_at: String,
+    pub expires_at: Option<String>,
+    pub revoked_at: Option<String>,
+    pub last_used_at: Option<String>,
+    pub last_client_id: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct IssuedApiToken {
+    pub id: String,
+    pub token: String,
+    pub label: String,
+    pub scopes: Vec<String>,
+    pub created_at: String,
+    pub expires_at: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ApiAuditLogEntry {
+    pub id: i64,
+    pub occurred_at: String,
+    pub client_id: String,
+    pub endpoint: String,
+    pub method: String,
+    pub status_code: i64,
+    pub detail: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LocalApiSecuritySettings {
+    pub token_required: bool,
+    pub allowlist_enforced: bool,
+    pub rate_limit_per_min: i64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct WidgetPermissionEntry {
+    pub permission: String,
+    pub capability: String,
+    pub risk_label: String,
+    pub granted_at: String,
+    pub last_access_at: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct WidgetPermissionAuditEntry {
+    pub id: i64,
+    pub widget_id: String,
+    pub permission: String,
+    pub action: String,
+    pub actor: String,
+    pub occurred_at: String,
+    pub detail: String,
 }

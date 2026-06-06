@@ -198,8 +198,24 @@ pub fn initialize(conn: &Connection) -> Result<()> {
             widget_id       TEXT    NOT NULL,
             permission      TEXT    NOT NULL,
             granted_at      TEXT    NOT NULL,
+            capability      TEXT    NOT NULL DEFAULT 'read_metrics',
+            risk_label      TEXT    NOT NULL DEFAULT 'low',
+            last_access_at  TEXT,
             PRIMARY KEY (widget_id, permission)
         );
+
+        CREATE TABLE IF NOT EXISTS widget_permission_audit_log (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            widget_id    TEXT    NOT NULL,
+            permission   TEXT    NOT NULL,
+            action       TEXT    NOT NULL,
+            actor        TEXT    NOT NULL DEFAULT 'system',
+            occurred_at  TEXT    NOT NULL,
+            detail       TEXT    NOT NULL DEFAULT ''
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_widget_permission_audit_widget_time
+            ON widget_permission_audit_log(widget_id, occurred_at DESC);
 
         CREATE TABLE IF NOT EXISTS vscode_sessions (
             session_id       TEXT PRIMARY KEY,
@@ -224,6 +240,39 @@ pub fn initialize(conn: &Connection) -> Result<()> {
         );
 
         CREATE INDEX IF NOT EXISTS idx_vscode_session_languages_language ON vscode_session_languages(language);
+
+        CREATE TABLE IF NOT EXISTS api_tokens (
+            id              TEXT    PRIMARY KEY,
+            label           TEXT    NOT NULL,
+            token_hash      TEXT    NOT NULL UNIQUE,
+            scopes_json     TEXT    NOT NULL DEFAULT '[]',
+            created_at      TEXT    NOT NULL,
+            expires_at      TEXT,
+            revoked_at      TEXT,
+            last_used_at    TEXT,
+            last_client_id  TEXT
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_api_tokens_revoked_at ON api_tokens(revoked_at);
+
+        CREATE TABLE IF NOT EXISTS api_client_allowlist (
+            client_id   TEXT PRIMARY KEY,
+            created_at  TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS api_audit_log (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            occurred_at  TEXT    NOT NULL,
+            client_id    TEXT    NOT NULL DEFAULT '',
+            endpoint     TEXT    NOT NULL,
+            method       TEXT    NOT NULL,
+            status_code  INTEGER NOT NULL,
+            detail       TEXT    NOT NULL DEFAULT ''
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_api_audit_log_occurred_at ON api_audit_log(occurred_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_api_audit_log_client_id ON api_audit_log(client_id);
+        CREATE INDEX IF NOT EXISTS idx_api_audit_log_endpoint ON api_audit_log(endpoint);
         ",
     )?;
 
@@ -256,6 +305,40 @@ pub fn initialize(conn: &Connection) -> Result<()> {
         )?;
     }
 
+    let widget_permission_columns = table_columns(conn, "widget_permissions")?;
+    if !widget_permission_columns.iter().any(|c| c == "capability") {
+        conn.execute(
+            "ALTER TABLE widget_permissions ADD COLUMN capability TEXT NOT NULL DEFAULT 'read_metrics'",
+            [],
+        )?;
+    }
+    if !widget_permission_columns.iter().any(|c| c == "risk_label") {
+        conn.execute(
+            "ALTER TABLE widget_permissions ADD COLUMN risk_label TEXT NOT NULL DEFAULT 'low'",
+            [],
+        )?;
+    }
+    if !widget_permission_columns.iter().any(|c| c == "last_access_at") {
+        conn.execute(
+            "ALTER TABLE widget_permissions ADD COLUMN last_access_at TEXT",
+            [],
+        )?;
+    }
+
+    let widget_permission_audit_columns = table_columns(conn, "widget_permission_audit_log")?;
+    if !widget_permission_audit_columns.iter().any(|c| c == "actor") {
+        conn.execute(
+            "ALTER TABLE widget_permission_audit_log ADD COLUMN actor TEXT NOT NULL DEFAULT 'system'",
+            [],
+        )?;
+    }
+    if !widget_permission_audit_columns.iter().any(|c| c == "detail") {
+        conn.execute(
+            "ALTER TABLE widget_permission_audit_log ADD COLUMN detail TEXT NOT NULL DEFAULT ''",
+            [],
+        )?;
+    }
+
     // Backfill daily aggregates for existing records.
     conn.execute(
         "INSERT INTO daily_app_usage (date, app_name, exe_path, total_seconds, first_seen_at, last_seen_at)
@@ -274,7 +357,7 @@ pub fn initialize(conn: &Connection) -> Result<()> {
         [],
     )?;
 
-    set_setting(conn, "schema_version", "4")?;
+    set_setting(conn, "schema_version", "5")?;
 
     Ok(())
 }
@@ -1079,6 +1162,224 @@ pub fn set_bool_setting(conn: &Connection, key: &str, value: bool) -> Result<()>
     set_setting(conn, key, if value { "1" } else { "0" })
 }
 
+fn parse_scopes_json(raw: String) -> Vec<String> {
+    serde_json::from_str::<Vec<String>>(&raw).unwrap_or_default()
+}
+
+pub fn insert_api_token(
+    conn: &Connection,
+    id: &str,
+    label: &str,
+    token_hash: &str,
+    scopes: &[String],
+    created_at: &str,
+    expires_at: Option<&str>,
+) -> Result<()> {
+    let scopes_json = serde_json::to_string(scopes).unwrap_or_else(|_| "[]".to_string());
+    conn.execute(
+        "INSERT INTO api_tokens
+         (id, label, token_hash, scopes_json, created_at, expires_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        params![id, label, token_hash, scopes_json, created_at, expires_at],
+    )?;
+    Ok(())
+}
+
+pub fn get_api_token_by_id(
+    conn: &Connection,
+    id: &str,
+) -> Result<Option<crate::models::ApiTokenMetadata>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, label, scopes_json, created_at, expires_at, revoked_at, last_used_at, last_client_id
+         FROM api_tokens
+         WHERE id = ?1",
+    )?;
+    let mut rows = stmt.query(params![id])?;
+    if let Some(row) = rows.next()? {
+        let scopes_json: String = row.get(2)?;
+        return Ok(Some(crate::models::ApiTokenMetadata {
+            id: row.get(0)?,
+            label: row.get(1)?,
+            scopes: parse_scopes_json(scopes_json),
+            created_at: row.get(3)?,
+            expires_at: row.get(4)?,
+            revoked_at: row.get(5)?,
+            last_used_at: row.get(6)?,
+            last_client_id: row.get(7)?,
+        }));
+    }
+    Ok(None)
+}
+
+pub fn list_api_tokens(conn: &Connection) -> Result<Vec<crate::models::ApiTokenMetadata>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, label, scopes_json, created_at, expires_at, revoked_at, last_used_at, last_client_id
+         FROM api_tokens
+         ORDER BY created_at DESC",
+    )?;
+    let rows = stmt.query_map([], |row| {
+        let scopes_json: String = row.get(2)?;
+        Ok(crate::models::ApiTokenMetadata {
+            id: row.get(0)?,
+            label: row.get(1)?,
+            scopes: parse_scopes_json(scopes_json),
+            created_at: row.get(3)?,
+            expires_at: row.get(4)?,
+            revoked_at: row.get(5)?,
+            last_used_at: row.get(6)?,
+            last_client_id: row.get(7)?,
+        })
+    })?;
+    rows.collect()
+}
+
+pub fn revoke_api_token(conn: &Connection, id: &str, revoked_at: &str) -> Result<()> {
+    conn.execute(
+        "UPDATE api_tokens
+         SET revoked_at = ?2
+         WHERE id = ?1",
+        params![id, revoked_at],
+    )?;
+    Ok(())
+}
+
+pub fn find_active_api_token_id_by_hash(
+    conn: &Connection,
+    token_hash: &str,
+    now: &str,
+) -> Result<Option<String>> {
+    let mut stmt = conn.prepare(
+        "SELECT id
+         FROM api_tokens
+         WHERE token_hash = ?1
+           AND revoked_at IS NULL
+           AND (expires_at IS NULL OR expires_at > ?2)
+         LIMIT 1",
+    )?;
+    let mut rows = stmt.query(params![token_hash, now])?;
+    if let Some(row) = rows.next()? {
+        return Ok(Some(row.get(0)?));
+    }
+    Ok(None)
+}
+
+pub fn touch_api_token_use(
+    conn: &Connection,
+    id: &str,
+    used_at: &str,
+    client_id: &str,
+) -> Result<()> {
+    conn.execute(
+        "UPDATE api_tokens
+         SET last_used_at = ?2,
+             last_client_id = ?3
+         WHERE id = ?1",
+        params![id, used_at, client_id],
+    )?;
+    Ok(())
+}
+
+pub fn get_api_client_allowlist(conn: &Connection) -> Result<Vec<String>> {
+    let mut stmt = conn.prepare(
+        "SELECT client_id
+         FROM api_client_allowlist
+         ORDER BY client_id ASC",
+    )?;
+    let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
+    rows.collect()
+}
+
+pub fn replace_api_client_allowlist(conn: &Connection, client_ids: &[String]) -> Result<()> {
+    let now = chrono::Local::now().to_rfc3339();
+    let tx = conn.unchecked_transaction()?;
+    tx.execute("DELETE FROM api_client_allowlist", [])?;
+    for client_id in client_ids {
+        let normalized = client_id.trim();
+        if normalized.is_empty() {
+            continue;
+        }
+        tx.execute(
+            "INSERT OR IGNORE INTO api_client_allowlist (client_id, created_at)
+             VALUES (?1, ?2)",
+            params![normalized, now],
+        )?;
+    }
+    tx.commit()?;
+    Ok(())
+}
+
+pub fn is_api_client_allowed(conn: &Connection, client_id: &str) -> Result<bool> {
+    let exists: i64 = conn.query_row(
+        "SELECT COUNT(1)
+         FROM api_client_allowlist
+         WHERE client_id = ?1",
+        params![client_id],
+        |row| row.get(0),
+    )?;
+    Ok(exists > 0)
+}
+
+pub fn insert_api_audit_log(
+    conn: &Connection,
+    occurred_at: &str,
+    client_id: &str,
+    endpoint: &str,
+    method: &str,
+    status_code: i64,
+    detail: &str,
+) -> Result<i64> {
+    conn.execute(
+        "INSERT INTO api_audit_log
+         (occurred_at, client_id, endpoint, method, status_code, detail)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        params![occurred_at, client_id, endpoint, method, status_code, detail],
+    )?;
+    Ok(conn.last_insert_rowid())
+}
+
+pub fn count_api_audit_log_since(
+    conn: &Connection,
+    client_id: &str,
+    since: &str,
+) -> Result<i64> {
+    conn.query_row(
+        "SELECT COUNT(1)
+         FROM api_audit_log
+         WHERE client_id = ?1 AND occurred_at >= ?2",
+        params![client_id, since],
+        |row| row.get(0),
+    )
+}
+
+pub fn list_api_audit_log(
+    conn: &Connection,
+    limit: i64,
+    offset: i64,
+    client_id: Option<&str>,
+    endpoint: Option<&str>,
+) -> Result<Vec<crate::models::ApiAuditLogEntry>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, occurred_at, client_id, endpoint, method, status_code, detail
+         FROM api_audit_log
+         WHERE (?1 IS NULL OR client_id = ?1)
+           AND (?2 IS NULL OR endpoint = ?2)
+         ORDER BY occurred_at DESC, id DESC
+         LIMIT ?3 OFFSET ?4",
+    )?;
+    let rows = stmt.query_map(params![client_id, endpoint, limit.max(1), offset.max(0)], |row| {
+        Ok(crate::models::ApiAuditLogEntry {
+            id: row.get(0)?,
+            occurred_at: row.get(1)?,
+            client_id: row.get(2)?,
+            endpoint: row.get(3)?,
+            method: row.get(4)?,
+            status_code: row.get(5)?,
+            detail: row.get(6)?,
+        })
+    })?;
+    rows.collect()
+}
+
 pub fn insert_browser_session(
     conn: &Connection,
     session: &crate::models::BrowserSession,
@@ -1272,6 +1573,41 @@ pub fn get_browser_domain_stats(
     rows.collect()
 }
 
+pub fn get_browser_domain_stats_for_hour(
+    conn: &Connection,
+    date: &str,
+    hour: i32,
+    limit: i64,
+) -> Result<Vec<crate::models::BrowserHourDomainStats>> {
+    let normalized_hour = hour.clamp(0, 23);
+    let safe_limit = if limit <= 0 { 5 } else { limit.min(50) };
+    let hour_text = format!("{:02}", normalized_hour);
+
+    let mut stmt = conn.prepare(
+        "SELECT host,
+                SUM(duration_seconds) as total_seconds,
+                COUNT(1) as visit_count,
+                MAX(ended_at) as last_visited_at
+         FROM browser_sessions
+         WHERE substr(ended_at, 1, 10) = ?1
+           AND substr(ended_at, 12, 2) = ?2
+           AND host NOT IN (SELECT host FROM browser_ignored_domains)
+           AND host != ''
+         GROUP BY host
+         ORDER BY total_seconds DESC
+         LIMIT ?3",
+    )?;
+    let rows = stmt.query_map(params![date, hour_text, safe_limit], |row| {
+        Ok(crate::models::BrowserHourDomainStats {
+            host: row.get(0)?,
+            total_seconds: row.get(1)?,
+            visit_count: row.get(2)?,
+            last_visited_at: row.get(3)?,
+        })
+    })?;
+    rows.collect()
+}
+
 // ── Browser ignored domains ────────────────────────────────────
 
 pub fn get_browser_ignored_domains(conn: &Connection) -> Result<Vec<String>> {
@@ -1359,32 +1695,178 @@ pub fn get_widget_permissions(conn: &Connection, widget_id: &str) -> Result<Vec<
     rows.collect()
 }
 
+fn map_widget_permission_capability(permission: &str) -> &'static str {
+    match permission {
+        "todo:write" | "settings:write" => "write_data",
+        "active-window:subscribe" => "automation_trigger",
+        "local-api:call" | "api:call" => "local_api_call",
+        _ => "read_metrics",
+    }
+}
+
+fn map_widget_permission_risk(permission: &str) -> &'static str {
+    match permission {
+        "settings:write" => "high",
+        "todo:write" | "active-window:subscribe" | "local-api:call" | "api:call" => "medium",
+        _ => "low",
+    }
+}
+
 pub fn set_widget_permissions(
     conn: &Connection,
     widget_id: &str,
     permissions: &[String],
+    actor: Option<&str>,
 ) -> Result<()> {
     let tx = conn.unchecked_transaction()?;
+    let existing: Vec<String> = {
+        let mut stmt = tx.prepare(
+            "SELECT permission FROM widget_permissions WHERE widget_id = ?1 ORDER BY permission",
+        )?;
+        let rows = stmt.query_map(params![widget_id], |row| row.get::<_, String>(0))?;
+        rows.collect::<Result<Vec<_>>>()?
+    };
+
     tx.execute(
         "DELETE FROM widget_permissions WHERE widget_id = ?1",
         params![widget_id],
     )?;
+
+    let actor_value = actor
+        .map(|v| v.trim())
+        .filter(|v| !v.is_empty())
+        .unwrap_or("system");
     let now = chrono::Local::now().format("%Y-%m-%dT%H:%M:%S").to_string();
+
+    for removed in &existing {
+        if !permissions.iter().any(|p| p == removed) {
+            tx.execute(
+                "INSERT INTO widget_permission_audit_log
+                 (widget_id, permission, action, actor, occurred_at, detail)
+                 VALUES (?1, ?2, 'revoke', ?3, ?4, ?5)",
+                params![widget_id, removed, actor_value, now, "permission removed"],
+            )?;
+        }
+    }
+
     for perm in permissions {
+        let capability = map_widget_permission_capability(perm);
+        let risk_label = map_widget_permission_risk(perm);
         tx.execute(
-            "INSERT OR IGNORE INTO widget_permissions (widget_id, permission, granted_at)
-             VALUES (?1, ?2, ?3)",
-            params![widget_id, perm, now],
+            "INSERT OR IGNORE INTO widget_permissions
+             (widget_id, permission, granted_at, capability, risk_label)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![widget_id, perm, now, capability, risk_label],
         )?;
+
+        if !existing.iter().any(|p| p == perm) {
+            tx.execute(
+                "INSERT INTO widget_permission_audit_log
+                 (widget_id, permission, action, actor, occurred_at, detail)
+                 VALUES (?1, ?2, 'grant', ?3, ?4, ?5)",
+                params![widget_id, perm, actor_value, now, "permission granted"],
+            )?;
+        }
     }
     tx.commit()?;
     Ok(())
 }
 
-pub fn revoke_all_widget_permissions(conn: &Connection, widget_id: &str) -> Result<()> {
-    conn.execute(
+pub fn revoke_all_widget_permissions(conn: &Connection, widget_id: &str, actor: Option<&str>) -> Result<()> {
+    let tx = conn.unchecked_transaction()?;
+    let existing: Vec<String> = {
+        let mut stmt = tx.prepare(
+            "SELECT permission FROM widget_permissions WHERE widget_id = ?1 ORDER BY permission",
+        )?;
+        let rows = stmt.query_map(params![widget_id], |row| row.get::<_, String>(0))?;
+        rows.collect::<Result<Vec<_>>>()?
+    };
+
+    tx.execute(
         "DELETE FROM widget_permissions WHERE widget_id = ?1",
         params![widget_id],
     )?;
+
+    if !existing.is_empty() {
+        let now = chrono::Local::now().format("%Y-%m-%dT%H:%M:%S").to_string();
+        let actor_value = actor
+            .map(|v| v.trim())
+            .filter(|v| !v.is_empty())
+            .unwrap_or("system");
+        for perm in existing {
+            tx.execute(
+                "INSERT INTO widget_permission_audit_log
+                 (widget_id, permission, action, actor, occurred_at, detail)
+                 VALUES (?1, ?2, 'revoke', ?3, ?4, ?5)",
+                params![widget_id, perm, actor_value, now, "revoke all permissions"],
+            )?;
+        }
+    }
+
+    tx.commit()?;
     Ok(())
+}
+
+pub fn get_widget_permission_entries(
+    conn: &Connection,
+    widget_id: &str,
+) -> Result<Vec<crate::models::WidgetPermissionEntry>> {
+    let mut stmt = conn.prepare(
+        "SELECT permission, capability, risk_label, granted_at, last_access_at
+         FROM widget_permissions
+         WHERE widget_id = ?1
+         ORDER BY risk_label DESC, permission ASC",
+    )?;
+    let rows = stmt.query_map(params![widget_id], |row| {
+        Ok(crate::models::WidgetPermissionEntry {
+            permission: row.get(0)?,
+            capability: row.get(1)?,
+            risk_label: row.get(2)?,
+            granted_at: row.get(3)?,
+            last_access_at: row.get(4)?,
+        })
+    })?;
+    rows.collect()
+}
+
+pub fn touch_widget_permission_access(
+    conn: &Connection,
+    widget_id: &str,
+    permission: &str,
+) -> Result<()> {
+    let now = chrono::Local::now().to_rfc3339();
+    conn.execute(
+        "UPDATE widget_permissions
+         SET last_access_at = ?3
+         WHERE widget_id = ?1 AND permission = ?2",
+        params![widget_id, permission, now],
+    )?;
+    Ok(())
+}
+
+pub fn get_widget_permission_audit_log(
+    conn: &Connection,
+    widget_id: &str,
+    limit: i64,
+) -> Result<Vec<crate::models::WidgetPermissionAuditEntry>> {
+    let safe_limit = limit.clamp(1, 200);
+    let mut stmt = conn.prepare(
+        "SELECT id, widget_id, permission, action, actor, occurred_at, detail
+         FROM widget_permission_audit_log
+         WHERE widget_id = ?1
+         ORDER BY occurred_at DESC, id DESC
+         LIMIT ?2",
+    )?;
+    let rows = stmt.query_map(params![widget_id, safe_limit], |row| {
+        Ok(crate::models::WidgetPermissionAuditEntry {
+            id: row.get(0)?,
+            widget_id: row.get(1)?,
+            permission: row.get(2)?,
+            action: row.get(3)?,
+            actor: row.get(4)?,
+            occurred_at: row.get(5)?,
+            detail: row.get(6)?,
+        })
+    })?;
+    rows.collect()
 }

@@ -66,35 +66,62 @@ const PERMISSION_METHODS: Record<string, string[]> = {
   "active-window:subscribe": ["onActiveWindowChanged"],
   "todo:read": ["getTodos"],
   "todo:write": ["addTodo", "toggleTodo", "deleteTodo"],
+  "settings:write": ["setFocusModeActive", "setMonitoringActive"],
 };
 
 function denied(method: string, perm: string): () => Promise<never> {
   return () => Promise.reject(new Error(`permission denied: ${perm} required for ${method}`));
 }
 
-function buildChannel(grantedPerms: string[]) {
+function buildChannel(widgetId: string, grantedPerms: string[]) {
+  const markPermissionAccess = (permission: string) => {
+    void api.recordWidgetPermissionAccess(widgetId, permission).catch(() => {});
+  };
+
+  const withPermission = (
+    permission: string,
+    fn: (...args: unknown[]) => Promise<unknown>
+  ) => {
+    return (...args: unknown[]) => {
+      markPermissionAccess(permission);
+      return fn(...args);
+    };
+  };
+
   // Full method → api function map
   const allMethods: Record<string, (...args: unknown[]) => Promise<unknown>> = {
     // screen-time:read
-    getTodayAppTotals: () => api.getTodayAppTotals() as Promise<unknown>,
-    getAppTotalsInRange: (start: unknown, end: unknown) =>
+    getTodayAppTotals: withPermission("screen-time:read", () => api.getTodayAppTotals() as Promise<unknown>),
+    getAppTotalsInRange: withPermission("screen-time:read", (start: unknown, end: unknown) =>
       api.getAppTotalsInRange(start as string, end as string) as Promise<unknown>,
-    getCategoryTotalsInRange: (start: unknown, end: unknown) =>
+    ),
+    getCategoryTotalsInRange: withPermission("screen-time:read", (start: unknown, end: unknown) =>
       api.getCategoryTotalsInRange(start as string, end as string) as Promise<unknown>,
-    getHourlyForDate: (date: unknown) =>
+    ),
+    getHourlyForDate: withPermission("screen-time:read", (date: unknown) =>
       api.getHourlyDistributionForDate(date as string) as Promise<unknown>,
-    getRecentDailyTotalsRange: (start: unknown, end: unknown) =>
+    ),
+    getRecentDailyTotalsRange: withPermission("screen-time:read", (start: unknown, end: unknown) =>
       api.getRecentDailyTotalsRange(start as string, end as string) as Promise<unknown>,
-    getAppCategoryMap: () => api.getAppCategoryMap() as Promise<unknown>,
+    ),
+    getAppCategoryMap: withPermission("screen-time:read", () => api.getAppCategoryMap() as Promise<unknown>),
     // active-window:subscribe
-    onActiveWindowChanged: (cb: unknown) =>
+    onActiveWindowChanged: withPermission("active-window:subscribe", (cb: unknown) =>
       api.onActiveWindowChanged(cb as Parameters<typeof api.onActiveWindowChanged>[0]) as Promise<unknown>,
+    ),
     // todo:read
-    getTodos: () => api.getTodos() as Promise<unknown>,
+    getTodos: withPermission("todo:read", () => api.getTodos() as Promise<unknown>),
     // todo:write
-    addTodo: (content: unknown) => api.addTodo(content as string) as Promise<unknown>,
-    toggleTodo: (id: unknown) => api.toggleTodo(id as number) as Promise<unknown>,
-    deleteTodo: (id: unknown) => api.deleteTodo(id as number) as Promise<unknown>,
+    addTodo: withPermission("todo:write", (content: unknown) => api.addTodo(content as string) as Promise<unknown>),
+    toggleTodo: withPermission("todo:write", (id: unknown) => api.toggleTodo(id as number) as Promise<unknown>),
+    deleteTodo: withPermission("todo:write", (id: unknown) => api.deleteTodo(id as number) as Promise<unknown>),
+    // settings:write
+    setFocusModeActive: withPermission("settings:write", (active: unknown) =>
+      api.setFocusModeActive(Boolean(active)) as Promise<unknown>,
+    ),
+    setMonitoringActive: withPermission("settings:write", (active: unknown) =>
+      api.setMonitoringActive(Boolean(active)) as Promise<unknown>,
+    ),
     // always available
     getUsageGoals: () => api.getUsageGoals() as Promise<unknown>,
     listFocusSessions: () => api.listFocusSessions() as Promise<unknown>,
@@ -128,14 +155,35 @@ export default function ExternalWidgetHost({ widgetId, widgetType }: Props) {
 
   // Load permissions once
   useEffect(() => {
-    api.getWidgetPermissions(widgetId)
-      .then(setGrantedPerms)
-      .catch(() => setGrantedPerms([]));
+    let disposed = false;
+
+    const refreshPermissions = async () => {
+      try {
+        const next = await api.getWidgetPermissions(widgetId);
+        if (!disposed) {
+          setGrantedPerms(next);
+        }
+      } catch {
+        if (!disposed) {
+          setGrantedPerms([]);
+        }
+      }
+    };
+
+    void refreshPermissions();
+    const timer = window.setInterval(() => {
+      void refreshPermissions();
+    }, 2000);
+
+    return () => {
+      disposed = true;
+      window.clearInterval(timer);
+    };
   }, [widgetId]);
 
   const channel = useMemo(
-    () => buildChannel(grantedPerms),
-    [grantedPerms]
+    () => buildChannel(widgetId, grantedPerms),
+    [widgetId, grantedPerms]
   );
 
   useEffect(() => {

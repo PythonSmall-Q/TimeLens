@@ -12,6 +12,14 @@
   "periodMonth": "Month",
   "avgDailyUsage": "Average daily usage ({{mode}})",
   "weeklyCompare": "Week-over-week change",
+  "whatChangedTitle": "What changed (recent period)",
+  "whatChangedDelta": "Total change: {{sign}}{{value}}",
+  "whatChangedTopIncrease": "Top increase",
+  "whatChangedTopDecrease": "Top decrease",
+  "whatChangedNewApps": "Newly active apps",
+  "whatChangedStoppedApps": "No longer active apps",
+  "openTopIncreaseCategory": "Open top-increase app in Categories",
+  "openRangeInBrowser": "Open this range in Browser Usage",
   "screenTime": "Screen time",
   "noActivity": "No activity recorded today",
   "activeFor": "Active for {{duration}}",
@@ -97,5 +105,62 @@
   "trackingLevel_basic": "basic",
   "trackingLevel_standard": "standard",
   "trackingLevel_detailed": "detailed",
-  "trackingLevelHidden": "Not recorded at current detail level"
+  "trackingLevelHidden": "Not recorded at current detail level",
+  "insightWorkspace": {
+    "title": "Insight Hub",
+    "subtitle": "Narrative view for {{mode}}",
+    "loading": "Generating local insights...",
+    "dailyReviewTitle": "Daily Review",
+    "dailySpike": "Usage spiked by about {{ratio}}% vs baseline.",
+    "dailyDrop": "Usage dropped by about {{ratio}}% vs baseline.",
+    "dailyStable": "No major anomaly today; behavior is within baseline range.",
+    "baseline": "Current: {{current}} | Baseline: {{baseline}}",
+    "weeklyReflectionTitle": "Weekly Reflection",
+    "bestFocusWindow": "Best focus window tends to be {{start}} - {{end}}.",
+    "confidence": "Confidence: {{value}}%",
+    "notEnoughData": "Not enough local history yet to infer a stable pattern.",
+    "goalHealthTitle": "Goal Health",
+    "scope": "Scope: {{scopeType}} / {{scopeValue}}",
+    "noGoals": "No active goals found.",
+    "goalRecommendation": {
+      "increase": "Current goal may be too easy; consider increasing target.",
+      "decrease": "Current goal may be too hard; consider reducing target.",
+      "keep": "Current goal appears balanced; keep current target."
+    }
+  },
+  "timeline": {
+    "title": "Unified Timeline",
+    "range": "Range: {{start}} to {{end}}",
+    "loading": "Loading timeline...",
+    "empty": "No timeline records in this range.",
+    "searchPlaceholder": "Search timeline...",
+    "openDetail": "Open detail",
+    "focusSession": "Desktop focus session",
+    "focusSessionDetail": "trigger: {{trigger}} | reason: {{reason}} | duration: {{duration}}",
+    "browserSession": "Browser session",
+    "browserSessionDetail": "host: {{host}} | duration: {{duration}}",
+    "interruptionMarker": "Interruption marker",
+    "interruptionDetail": "switches: {{count}} | fragment score: {{score}}",
+    "filter": {
+      "all": "All",
+      "desktop": "Desktop",
+      "browser": "Browser",
+      "interrupt": "Interruption"
+    }
+  },
+  "timelineDetail": {
+    "timeWindow": "Time window",
+    "fragmentScore": "Fragment score",
+    "sameDayHours": "Same-day interruption periods",
+    "topAppsInHour": "Top apps in this hour",
+    "topDomainsInHour": "Top domains in this hour",
+    "noAppDataInHour": "No app details for this hour",
+    "noDomainDataInHour": "No domain details for this hour"
+  },
+  "insightFilters": {
+    "day": "Day preset",
+    "week": "Week preset",
+    "month": "Month preset",
+    "backToToday": "Back to today"
+  }
 }

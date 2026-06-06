@@ -16,6 +16,7 @@ import UsageHeatmap from "./UsageHeatmap";
 import TrendComparePanel from "./TrendComparePanel";
 import ProductivityScoreCard from "./ProductivityScoreCard";
 import ProductivityTrendChart from "./ProductivityTrendChart";
+import AsyncStateCard from "@/components/AsyncStateCard";
 import { ChevronLeft, ChevronRight, GripVertical } from "lucide-react";
 import { todayString, daysAgo } from "@/utils/format";
 import { formatDuration } from "@/utils/format";
@@ -89,7 +90,6 @@ export default function Dashboard() {
     todayTotals,
     weekComparison,
     productivityScores,
-    interruptionPeriods,
     fetchProductivityRange,
     fetchInterruptionPeriods,
     fetchVsCodeStatsForRange,
@@ -349,6 +349,12 @@ export default function Dashboard() {
         <div className="flex items-center gap-2">
           <button
             className="ui-btn-secondary !text-xs !px-3 !py-2"
+            onClick={() => navigate(`/dashboard-insights?mode=${periodMode}&date=${encodeURIComponent(selectedDate)}&week=${encodeURIComponent(weekValue)}&month=${encodeURIComponent(monthValue)}`)}
+          >
+            {t("dashboard:insightWorkspace.title")}
+          </button>
+          <button
+            className="ui-btn-secondary !text-xs !px-3 !py-2"
             onClick={() => navigate("/dashboard-customize")}
           >
             {t("dashboard:customizeEntry")}
@@ -431,13 +437,11 @@ export default function Dashboard() {
       </div>
 
       {loading && (
-        <div className="text-center py-4 text-text-muted text-sm">{t("common:loading")}</div>
+        <AsyncStateCard variant="loading" title={t("common:loading")} compact />
       )}
 
       {visibleWindowIds.length === 0 && (
-        <div className="glass-card p-6 text-sm text-text-muted">
-          {t("dashboard:noVisibleWindows")}
-        </div>
+        <AsyncStateCard variant="empty" title={t("dashboard:noVisibleWindows")} compact />
       )}
 
       <DndContext sensors={sensors} onDragStart={onDragStart} onDragCancel={onDragCancel} onDragEnd={onDragEnd}>

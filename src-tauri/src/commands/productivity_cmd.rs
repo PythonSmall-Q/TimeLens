@@ -22,6 +22,34 @@ pub struct InterruptionPeriod {
     pub fragment_score: f32,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct FocusWindowSuggestion {
+    pub start_hour: u8,
+    pub end_hour: u8,
+    pub confidence: f32,
+    pub reason: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct GoalAdjustmentSuggestion {
+    pub goal_id: i64,
+    pub scope_type: String,
+    pub scope_value: String,
+    pub recommendation: String,
+    pub reason: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct UsageAnomalyMarker {
+    pub date: String,
+    pub current_seconds: i64,
+    pub baseline_seconds: i64,
+    pub delta_seconds: i64,
+    pub delta_ratio: f64,
+    pub direction: String,
+    pub reason: String,
+}
+
 // ── Score calculation ─────────────────────────────────────────
 
 /// score = clamp(focusRatio * 60 + (1 - switchPenalty) * 40, 0, 100)
@@ -227,4 +255,167 @@ pub fn get_interruption_periods(
     }
 
     Ok(result)
+}
+
+#[tauri::command]
+pub fn suggest_focus_windows(
+    lookback_days: Option<i64>,
+    db: State<'_, DbState>,
+) -> Result<Vec<FocusWindowSuggestion>, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    let days = lookback_days.unwrap_or(21).clamp(3, 90);
+    let start_date = (chrono::Local::now() - chrono::Duration::days(days - 1))
+        .format("%Y-%m-%d")
+        .to_string();
+
+    let mut stmt = conn
+        .prepare(
+            "SELECT CAST(substr(a.first_seen_at, 12, 2) AS INTEGER) as hour,
+                    COALESCE(SUM(a.active_seconds), 0) as total_seconds
+             FROM app_usage a
+             LEFT JOIN app_categories c ON lower(COALESCE(a.exe_path, '')) = lower(COALESCE(c.exe_path, ''))
+             WHERE a.date >= ?1
+               AND lower(COALESCE(c.category, '')) IN ('work', 'study')
+             GROUP BY hour
+             ORDER BY total_seconds DESC",
+        )
+        .map_err(|e| e.to_string())?;
+
+    let rows: Vec<(i64, i64)> = stmt
+        .query_map(params![start_date], |row| Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?)))
+        .map_err(|e| e.to_string())?
+        .collect::<Result<_, _>>()
+        .map_err(|e: rusqlite::Error| e.to_string())?;
+
+    if rows.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let max_seconds = rows.iter().map(|(_, secs)| *secs).max().unwrap_or(1) as f32;
+    let mut out = Vec::new();
+    for (hour, total_seconds) in rows.into_iter().take(3) {
+        let start_hour = hour.clamp(0, 23) as u8;
+        out.push(FocusWindowSuggestion {
+            start_hour,
+            end_hour: (start_hour + 1).min(23),
+            confidence: (total_seconds as f32 / max_seconds).clamp(0.1, 1.0),
+            reason: format!(
+                "Historically high focused usage in this window over the last {} days",
+                days
+            ),
+        });
+    }
+    Ok(out)
+}
+
+#[tauri::command]
+pub fn suggest_goal_adjustments(
+    db: State<'_, DbState>,
+) -> Result<Vec<GoalAdjustmentSuggestion>, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+    let week_start = (chrono::Local::now() - chrono::Duration::days(6))
+        .format("%Y-%m-%d")
+        .to_string();
+    let progress = crate::db::get_goal_progress(&conn, &today, &week_start, &today)
+        .map_err(|e| e.to_string())?;
+
+    let mut out = Vec::new();
+    for item in progress {
+        let Some(goal_id) = item.goal.id else { continue };
+        let (recommendation, reason) = if item.progress_ratio >= 1.5 {
+            (
+                "increase_target".to_string(),
+                "Goal has been consistently exceeded; consider a realistic stretch target.".to_string(),
+            )
+        } else if item.progress_ratio <= 0.4 {
+            (
+                "decrease_target".to_string(),
+                "Goal appears too aggressive based on recent completion ratio.".to_string(),
+            )
+        } else {
+            (
+                "keep_target".to_string(),
+                "Current target appears balanced with recent usage behavior.".to_string(),
+            )
+        };
+
+        out.push(GoalAdjustmentSuggestion {
+            goal_id,
+            scope_type: item.goal.scope_type,
+            scope_value: item.goal.scope_value,
+            recommendation,
+            reason,
+        });
+    }
+    Ok(out)
+}
+
+#[tauri::command]
+pub fn detect_usage_anomalies(
+    date: String,
+    baseline_days: Option<i64>,
+    db: State<'_, DbState>,
+) -> Result<Vec<UsageAnomalyMarker>, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    let baseline_days = baseline_days.unwrap_or(14).clamp(7, 60);
+    let baseline_start = match chrono::NaiveDate::parse_from_str(&date, "%Y-%m-%d") {
+        Ok(d) => (d - chrono::Duration::days(baseline_days)).format("%Y-%m-%d").to_string(),
+        Err(_) => return Err("date must be in YYYY-MM-DD format".to_string()),
+    };
+    let baseline_end = match chrono::NaiveDate::parse_from_str(&date, "%Y-%m-%d") {
+        Ok(d) => (d - chrono::Duration::days(1)).format("%Y-%m-%d").to_string(),
+        Err(_) => return Err("date must be in YYYY-MM-DD format".to_string()),
+    };
+
+    let current_seconds: i64 = conn
+        .query_row(
+            "SELECT COALESCE(SUM(total_seconds), 0)
+             FROM daily_app_usage
+             WHERE date = ?1",
+            params![date],
+            |row| row.get(0),
+        )
+        .map_err(|e| e.to_string())?;
+
+    let baseline_seconds: i64 = conn
+        .query_row(
+            "SELECT COALESCE(AVG(day_total), 0)
+             FROM (
+                 SELECT date, COALESCE(SUM(total_seconds), 0) as day_total
+                 FROM daily_app_usage
+                 WHERE date >= ?1 AND date <= ?2
+                 GROUP BY date
+             )",
+            params![baseline_start, baseline_end],
+            |row| row.get(0),
+        )
+        .map_err(|e| e.to_string())?;
+
+    if baseline_seconds <= 0 {
+        return Ok(Vec::new());
+    }
+
+    let delta_seconds = current_seconds - baseline_seconds;
+    let delta_ratio = delta_seconds as f64 / baseline_seconds as f64;
+    if delta_ratio.abs() < 0.25 {
+        return Ok(Vec::new());
+    }
+
+    let direction = if delta_ratio > 0.0 { "spike" } else { "drop" }.to_string();
+    let reason = if delta_ratio > 0.0 {
+        format!("Usage is {:.0}% above recent baseline", delta_ratio * 100.0)
+    } else {
+        format!("Usage is {:.0}% below recent baseline", delta_ratio.abs() * 100.0)
+    };
+
+    Ok(vec![UsageAnomalyMarker {
+        date,
+        current_seconds,
+        baseline_seconds,
+        delta_seconds,
+        delta_ratio,
+        direction,
+        reason,
+    }])
 }

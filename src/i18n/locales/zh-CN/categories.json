@@ -4,6 +4,7 @@
   "addRule": "添加分类规则",
   "exePlaceholder": "选择最近使用的应用…",
   "categoryLabel": "分类",
+  "drilldownHint": "已定位到 {{app}} 的下钻上下文，可直接新增或调整分类规则。",
   "noRules": "暂无分类规则，请在上方添加应用。",
   "suggestedCategory": "建议分类：{{cat}} — 点击应用",
   "applySuggestion": "应用建议分类",

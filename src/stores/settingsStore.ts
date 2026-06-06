@@ -32,6 +32,10 @@ interface SettingsState {
   trackWindowTitles: boolean;
   weekStartDay: 0 | 1; // 0 = Sunday, 1 = Monday
   excludeTimelens: boolean;
+  notificationQuietHoursEnabled: boolean;
+  notificationQuietStart: string;
+  notificationQuietEnd: string;
+  notificationCooldownMin: number;
   setLanguage: (lang: string) => void;
   setTheme: (theme: "dark" | "light" | "system") => void;
   setAutoCheckUpdates: (enabled: boolean) => void;
@@ -44,6 +48,10 @@ interface SettingsState {
   setTrackWindowTitles: (active: boolean) => void;
   setWeekStartDay: (day: 0 | 1) => void;
   setExcludeTimelens: (val: boolean) => void;
+  setNotificationQuietHoursEnabled: (enabled: boolean) => void;
+  setNotificationQuietStart: (value: string) => void;
+  setNotificationQuietEnd: (value: string) => void;
+  setNotificationCooldownMin: (minutes: number) => void;
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -61,6 +69,10 @@ export const useSettingsStore = create<SettingsState>()(
       trackWindowTitles: true,
       weekStartDay: 1,
       excludeTimelens: true,
+      notificationQuietHoursEnabled: false,
+      notificationQuietStart: "22:00",
+      notificationQuietEnd: "07:00",
+      notificationCooldownMin: 15,
 
       setLanguage: (lang) => {
         set({ language: lang });
@@ -114,6 +126,18 @@ export const useSettingsStore = create<SettingsState>()(
       setWeekStartDay: (weekStartDay) => set({ weekStartDay }),
 
       setExcludeTimelens: (excludeTimelens) => set({ excludeTimelens }),
+
+      setNotificationQuietHoursEnabled: (notificationQuietHoursEnabled) =>
+        set({ notificationQuietHoursEnabled }),
+
+      setNotificationQuietStart: (notificationQuietStart) =>
+        set({ notificationQuietStart }),
+
+      setNotificationQuietEnd: (notificationQuietEnd) =>
+        set({ notificationQuietEnd }),
+
+      setNotificationCooldownMin: (notificationCooldownMin) =>
+        set({ notificationCooldownMin: Math.max(0, Math.min(240, notificationCooldownMin)) }),
     }),
     {
       name: "timelens-settings",
