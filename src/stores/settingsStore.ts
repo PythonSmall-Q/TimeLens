@@ -22,6 +22,7 @@ const safeSettingsStorage = createJSONStorage(() => ({
 interface SettingsState {
   language: string;
   theme: "dark" | "light" | "system";
+  autoCheckUpdates: boolean;
   monitoringActive: boolean;
   samplingIntervalMs: number;
   debounceMs: number;
@@ -33,6 +34,7 @@ interface SettingsState {
   excludeTimelens: boolean;
   setLanguage: (lang: string) => void;
   setTheme: (theme: "dark" | "light" | "system") => void;
+  setAutoCheckUpdates: (enabled: boolean) => void;
   setMonitoringActive: (active: boolean) => Promise<void>;
   setSamplingInterval: (ms: number) => void;
   setDebounce: (ms: number) => void;
@@ -49,6 +51,7 @@ export const useSettingsStore = create<SettingsState>()(
     (set) => ({
       language: i18n.language || "en",
       theme: "dark",
+      autoCheckUpdates: true,
       monitoringActive: true,
       samplingIntervalMs: 1000,
       debounceMs: 500,
@@ -66,6 +69,8 @@ export const useSettingsStore = create<SettingsState>()(
       },
 
       setTheme: (theme) => set({ theme }),
+
+      setAutoCheckUpdates: (autoCheckUpdates) => set({ autoCheckUpdates }),
 
       setMonitoringActive: (monitoringActive) => {
         set({ monitoringActive });

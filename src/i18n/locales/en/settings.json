@@ -107,6 +107,9 @@
     "previewRepair": "Preview repair",
     "applyRepair": "Repair now",
     "repairRows": "Dry run would rebuild {{count}} daily rows",
+    "lastAction": "Last action",
+    "repairedRows": "Rebuilt rows",
+    "actionCount": "Repair steps",
     "repairing": "Repairing...",
     "repairFailed": "Repair failed",
     "repairTimeout": "Repair timed out, please retry"
@@ -115,8 +118,14 @@
     "title": "Backup & Restore v2",
     "export": "Backup package",
     "exportAction": "Export .timelens-backup",
+    "importRestoreAction": "Import and restore",
     "validateAction": "Validate package",
     "applyAction": "Apply restore",
+    "working": "Processing...",
+    "validated": "Backup package validated",
+    "failed": "Backup action failed",
+    "applySuccess": "Restore completed, imported {{count}} rows",
+    "exportSuccess": "Backup package exported",
     "restoreMode": "Restore strategy",
     "overwrite": "Overwrite",
     "merge": "Merge",
@@ -141,7 +150,11 @@
     "preview": "Current preset: {{label}}",
     "cutoff": "Archive data older than: {{date}}",
     "impact": "Estimated rows to archive: {{rows}} (about {{size}})",
-    "runNow": "Archive now"
+    "runNow": "Archive now",
+    "running": "Archiving...",
+    "lastRunPolicy": "Last run policy: {{policy}}",
+    "lastRunAppRows": "Archived usage rows: {{count}}",
+    "lastRunDailyRows": "Archived daily rows: {{count}}"
   },
   "transparency": {
     "title": "Tracking Transparency",
@@ -168,8 +181,10 @@
     "version": "Version",
     "logs": "Logs",
     "openLogFolder": "Open Log Folder",
+    "autoCheckUpdates": "Auto-check updates",
     "checkUpdate": "Check for Updates",
     "checking": "Checking…",
+    "checkFailed": "Update check failed",
     "upToDate": "You are on the latest version",
     "updateAvailable": "Update available: v{{version}}",
     "viewRelease": "View Release"

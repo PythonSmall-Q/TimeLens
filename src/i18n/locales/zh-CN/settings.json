@@ -107,6 +107,9 @@
     "previewRepair": "预览修复",
     "applyRepair": "立即修复",
     "repairRows": "预演将重建 {{count}} 条日汇总记录",
+    "lastAction": "最近操作",
+    "repairedRows": "重建记录",
+    "actionCount": "修复步骤",
     "repairing": "修复中...",
     "repairFailed": "修复失败",
     "repairTimeout": "修复超时，请重试"
@@ -115,8 +118,14 @@
     "title": "备份与恢复 v2",
     "export": "备份包",
     "exportAction": "导出 .timelens-backup",
+    "importRestoreAction": "导入并恢复",
     "validateAction": "验证备份包",
     "applyAction": "执行恢复",
+    "working": "处理中...",
+    "validated": "备份包验证通过",
+    "failed": "备份操作失败",
+    "applySuccess": "恢复完成，已导入 {{count}} 条记录",
+    "exportSuccess": "备份包已导出",
     "restoreMode": "恢复策略",
     "overwrite": "覆盖",
     "merge": "合并",
@@ -141,7 +150,11 @@
     "preview": "当前预设：{{label}}",
     "cutoff": "归档早于此日期的数据：{{date}}",
     "impact": "预计归档记录数：{{rows}}（约 {{size}}）",
-    "runNow": "立即归档"
+    "runNow": "立即归档",
+    "running": "归档中...",
+    "lastRunPolicy": "最近执行策略：{{policy}}",
+    "lastRunAppRows": "归档使用记录：{{count}}",
+    "lastRunDailyRows": "归档日汇总：{{count}}"
   },
   "transparency": {
     "title": "追踪透明面板",
@@ -168,8 +181,10 @@
     "version": "版本",
     "logs": "日志",
     "openLogFolder": "打开日志文件夹",
+    "autoCheckUpdates": "自动检查更新",
     "checkUpdate": "检查更新",
     "checking": "检查中…",
+    "checkFailed": "检查更新失败",
     "upToDate": "已是最新版本",
     "updateAvailable": "发现新版本：v{{version}}",
     "viewRelease": "查看发布说明"

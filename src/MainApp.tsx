@@ -57,7 +57,7 @@ export default function MainApp() {
     selectedDate,
     periodMode,
   } = useStatsStore();
-  const { setMonitoringActive } = useSettingsStore();
+  const { setMonitoringActive, autoCheckUpdates } = useSettingsStore();
   const { t } = useTranslation(["common", "limits", "browserUsage"]);
 
   const [updateInfo, setUpdateInfo] = useState<{ version: string; notes: string; url: string } | null>(null);
@@ -237,6 +237,8 @@ export default function MainApp() {
 
   // Update check – once after 4 s
   useEffect(() => {
+    if (!autoCheckUpdates) return;
+
     const timer = setTimeout(async () => {
       try {
         const res = await fetch("https://api.github.com/repos/PythonSmall-Q/TimeLens/releases/latest");
@@ -289,7 +291,7 @@ export default function MainApp() {
       } catch { /* offline */ }
     }, 4000);
     return () => clearTimeout(timer);
-  }, [notifyWithNavigate, t]);
+  }, [autoCheckUpdates, notifyWithNavigate, t]);
 
   useEffect(() => {
     let mounted = true;

@@ -636,7 +636,7 @@ pub fn get_data_health_summary(db: State<DbState>) -> Result<DataHealthSummary, 
     if !missing_days.is_empty() {
         issues.push(DataHealthIssue {
             code: "missing_days".to_string(),
-            severity: "warning".to_string(),
+            severity: "info".to_string(),
             title: "Missing timeline days".to_string(),
             detail: "Detected gaps in the daily usage timeline".to_string(),
             count: missing_days.len() as i64,

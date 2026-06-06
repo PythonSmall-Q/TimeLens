@@ -5,6 +5,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [1.4.4] - 2026-06-06
+
+### Added
+
+- **Backup & Restore v2 import-and-restore action** - added a direct import-and-restore entry in Settings so users can pick a backup package and apply restore in one flow
+- **Browser Usage all-time query preset** - added an `All` date preset to query full historical browser records instead of being limited to today/week/month
+- **Settings update controls** - added an `Auto-check updates` option and a manual `Check for Updates` action in Settings > About
+
+### Changed
+
+- **Data Health Center severity tuning** - timeline `gap days` now show as informational instead of warning-level risk
+- **Repair and maintenance action feedback** - repair/backup/retention actions now provide visible in-page status and result summaries instead of silent behavior
+
+### Fixed
+
+- Fixed multiple repair and maintenance buttons that could appear unresponsive due to missing user-facing feedback
+- Improved Backup & Restore v2 workflow discoverability by exposing a dedicated import-and-restore path
+
 ## [1.4.3] - 2026-05-23
 
 ### Changed

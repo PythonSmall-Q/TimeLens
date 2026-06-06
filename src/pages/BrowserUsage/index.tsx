@@ -7,7 +7,7 @@ import { formatDuration } from "@/utils/format";
 import { todayString, daysAgo } from "@/utils/format";
 import clsx from "clsx";
 
-type DatePreset = "today" | "week" | "month";
+type DatePreset = "today" | "week" | "month" | "all";
 
 // ── Limit edit inline form ────────────────────────────────────
 
@@ -231,6 +231,7 @@ export default function BrowserUsage() {
   // Compute date range from preset
   const { startDate, endDate } = useMemo(() => {
     const today = todayString();
+    if (preset === "all") return { startDate: "1970-01-01", endDate: today };
     if (preset === "today") return { startDate: today, endDate: today };
     if (preset === "week") return { startDate: daysAgo(6), endDate: today };
     return { startDate: daysAgo(29), endDate: today };
@@ -329,7 +330,7 @@ export default function BrowserUsage() {
     setLimits((prev) => prev.filter((l) => l.host !== host));
   }, []);
 
-  const PRESETS: DatePreset[] = ["today", "week", "month"];
+  const PRESETS: DatePreset[] = ["today", "week", "month", "all"];
   const BROWSER_EXTENSION_DOWNLOAD_URL = "https://microsoftedge.microsoft.com/addons/detail/ggpfddncgjgicapbhiifkcffbfjcdcpi";
   const browserLinkPayload = JSON.stringify(
     {

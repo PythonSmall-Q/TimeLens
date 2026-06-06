@@ -13,6 +13,7 @@ import type {
   InstallChannelInfo,
   RepairAssistantResult,
   RetentionPolicyInfo,
+  RetentionRunResult,
   ShortcutSettings,
   TrackingTransparencyReport,
 } from "@/types";
@@ -66,6 +67,7 @@ export default function Settings() {
   const [trackingTransparency, setTrackingTransparency] = useState<TrackingTransparencyReport | null>(null);
   const [repairing, setRepairing] = useState(false);
   const [repairError, setRepairError] = useState<string | null>(null);
+  const [repairRunMode, setRepairRunMode] = useState<"preview" | "apply" | null>(null);
   const [settingSearch, setSettingSearch] = useState("");
   const [activeSection, setActiveSection] = useState<
     | "general"
@@ -91,6 +93,12 @@ export default function Settings() {
   const [extensionBridgeLoading, setExtensionBridgeLoading] = useState(false);
   const [extensionBridgeKeyRotatedAt, setExtensionBridgeKeyRotatedAt] = useState<string>("");
   const [trayIconStyle, setTrayIconStyleState] = useState<"auto" | "color" | "black" | "white">("auto");
+  const [backupBusy, setBackupBusy] = useState<"export" | "validate" | "apply" | "import" | null>(null);
+  const [backupMessage, setBackupMessage] = useState<{ type: "success" | "error" | "info"; text: string } | null>(null);
+  const [retentionRunning, setRetentionRunning] = useState(false);
+  const [retentionRunResult, setRetentionRunResult] = useState<RetentionRunResult | null>(null);
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [updateCheckResult, setUpdateCheckResult] = useState<{ status: "upToDate" | "available" | "error"; version?: string; url?: string; message?: string } | null>(null);
   const [shortcuts, setShortcutState] = useState<ShortcutSettings>({
     open_widget_center: "Alt+W",
     toggle_widget_visibility: "Alt+Shift+W",
@@ -118,6 +126,8 @@ export default function Settings() {
     setWeekStartDay,
     excludeTimelens,
     setExcludeTimelens,
+    autoCheckUpdates,
+    setAutoCheckUpdates,
   } = useSettingsStore();
 
   useEffect(() => {
@@ -201,6 +211,18 @@ export default function Settings() {
     setShortcutState((prev) => ({ ...prev, [key]: value }));
   };
 
+  const compareVersions = (a: string, b: string) => {
+    const pa = a.split(".").map(Number);
+    const pb = b.split(".").map(Number);
+    for (let i = 0; i < 3; i += 1) {
+      const na = pa[i] ?? 0;
+      const nb = pb[i] ?? 0;
+      if (na > nb) return 1;
+      if (na < nb) return -1;
+    }
+    return 0;
+  };
+
   const toggleIgnoredApp = (exePath: string) => {
     setIgnoredAppsState((prev) =>
       prev.includes(exePath)
@@ -252,6 +274,7 @@ export default function Settings() {
     try {
       const preview = await api.repairDataIssues(true);
       setRepairPreview(preview);
+      setRepairRunMode("preview");
     } catch (error) {
       setRepairError(error instanceof Error ? error.message : t("dataHealth.repairFailed"));
     }
@@ -268,6 +291,7 @@ export default function Settings() {
         }),
       ]);
       setRepairPreview(result);
+      setRepairRunMode("apply");
       await refreshReliabilityPanels();
     } catch (error) {
       setRepairError(error instanceof Error ? error.message : t("dataHealth.repairFailed"));
@@ -318,42 +342,143 @@ export default function Settings() {
   const validateBackupPackage = async () => {
     const path = await openBackupPackage();
     if (!path) return;
-    setBackupPackagePath(path);
-    const preview = await api.importBackupV2Validate(path);
-    setBackupPreview(preview);
+    setBackupBusy("validate");
+    setBackupMessage(null);
+    try {
+      setBackupPackagePath(path);
+      const preview = await api.importBackupV2Validate(path);
+      setBackupPreview(preview);
+      setBackupMessage({ type: "info", text: t("backup.validated") });
+    } catch (error) {
+      setBackupMessage({
+        type: "error",
+        text: error instanceof Error ? error.message : t("backup.failed"),
+      });
+    } finally {
+      setBackupBusy(null);
+    }
   };
 
   const applyBackupPackage = async () => {
     const path = backupPackagePath ?? await openBackupPackage();
     if (!path) return;
+    setBackupBusy("apply");
+    setBackupMessage(null);
+    try {
+      setBackupPackagePath(path);
+      const result = await api.importBackupV2Apply(path, backupStrategy);
+      setBackupPreview({
+        manifest: result.manifest,
+        compatible: true,
+        supported_strategies: ["overwrite", "merge"],
+        warnings: result.warnings,
+      });
+      setBackupMessage({
+        type: "success",
+        text: t("backup.applySuccess", { count: result.imported_rows }),
+      });
+      await refreshReliabilityPanels();
+    } catch (error) {
+      setBackupMessage({
+        type: "error",
+        text: error instanceof Error ? error.message : t("backup.failed"),
+      });
+    } finally {
+      setBackupBusy(null);
+    }
+  };
+
+  const importAndApplyBackupPackage = async () => {
+    const path = await openBackupPackage();
+    if (!path) return;
     setBackupPackagePath(path);
-    const result = await api.importBackupV2Apply(path, backupStrategy);
-    setBackupPreview({
-      manifest: result.manifest,
-      compatible: true,
-      supported_strategies: ["overwrite", "merge"],
-      warnings: result.warnings,
-    });
-    await refreshReliabilityPanels();
+    setBackupBusy("import");
+    setBackupMessage(null);
+    try {
+      const preview = await api.importBackupV2Validate(path);
+      setBackupPreview(preview);
+      const result = await api.importBackupV2Apply(path, backupStrategy);
+      setBackupPreview({
+        manifest: result.manifest,
+        compatible: true,
+        supported_strategies: ["overwrite", "merge"],
+        warnings: result.warnings,
+      });
+      setBackupMessage({
+        type: "success",
+        text: t("backup.applySuccess", { count: result.imported_rows }),
+      });
+      await refreshReliabilityPanels();
+    } catch (error) {
+      setBackupMessage({
+        type: "error",
+        text: error instanceof Error ? error.message : t("backup.failed"),
+      });
+    } finally {
+      setBackupBusy(null);
+    }
   };
 
   const exportBackupPackage = async () => {
     const path = await saveBackupPackage();
     if (!path) return;
-    const manifest = await api.exportBackupV2(path);
-    setBackupPackagePath(path);
-    setBackupPreview({
-      manifest,
-      compatible: true,
-      supported_strategies: ["overwrite", "merge"],
-      warnings: [],
-    });
-    await refreshReliabilityPanels();
+    setBackupBusy("export");
+    setBackupMessage(null);
+    try {
+      const manifest = await api.exportBackupV2(path);
+      setBackupPackagePath(path);
+      setBackupPreview({
+        manifest,
+        compatible: true,
+        supported_strategies: ["overwrite", "merge"],
+        warnings: [],
+      });
+      setBackupMessage({ type: "success", text: t("backup.exportSuccess") });
+      await refreshReliabilityPanels();
+    } catch (error) {
+      setBackupMessage({
+        type: "error",
+        text: error instanceof Error ? error.message : t("backup.failed"),
+      });
+    } finally {
+      setBackupBusy(null);
+    }
   };
 
   const runRetentionArchive = async () => {
-    await api.runLocalArchiveNow();
-    await refreshReliabilityPanels();
+    setRetentionRunning(true);
+    try {
+      const result = await api.runLocalArchiveNow();
+      setRetentionRunResult(result);
+      await refreshReliabilityPanels();
+    } finally {
+      setRetentionRunning(false);
+    }
+  };
+
+  const checkForUpdatesNow = async () => {
+    setCheckingUpdate(true);
+    setUpdateCheckResult(null);
+    try {
+      const res = await fetch("https://api.github.com/repos/PythonSmall-Q/TimeLens/releases/latest");
+      if (!res.ok) {
+        throw new Error(`GitHub API: ${res.status}`);
+      }
+      const data = (await res.json()) as { tag_name?: string; html_url?: string };
+      const latest = (data.tag_name ?? "").replace(/^v/, "");
+      if (latest && compareVersions(latest, APP_VERSION) > 0) {
+        setUpdateCheckResult({ status: "available", version: latest, url: data.html_url });
+      } else {
+        setUpdateCheckResult({ status: "upToDate" });
+      }
+    } catch (error) {
+      setUpdateCheckResult({
+        status: "error",
+        message: error instanceof Error ? error.message : t("about.checkFailed"),
+      });
+    } finally {
+      setCheckingUpdate(false);
+    }
   };
 
   const showWindowsStartupSettings = installChannelInfo?.platform === "windows";
@@ -936,6 +1061,7 @@ export default function Settings() {
         <div className="flex justify-end gap-2">
           <button
             onClick={previewRepairAssistant}
+            disabled={repairing}
             className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
           >
             {t("dataHealth.previewRepair")}
@@ -954,7 +1080,21 @@ export default function Settings() {
           </div>
         )}
         {repairPreview && (
-          <div className="rounded-lg border border-surface-border bg-surface-hover/40 p-3 text-xs text-text-muted space-y-1">
+          <div className="rounded-lg border border-surface-border bg-surface-hover/40 p-3 text-xs text-text-muted space-y-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <div className="rounded-md border border-surface-border px-2 py-1.5">
+                <p className="text-[11px] text-text-muted">{t("dataHealth.lastAction")}</p>
+                <p className="text-text-primary font-medium">{repairRunMode === "apply" ? t("dataHealth.applyRepair") : t("dataHealth.previewRepair")}</p>
+              </div>
+              <div className="rounded-md border border-surface-border px-2 py-1.5">
+                <p className="text-[11px] text-text-muted">{t("dataHealth.repairedRows")}</p>
+                <p className="text-text-primary font-medium">{repairPreview.rebuilt_daily_rows}</p>
+              </div>
+              <div className="rounded-md border border-surface-border px-2 py-1.5">
+                <p className="text-[11px] text-text-muted">{t("dataHealth.actionCount")}</p>
+                <p className="text-text-primary font-medium">{repairPreview.actions.length}</p>
+              </div>
+            </div>
             <p>{t("dataHealth.repairRows", { count: repairPreview.rebuilt_daily_rows })}</p>
             {repairPreview.actions.map((action) => (
               <p key={action.code}>{action.description}</p>
@@ -1029,15 +1169,24 @@ export default function Settings() {
           <div className="flex items-center gap-2 flex-wrap justify-end">
             <button
               onClick={exportBackupPackage}
+              disabled={backupBusy !== null}
               className="text-xs px-3 py-1.5 rounded-lg border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
             >
-              {t("backup.exportAction")}
+              {backupBusy === "export" ? t("backup.working") : t("backup.exportAction")}
             </button>
             <button
               onClick={validateBackupPackage}
+              disabled={backupBusy !== null}
               className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
             >
-              {t("backup.validateAction")}
+              {backupBusy === "validate" ? t("backup.working") : t("backup.validateAction")}
+            </button>
+            <button
+              onClick={importAndApplyBackupPackage}
+              disabled={backupBusy !== null}
+              className="text-xs px-3 py-1.5 rounded-lg border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
+            >
+              {backupBusy === "import" ? t("backup.working") : t("backup.importRestoreAction")}
             </button>
           </div>
         </Row>
@@ -1059,9 +1208,10 @@ export default function Settings() {
             ))}
             <button
               onClick={applyBackupPackage}
+              disabled={backupBusy !== null}
               className="text-xs px-3 py-1.5 rounded-lg border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
             >
-              {t("backup.applyAction")}
+              {backupBusy === "apply" ? t("backup.working") : t("backup.applyAction")}
             </button>
           </div>
         </Row>
@@ -1084,6 +1234,18 @@ export default function Settings() {
                 </div>
               )}
             </div>
+          )}
+          {backupMessage && (
+            <p
+              className={clsx(
+                "text-xs",
+                backupMessage.type === "success" && "text-accent-green",
+                backupMessage.type === "error" && "text-red-300",
+                backupMessage.type === "info" && "text-accent-blue",
+              )}
+            >
+              {backupMessage.text}
+            </p>
           )}
         </div>
       </Section>
@@ -1120,11 +1282,19 @@ export default function Settings() {
         <div className="flex justify-end">
           <button
             onClick={runRetentionArchive}
+            disabled={retentionRunning}
             className="text-xs px-3 py-1.5 rounded-lg border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
           >
-            {t("retention.runNow")}
+            {retentionRunning ? t("retention.running") : t("retention.runNow")}
           </button>
         </div>
+        {retentionRunResult && (
+          <div className="rounded-lg border border-surface-border bg-surface-hover/40 p-3 text-xs text-text-muted space-y-1">
+            <p>{t("retention.lastRunPolicy", { policy: retentionRunResult.policy })}</p>
+            <p>{t("retention.lastRunAppRows", { count: retentionRunResult.archived_app_usage_rows })}</p>
+            <p>{t("retention.lastRunDailyRows", { count: retentionRunResult.archived_daily_rows })}</p>
+          </div>
+        )}
       </Section>
       )}
 
@@ -1253,6 +1423,53 @@ export default function Settings() {
             {t("about.openLogFolder")}
           </button>
         </Row>
+        <Row label={t("about.autoCheckUpdates")}> 
+          <button
+            onClick={() => setAutoCheckUpdates(!autoCheckUpdates)}
+            title={t("about.autoCheckUpdates")}
+            className={clsx(
+              "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+              autoCheckUpdates ? "bg-accent-blue" : "bg-surface-hover"
+            )}
+          >
+            <span
+              className={clsx(
+                "inline-block h-4 w-4 rounded-full bg-white shadow transition-transform",
+                autoCheckUpdates ? "translate-x-6" : "translate-x-1"
+              )}
+            />
+          </button>
+        </Row>
+        <Row label={t("about.checkUpdate")}>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={checkForUpdatesNow}
+              disabled={checkingUpdate}
+              className="text-xs px-3 py-1.5 rounded-lg border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
+            >
+              {checkingUpdate ? t("about.checking") : t("about.checkUpdate")}
+            </button>
+            {updateCheckResult?.status === "available" && updateCheckResult.url && (
+              <a
+                href={updateCheckResult.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
+              >
+                {t("about.viewRelease")}
+              </a>
+            )}
+          </div>
+        </Row>
+        {updateCheckResult?.status === "upToDate" && (
+          <p className="text-xs text-accent-green text-right">{t("about.upToDate")}</p>
+        )}
+        {updateCheckResult?.status === "available" && (
+          <p className="text-xs text-accent-blue text-right">{t("about.updateAvailable", { version: updateCheckResult.version })}</p>
+        )}
+        {updateCheckResult?.status === "error" && (
+          <p className="text-xs text-red-300 text-right">{updateCheckResult.message || t("about.checkFailed")}</p>
+        )}
         <Row label="GitHub">
           <a
             href="https://github.com/PythonSmall-Q/TimeLens"
