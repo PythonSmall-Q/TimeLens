@@ -67,6 +67,7 @@ const PERMISSION_METHODS: Record<string, string[]> = {
   "todo:read": ["getTodos"],
   "todo:write": ["addTodo", "toggleTodo", "deleteTodo"],
   "settings:write": ["setFocusModeActive", "setMonitoringActive"],
+  "local-api:call": ["localApiCall"],
 };
 
 function denied(method: string, perm: string): () => Promise<never> {
@@ -122,6 +123,40 @@ function buildChannel(widgetId: string, grantedPerms: string[]) {
     setMonitoringActive: withPermission("settings:write", (active: unknown) =>
       api.setMonitoringActive(Boolean(active)) as Promise<unknown>,
     ),
+    // local-api:call
+    localApiCall: withPermission("local-api:call", async (options: unknown) => {
+      const {
+        method = "GET",
+        path,
+        body,
+        scopes = [],
+      } = options as {
+        method?: string;
+        path: string;
+        body?: unknown;
+        scopes?: string[];
+      };
+      if (!path || typeof path !== "string") {
+        throw new Error("localApiCall requires a path string");
+      }
+      const token = await api.issueWidgetApiToken(widgetId, scopes);
+      const resp = await fetch(`http://127.0.0.1:49152${path}`, {
+        method: method.toUpperCase(),
+        headers: {
+          "Content-Type": "application/json",
+          "X-Client-Id": `widget-${widgetId}`,
+          "X-Api-Token": token.token,
+        },
+        body: body !== undefined ? JSON.stringify(body) : undefined,
+      });
+      if (!resp.ok) {
+        throw new Error(`local API call failed: ${resp.status}`);
+      }
+      if (resp.status === 204) {
+        return undefined;
+      }
+      return (await resp.json()) as unknown;
+    }),
     // always available
     getUsageGoals: () => api.getUsageGoals() as Promise<unknown>,
     listFocusSessions: () => api.listFocusSessions() as Promise<unknown>,

@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 import {
   Clock, List, Timer, ExternalLink, Trash2, Plus, StickyNote, Activity,
-  Layers, Puzzle, FolderOpen, ShieldCheck, PawPrint, Ruler, Upload,
+  Puzzle, FolderOpen, ShieldCheck, PawPrint, Ruler, Upload, Wrench,
 } from "lucide-react";
 import { useWidgetStore } from "@/stores/widgetStore";
 import type {
@@ -52,7 +53,7 @@ function WidgetCard({
   onNotify: (message: InlineMessage) => void;
 }) {
   const { t } = useTranslation("widgets");
-  const { openWidget, closeWidget, removeWidget, updateWidgetConfig } = useWidgetStore();
+  const { openWidget, removeWidget, updateWidgetConfig } = useWidgetStore();
   const Icon = ICONS[config.widget_type as keyof typeof ICONS] ?? Clock;
   const petPackInputRef = useRef<HTMLInputElement | null>(null);
   const [petWidth, setPetWidth] = useState(String(Math.round(config.width)));
@@ -399,8 +400,12 @@ function MarketplaceCard({ type, title, icon: Icon, description, source, install
 
 export default function WidgetCenter() {
   const { t } = useTranslation("widgets");
+  const navigate = useNavigate();
   const { widgets, loading, fetchWidgets, createWidget } = useWidgetStore();
   const loadedRef = useRef(false);
+  const showDevHarness =
+    import.meta.env.DEV ||
+    (typeof window !== "undefined" && localStorage.getItem("timelens:widget-dev-harness-enabled") === "1");
   const [tab, setTab] = useState<"mine" | "selfAdd">("mine");
   const [registryItems, setRegistryItems] = useState<WidgetRegistryItem[]>([]);
   const [registryErrors, setRegistryErrors] = useState<WidgetRegistryLoadError[]>([]);
@@ -531,7 +536,7 @@ export default function WidgetCenter() {
     if (created && granted.length > 0) {
       try {
         await api.setWidgetPermissions(created.id, granted, "widget-center");
-      } catch (_) { /* non-fatal */ }
+      } catch { /* non-fatal */ }
     }
     void refreshPermissionData();
     setTab("mine");
@@ -692,13 +697,24 @@ export default function WidgetCenter() {
               <p className="text-xs font-semibold text-text-secondary uppercase tracking-wider">
                 {t("thirdPartyWidgets")}
               </p>
-              <button
-                onClick={handleImportLocalWidget}
-                className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs border border-surface-border
-                           text-text-secondary hover:text-text-primary transition-colors"
-              >
-                <FolderOpen size={12} /> {t("importLocalWidget")}
-              </button>
+              <div className="flex items-center gap-2">
+                {showDevHarness && (
+                  <button
+                    onClick={() => navigate("/widget-dev-harness")}
+                    className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs border border-surface-border
+                               text-text-secondary hover:text-text-primary transition-colors"
+                  >
+                    <Wrench size={12} /> {t("devHarness.open")}
+                  </button>
+                )}
+                <button
+                  onClick={handleImportLocalWidget}
+                  className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs border border-surface-border
+                             text-text-secondary hover:text-text-primary transition-colors"
+                >
+                  <FolderOpen size={12} /> {t("importLocalWidget")}
+                </button>
+              </div>
             </div>
 
             {thirdPartyEntries.length === 0 && (

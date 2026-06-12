@@ -19,6 +19,7 @@ import HomeCustomize from "./pages/HomeCustomize";
 import VsCodeInsights from "./pages/VsCodeInsights";
 import DashboardInsights from "./pages/DashboardInsights";
 import InterruptionDetail from "./pages/InterruptionDetail";
+import WidgetDevHarness from "./pages/WidgetDevHarness";
 import { useStatsStore } from "./stores/statsStore";
 import { useSettingsStore } from "./stores/settingsStore";
 import type { ActiveWindowInfo, AppLimit } from "./types";
@@ -434,6 +435,7 @@ export default function MainApp() {
           <Route path="/focus" element={<FocusMode />} />
           <Route path="/browser" element={<BrowserUsage />} />
           <Route path="/interruptions/detail" element={<InterruptionDetail />} />
+          <Route path="/widget-dev-harness" element={<WidgetDevHarness />} />
         </Routes>
       </MainLayout>
 

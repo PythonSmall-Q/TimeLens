@@ -1,6 +1,6 @@
+use chrono::Local;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
-use chrono::Local;
 use tauri::{AppHandle, Emitter};
 use tokio::time::{interval, MissedTickBehavior};
 
@@ -66,7 +66,9 @@ fn friendly_windows_app_name(process_stem: &str, window_title: &str) -> String {
         .map(|segment| {
             let mut chars = segment.chars();
             match chars.next() {
-                Some(first) => first.to_uppercase().collect::<String>() + &chars.as_str().to_ascii_lowercase(),
+                Some(first) => {
+                    first.to_uppercase().collect::<String>() + &chars.as_str().to_ascii_lowercase()
+                }
                 None => String::new(),
             }
         })
@@ -102,7 +104,10 @@ fn get_process_exe_path(pid: u32) -> Option<String> {
 }
 
 #[cfg(target_os = "windows")]
-fn resolve_uwp_real_pid(frame_hwnd: windows::Win32::Foundation::HWND, host_pid: u32) -> Option<u32> {
+fn resolve_uwp_real_pid(
+    frame_hwnd: windows::Win32::Foundation::HWND,
+    host_pid: u32,
+) -> Option<u32> {
     use windows::Win32::Foundation::{BOOL, HWND, LPARAM};
     use windows::Win32::UI::WindowsAndMessaging::{EnumChildWindows, GetWindowThreadProcessId};
 
@@ -128,7 +133,11 @@ fn resolve_uwp_real_pid(frame_hwnd: windows::Win32::Foundation::HWND, host_pid: 
     };
 
     unsafe {
-        let _ = EnumChildWindows(frame_hwnd, Some(enum_child), LPARAM(&mut probe as *mut Probe as isize));
+        let _ = EnumChildWindows(
+            frame_hwnd,
+            Some(enum_child),
+            LPARAM(&mut probe as *mut Probe as isize),
+        );
     }
 
     (probe.target_pid != 0).then_some(probe.target_pid)
@@ -167,7 +176,10 @@ fn get_foreground_window_info() -> Option<(String, String, String)> {
         if let Some(host_exe) = get_process_exe_path(pid) {
             let is_app_frame_host = std::path::Path::new(&host_exe)
                 .file_stem()
-                .map(|s| s.to_string_lossy().eq_ignore_ascii_case("ApplicationFrameHost"))
+                .map(|s| {
+                    s.to_string_lossy()
+                        .eq_ignore_ascii_case("ApplicationFrameHost")
+                })
                 .unwrap_or(false);
             if is_app_frame_host {
                 if let Some(uwp_pid) = resolve_uwp_real_pid(hwnd, pid) {
@@ -207,7 +219,11 @@ fn get_foreground_window_info() -> Option<(String, String, String)> {
         end tell
     "#;
 
-    let output = Command::new("osascript").arg("-e").arg(script).output().ok()?;
+    let output = Command::new("osascript")
+        .arg("-e")
+        .arg(script)
+        .output()
+        .ok()?;
     if !output.status.success() {
         return None;
     }
@@ -435,11 +451,10 @@ pub fn start_monitor_task(
                     track_window_titles =
                         crate::db::get_bool_setting(&conn, "track_window_titles", true)
                             .unwrap_or(true);
-                    idle_time_policy =
-                        crate::db::get_setting(&conn, "idle_time_policy")
-                            .ok()
-                            .flatten()
-                            .unwrap_or_else(|| "count".to_string());
+                    idle_time_policy = crate::db::get_setting(&conn, "idle_time_policy")
+                        .ok()
+                        .flatten()
+                        .unwrap_or_else(|| "count".to_string());
                 }
             }
 
@@ -534,6 +549,14 @@ pub fn start_monitor_task(
                                         &seg.window_title,
                                         seconds,
                                         &seg.first_seen_at,
+                                        &now_ts,
+                                    );
+                                    let _ = crate::db::update_derived_metrics_for_switch(
+                                        &conn,
+                                        Some(&seg.app_name),
+                                        Some(&seg.window_title),
+                                        &app_name,
+                                        &window_title,
                                         &now_ts,
                                     );
                                 }

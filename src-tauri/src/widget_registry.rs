@@ -16,6 +16,14 @@ pub struct WidgetRegistryItem {
     pub default_width: f64,
     pub default_height: f64,
     pub permissions: Vec<String>,
+    #[serde(default)]
+    pub manifest_version: u32,
+    #[serde(default)]
+    pub capabilities: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sdk_version: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub csp: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -30,15 +38,43 @@ pub struct WidgetRegistryResponse {
     pub errors: Vec<WidgetRegistryLoadError>,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct WidgetManifestSize {
+    pub width: f64,
+    pub height: f64,
+}
+
+/// Normalized manifest v2 representation used by the registry.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct WidgetManifestV2 {
+    pub widget_type: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub entry: String,
+    pub icon: Option<String>,
+    pub default_size: Option<WidgetManifestSize>,
+    pub manifest_version: u32,
+    pub capabilities: Vec<String>,
+    pub permissions: Vec<String>,
+    pub sdk_version: Option<String>,
+    pub csp: Option<String>,
+    pub signature: Option<String>,
+}
+
 #[derive(Debug, Deserialize)]
-struct ThirdPartyWidgetManifest {
+pub struct RawWidgetManifest {
     widget_type: String,
     name: String,
     description: Option<String>,
     entry: String,
     icon: Option<String>,
     default_size: Option<ThirdPartyWidgetSize>,
+    #[serde(default)]
+    manifest_version: u32,
     permissions: Option<Vec<String>>,
+    capabilities: Option<Vec<String>>,
+    sdk_version: Option<String>,
+    csp: Option<String>,
     /// Optional SHA-256 hex digest of the entry JS file for integrity verification.
     signature: Option<String>,
 }
@@ -47,6 +83,82 @@ struct ThirdPartyWidgetManifest {
 struct ThirdPartyWidgetSize {
     width: f64,
     height: f64,
+}
+
+/// Map legacy v1 permission strings to v2 capability names.
+fn map_permission_to_capability(permission: &str) -> &'static str {
+    match permission {
+        "todo:write" | "settings:write" => "write_data",
+        "active-window:subscribe" => "automation_trigger",
+        "local-api:call" | "api:call" => "local_api_call",
+        _ => "read_metrics",
+    }
+}
+
+/// Map v2 capability names back to the runtime permission strings they imply.
+fn expand_capability_to_permissions(capability: &str) -> Vec<&'static str> {
+    match capability {
+        "read_metrics" => vec!["screen-time:read", "todo:read"],
+        "write_data" => vec!["todo:write", "settings:write"],
+        "automation_trigger" => vec!["active-window:subscribe"],
+        "local_api_call" => vec!["local-api:call"],
+        _ => vec![],
+    }
+}
+
+fn dedup_sort(items: Vec<String>) -> Vec<String> {
+    let mut unique: Vec<String> = items.into_iter().collect();
+    unique.sort();
+    unique.dedup();
+    unique
+}
+
+/// Convert a legacy v1 manifest (or an already-v2 manifest) into a normalized
+/// `WidgetManifestV2`. Returns an error if `manifest_version > 2`.
+pub fn normalize_manifest_v1_to_v2(manifest: RawWidgetManifest) -> Result<WidgetManifestV2, String> {
+    if manifest.manifest_version > 2 {
+        return Err("unsupported manifest version".to_string());
+    }
+
+    let (capabilities, permissions) = if let Some(caps) = manifest.capabilities {
+        // v2 manifest: capabilities are authoritative; derive runtime permissions.
+        let capabilities = dedup_sort(caps);
+        let mut perms: Vec<String> = capabilities
+            .iter()
+            .flat_map(|c| expand_capability_to_permissions(c).into_iter().map(String::from))
+            .collect();
+        // Also preserve any explicit permissions if present (for forward compat).
+        if let Some(explicit) = manifest.permissions {
+            perms.extend(explicit);
+        }
+        (capabilities, dedup_sort(perms))
+    } else {
+        // v1 manifest: permissions are authoritative; derive capabilities.
+        let perms = manifest.permissions.unwrap_or_default();
+        let caps: Vec<String> = perms
+            .iter()
+            .map(|p| map_permission_to_capability(p).to_string())
+            .collect();
+        (dedup_sort(caps), dedup_sort(perms))
+    };
+
+    Ok(WidgetManifestV2 {
+        widget_type: manifest.widget_type,
+        name: manifest.name,
+        description: manifest.description,
+        entry: manifest.entry,
+        icon: manifest.icon,
+        default_size: manifest.default_size.map(|s| WidgetManifestSize {
+            width: s.width,
+            height: s.height,
+        }),
+        manifest_version: 2,
+        capabilities,
+        permissions,
+        sdk_version: manifest.sdk_version,
+        csp: manifest.csp,
+        signature: manifest.signature,
+    })
 }
 
 fn official_widgets() -> Vec<WidgetRegistryItem> {
@@ -61,6 +173,10 @@ fn official_widgets() -> Vec<WidgetRegistryItem> {
             default_width: 300.0,
             default_height: 180.0,
             permissions: Vec::new(),
+            manifest_version: 2,
+            capabilities: Vec::new(),
+            sdk_version: None,
+            csp: None,
         },
         WidgetRegistryItem {
             widget_type: "todo".to_string(),
@@ -72,6 +188,10 @@ fn official_widgets() -> Vec<WidgetRegistryItem> {
             default_width: 320.0,
             default_height: 420.0,
             permissions: Vec::new(),
+            manifest_version: 2,
+            capabilities: Vec::new(),
+            sdk_version: None,
+            csp: None,
         },
         WidgetRegistryItem {
             widget_type: "timer".to_string(),
@@ -83,6 +203,10 @@ fn official_widgets() -> Vec<WidgetRegistryItem> {
             default_width: 360.0,
             default_height: 320.0,
             permissions: Vec::new(),
+            manifest_version: 2,
+            capabilities: Vec::new(),
+            sdk_version: None,
+            csp: None,
         },
         WidgetRegistryItem {
             widget_type: "note".to_string(),
@@ -94,6 +218,10 @@ fn official_widgets() -> Vec<WidgetRegistryItem> {
             default_width: 560.0,
             default_height: 340.0,
             permissions: Vec::new(),
+            manifest_version: 2,
+            capabilities: Vec::new(),
+            sdk_version: None,
+            csp: None,
         },
         WidgetRegistryItem {
             widget_type: "status".to_string(),
@@ -105,6 +233,10 @@ fn official_widgets() -> Vec<WidgetRegistryItem> {
             default_width: 520.0,
             default_height: 330.0,
             permissions: Vec::new(),
+            manifest_version: 2,
+            capabilities: Vec::new(),
+            sdk_version: None,
+            csp: None,
         },
         WidgetRegistryItem {
             widget_type: "pet".to_string(),
@@ -116,6 +248,10 @@ fn official_widgets() -> Vec<WidgetRegistryItem> {
             default_width: 420.0,
             default_height: 300.0,
             permissions: Vec::new(),
+            manifest_version: 2,
+            capabilities: Vec::new(),
+            sdk_version: None,
+            csp: None,
         },
     ]
 }
@@ -150,18 +286,23 @@ pub fn load_third_party_widget_from_manifest_path(
         message: format!("failed to read manifest: {e}"),
     })?;
 
-    let manifest: ThirdPartyWidgetManifest =
+    let raw: RawWidgetManifest =
         serde_json::from_str(&manifest_text).map_err(|e| WidgetRegistryLoadError {
             path: manifest_path.display().to_string(),
             message: format!("invalid manifest json: {e}"),
         })?;
 
-    if !is_valid_widget_type(&manifest.widget_type) {
+    if !is_valid_widget_type(&raw.widget_type) {
         return Err(WidgetRegistryLoadError {
             path: manifest_path.display().to_string(),
             message: "invalid widget_type: only [a-zA-Z0-9_-] allowed".to_string(),
         });
     }
+
+    let manifest = normalize_manifest_v1_to_v2(raw).map_err(|message| WidgetRegistryLoadError {
+        path: manifest_path.display().to_string(),
+        message,
+    })?;
 
     let Some(parent_dir) = manifest_path.parent() else {
         return Err(WidgetRegistryLoadError {
@@ -198,8 +339,16 @@ pub fn load_third_party_widget_from_manifest_path(
         }
     }
 
-    let default_width = manifest.default_size.as_ref().map(|s| s.width).unwrap_or(320.0);
-    let default_height = manifest.default_size.as_ref().map(|s| s.height).unwrap_or(240.0);
+    let default_width = manifest
+        .default_size
+        .as_ref()
+        .map(|s| s.width)
+        .unwrap_or(320.0);
+    let default_height = manifest
+        .default_size
+        .as_ref()
+        .map(|s| s.height)
+        .unwrap_or(240.0);
 
     Ok(WidgetRegistryItem {
         widget_type: manifest.widget_type,
@@ -210,7 +359,11 @@ pub fn load_third_party_widget_from_manifest_path(
         icon: manifest.icon,
         default_width,
         default_height,
-        permissions: manifest.permissions.unwrap_or_default(),
+        permissions: manifest.permissions,
+        manifest_version: manifest.manifest_version,
+        capabilities: manifest.capabilities,
+        sdk_version: manifest.sdk_version,
+        csp: manifest.csp,
     })
 }
 
@@ -254,7 +407,10 @@ pub fn load_widget_registry(app: &AppHandle) -> WidgetRegistryResponse {
 
         match load_third_party_widget_from_manifest(&manifest_path) {
             Ok(item) => {
-                if items.iter().any(|existing| existing.widget_type == item.widget_type) {
+                if items
+                    .iter()
+                    .any(|existing| existing.widget_type == item.widget_type)
+                {
                     errors.push(WidgetRegistryLoadError {
                         path: manifest_path.display().to_string(),
                         message: format!("duplicate widget_type: {}", item.widget_type),
@@ -276,4 +432,85 @@ pub fn get_widget_by_type(app: &AppHandle, widget_type: &str) -> Option<WidgetRe
         .items
         .into_iter()
         .find(|item| item.widget_type == widget_type)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_normalize_v1_permissions_to_capabilities() {
+        let raw = RawWidgetManifest {
+            widget_type: "test".to_string(),
+            name: "Test".to_string(),
+            description: None,
+            entry: "index.js".to_string(),
+            icon: None,
+            default_size: None,
+            manifest_version: 1,
+            permissions: Some(vec![
+                "screen-time:read".to_string(),
+                "todo:write".to_string(),
+                "local-api:call".to_string(),
+            ]),
+            capabilities: None,
+            sdk_version: None,
+            csp: None,
+            signature: None,
+        };
+        let v2 = normalize_manifest_v1_to_v2(raw).unwrap();
+        assert_eq!(v2.manifest_version, 2);
+        assert!(v2.capabilities.contains(&"read_metrics".to_string()));
+        assert!(v2.capabilities.contains(&"write_data".to_string()));
+        assert!(v2.capabilities.contains(&"local_api_call".to_string()));
+        assert!(v2.permissions.contains(&"screen-time:read".to_string()));
+        assert!(v2.permissions.contains(&"todo:write".to_string()));
+        assert!(v2.permissions.contains(&"local-api:call".to_string()));
+    }
+
+    #[test]
+    fn test_normalize_v2_capabilities_to_permissions() {
+        let raw = RawWidgetManifest {
+            widget_type: "test".to_string(),
+            name: "Test".to_string(),
+            description: None,
+            entry: "index.js".to_string(),
+            icon: None,
+            default_size: None,
+            manifest_version: 2,
+            permissions: None,
+            capabilities: Some(vec![
+                "read_metrics".to_string(),
+                "write_data".to_string(),
+            ]),
+            sdk_version: None,
+            csp: None,
+            signature: None,
+        };
+        let v2 = normalize_manifest_v1_to_v2(raw).unwrap();
+        assert!(v2.permissions.contains(&"screen-time:read".to_string()));
+        assert!(v2.permissions.contains(&"todo:read".to_string()));
+        assert!(v2.permissions.contains(&"todo:write".to_string()));
+        assert!(v2.permissions.contains(&"settings:write".to_string()));
+    }
+
+    #[test]
+    fn test_reject_unsupported_manifest_version() {
+        let raw = RawWidgetManifest {
+            widget_type: "test".to_string(),
+            name: "Test".to_string(),
+            description: None,
+            entry: "index.js".to_string(),
+            icon: None,
+            default_size: None,
+            manifest_version: 3,
+            permissions: None,
+            capabilities: None,
+            sdk_version: None,
+            csp: None,
+            signature: None,
+        };
+        let err = normalize_manifest_v1_to_v2(raw).unwrap_err();
+        assert_eq!(err, "unsupported manifest version");
+    }
 }

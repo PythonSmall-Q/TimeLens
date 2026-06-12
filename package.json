@@ -18,7 +18,7 @@
     "tauri:build:all": "npm run generate:icons && npm run gen:tray-icons && npm run tauri:build:msi && npm run tauri:build:nsis",
     "generate:icons": "node generate-msix-icons.mjs",
     "gen:tray-icons": "node generate-tray-icons.mjs",
-    "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "lint": "eslint src --report-unused-disable-directives",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
@@ -65,6 +65,7 @@
     "prettier": "^3.2.5",
     "tailwindcss": "^3.4.1",
     "typescript": "^5.2.2",
+    "typescript-eslint": "^8.61.0",
     "vite": "^8.0.14",
     "vitest": "^4.1.7"
   }

@@ -258,14 +258,14 @@ export const useStatsStore = create<StatsState>((set, get) => ({
     try {
       const scores = await api.getProductivityScoreRange(startDate, endDate);
       set({ productivityScores: scores });
-    } catch (_) {}
+    } catch { /* ignore */ }
   },
 
   fetchInterruptionPeriods: async (date: string) => {
     try {
       const periods = await api.getInterruptionPeriods(date);
       set({ interruptionPeriods: periods });
-    } catch (_) {}
+    } catch { /* ignore */ }
   },
 
   fetchVsCodeStatsForRange: async (startDate: string, endDate: string) => {

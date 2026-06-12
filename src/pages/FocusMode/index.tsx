@@ -247,7 +247,6 @@ export default function FocusModePage() {
               <Clock size={12} className="inline mr-1" />
               {/* tick used to force re-render */}
               {durationLabel(activeSession.started_at, null)}
-              {/* eslint-disable-next-line @typescript-eslint/no-unused-expressions */}
               {void tick}
             </p>
           ) : (

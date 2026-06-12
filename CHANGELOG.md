@@ -17,6 +17,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Cross-platform legacy 1.x migration** — startup now detects legacy database paths on Windows, macOS, and Linux and migrates them into the default profile.
 - **Restore monitoring active state on startup** — monitor no longer defaults to active when the user had paused tracking before quitting.
 - **Backup & Restore v2 completeness** — backup packages now include app categories, usage goals, focus sessions/rules, browser ignored domains/limits, widget permissions/audit log, VS Code sessions, API tokens, and client allowlist.
+- **Automatic archive scheduler** — added background scheduler with configurable daily run hour and battery-aware toggle, plus `get_archive_scheduler_settings` / `set_archive_scheduler_settings` commands.
+- **Hot/warm/archive tiering** — archived rows are now tagged with `tier` (`warm` or `archive`) based on age relative to the retention cutoff.
+- **Historical compression** — old archived raw usage rows can be compressed into zstd blobs in `app_usage_archive_compressed`, freeing storage while preserving queryability.
+- **Restore diff summary** — backup validation now reports per-table add/update/conflict counts and settings conflicts before applying a restore.
+- **`new_profile` restore strategy** — importing a backup can create and switch to a fresh profile instead of overwriting or merging the current one.
+- **Passphrase-protected backups** — Backup v2 packages can be AES-256-GCM encrypted with a passphrase derived key (Argon2id).
+- **Database encryption at rest** — optional file-level AES-256-GCM encryption for the local SQLite database; runtime plaintext is wiped on app exit so only the encrypted file remains at rest.
+- **Database encryption commands** — added `enable_database_encryption`, `disable_database_encryption`, and `get_database_encryption_status`.
+- **Derived metrics tables** — added incremental maintenance of `app_switch_density`, `focus_streaks`, and `interruption_summary` in the monitor task and a periodic scheduler, plus `rebuild_derived_metrics` for full repair.
+- **Distraction hotspot detection** — added `get_distraction_hotspots` command and data model for ranking high-switch-density / high-fragmentation apps and time windows.
+- **Category and project comparison** — added `get_category_comparison_in_ranges` and `get_project_comparison_in_ranges` for period-over-period drill-down beyond apps.
+- **Goal risk notifications** — added `evaluate_goal_risks` and a background notifier that emits `goal-risk-alert` events and native notifications when goals are off track.
+- **Backend Focus rule automation** — moved Focus rules from frontend-only `localStorage` to the `focus_rules` table with CRUD commands and a background evaluator that auto starts/stops focus sessions.
 
 ### Changed
 

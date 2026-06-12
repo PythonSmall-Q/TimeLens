@@ -167,5 +167,21 @@
     "loading": "正在載入小元件模塊...",
     "noDescription": "暫無描述。",
     "noWidgets": "暫無第三方小元件，點選「匯入本機元件」新增。"
+  },
+  "devHarness": {
+    "open": "開發調試",
+    "title": "小元件開發調試台",
+    "subtitle": "無需安裝即可載入並調試本機小元件。",
+    "selectFolder": "選擇元件資料夾",
+    "selectFolderHint": "選擇一個元件資料夾以在調試台中載入。",
+    "reload": "重新載入",
+    "capabilities": "能力",
+    "autoReload": "變更時自動重載",
+    "widgetType": "元件類型",
+    "manifestVersion": "清單版本",
+    "permissions": "權限",
+    "logs": "日誌",
+    "noLogs": "暫無日誌。",
+    "loadingManifest": "正在載入清單..."
   }
 }

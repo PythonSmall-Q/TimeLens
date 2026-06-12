@@ -1,23 +1,25 @@
-use std::sync::{Arc, Mutex};
-#[cfg(target_os = "windows")]
-use std::sync::OnceLock;
-#[cfg(target_os = "windows")]
-use std::time::{Duration, Instant};
 use chrono::{Datelike, Local};
 use rusqlite::params;
+#[cfg(target_os = "windows")]
+use std::sync::OnceLock;
+use std::sync::{Arc, Mutex};
+#[cfg(target_os = "windows")]
+use std::time::{Duration, Instant};
 use tauri::State;
 
 use crate::db;
 use crate::models::{
-    AppCategoryRule, AppUsageComparison, AppUsageSummary, CategorySuggestion,
-    BrowserSession, CategoryDailyUsage, CategoryUsageSummary, DailyUsage, ExecutableOption, FocusSession,
-    GoalProgress, HourlyDistribution, TodoItem, UsageGoal, WidgetConfig,
+    AppCategoryRule, AppUsageComparison, AppUsageSummary, BrowserSession, CategoryDailyUsage,
+    CategorySuggestion, CategoryUsageSummary, DailyUsage, ExecutableOption, FocusRule,
+    FocusRuleMatch, FocusSession, GoalProgress, HourlyDistribution, TodoItem, UsageGoal,
+    WidgetConfig,
 };
 
 pub type DbState = Arc<Mutex<rusqlite::Connection>>;
 
 #[cfg(target_os = "windows")]
-static RUNNING_EXE_CACHE: OnceLock<Mutex<Option<(Instant, Vec<ExecutableOption>)>>> = OnceLock::new();
+static RUNNING_EXE_CACHE: OnceLock<Mutex<Option<(Instant, Vec<ExecutableOption>)>>> =
+    OnceLock::new();
 
 fn today() -> String {
     Local::now().format("%Y-%m-%d").to_string()
@@ -27,7 +29,11 @@ fn current_week_range(week_start_day: i32) -> (String, String) {
     let now = Local::now().date_naive();
     let weekday = now.weekday().num_days_from_sunday() as i64;
     let start_offset = if week_start_day == 1 {
-        if weekday == 0 { 6 } else { weekday - 1 }
+        if weekday == 0 {
+            6
+        } else {
+            weekday - 1
+        }
     } else {
         weekday
     };
@@ -49,25 +55,39 @@ fn suggest_category(app_name: &str, exe_path: &str) -> CategorySuggestion {
     let rules: [(&str, &[&str], f64, &str); 4] = [
         (
             "work",
-            &["code", "idea", "devenv", "slack", "teams", "notion", "excel", "word"],
+            &[
+                "code", "idea", "devenv", "slack", "teams", "notion", "excel", "word",
+            ],
             0.88,
             "matched productivity keyword",
         ),
         (
             "entertainment",
-            &["steam", "game", "epic", "spotify", "video", "player", "netflix"],
+            &[
+                "steam", "game", "epic", "spotify", "video", "player", "netflix",
+            ],
             0.86,
             "matched entertainment keyword",
         ),
         (
             "study",
-            &["anki", "obsidian", "coursera", "udemy", "jupyter", "pdf", "lecture"],
+            &[
+                "anki", "obsidian", "coursera", "udemy", "jupyter", "pdf", "lecture",
+            ],
             0.84,
             "matched learning keyword",
         ),
         (
             "social",
-            &["wechat", "qq", "discord", "telegram", "whatsapp", "messenger", "weibo"],
+            &[
+                "wechat",
+                "qq",
+                "discord",
+                "telegram",
+                "whatsapp",
+                "messenger",
+                "weibo",
+            ],
             0.85,
             "matched social keyword",
         ),
@@ -109,7 +129,10 @@ pub fn get_today_app_totals(db: State<DbState>) -> Result<Vec<AppUsageSummary>, 
 
 /// Returns per-app totals for a specific date.
 #[tauri::command]
-pub fn get_app_totals_for_date(date: String, db: State<DbState>) -> Result<Vec<AppUsageSummary>, String> {
+pub fn get_app_totals_for_date(
+    date: String,
+    db: State<DbState>,
+) -> Result<Vec<AppUsageSummary>, String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
     let rows = db::get_daily_app_totals(&conn, &date).map_err(|e| e.to_string())?;
     Ok(rows
@@ -129,7 +152,8 @@ pub fn get_app_totals_in_range(
     db: State<DbState>,
 ) -> Result<Vec<AppUsageSummary>, String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
-    let rows = db::get_app_totals_in_range(&conn, &start_date, &end_date).map_err(|e| e.to_string())?;
+    let rows =
+        db::get_app_totals_in_range(&conn, &start_date, &end_date).map_err(|e| e.to_string())?;
     Ok(rows
         .into_iter()
         .map(|(app_name, exe_path, total_seconds)| AppUsageSummary {
@@ -172,25 +196,27 @@ pub fn get_app_comparison_in_ranges(
 
     let mut rows: Vec<AppUsageComparison> = map
         .into_iter()
-        .map(|(app_name, (exe_path, current_seconds, previous_seconds))| {
-            let delta_seconds = current_seconds - previous_seconds;
-            let delta_ratio = if previous_seconds > 0 {
-                delta_seconds as f64 / previous_seconds as f64
-            } else if current_seconds > 0 {
-                1.0
-            } else {
-                0.0
-            };
+        .map(
+            |(app_name, (exe_path, current_seconds, previous_seconds))| {
+                let delta_seconds = current_seconds - previous_seconds;
+                let delta_ratio = if previous_seconds > 0 {
+                    delta_seconds as f64 / previous_seconds as f64
+                } else if current_seconds > 0 {
+                    1.0
+                } else {
+                    0.0
+                };
 
-            AppUsageComparison {
-                app_name,
-                exe_path,
-                current_seconds,
-                previous_seconds,
-                delta_seconds,
-                delta_ratio,
-            }
-        })
+                AppUsageComparison {
+                    app_name,
+                    exe_path,
+                    current_seconds,
+                    previous_seconds,
+                    delta_seconds,
+                    delta_ratio,
+                }
+            },
+        )
         .collect();
 
     rows.sort_by(|a, b| b.current_seconds.cmp(&a.current_seconds));
@@ -218,7 +244,10 @@ pub fn get_recent_daily_totals(days: u32, db: State<DbState>) -> Result<Vec<Dail
     let rows = db::get_daily_totals(&conn, &since).map_err(|e| e.to_string())?;
     Ok(rows
         .into_iter()
-        .map(|(date, total_seconds)| DailyUsage { date, total_seconds })
+        .map(|(date, total_seconds)| DailyUsage {
+            date,
+            total_seconds,
+        })
         .collect())
 }
 
@@ -247,11 +276,14 @@ pub fn get_daily_totals_in_range(
     db: State<DbState>,
 ) -> Result<Vec<DailyUsage>, String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
-    let rows = db::get_daily_totals_in_range(&conn, &start_date, &end_date)
-        .map_err(|e| e.to_string())?;
+    let rows =
+        db::get_daily_totals_in_range(&conn, &start_date, &end_date).map_err(|e| e.to_string())?;
     Ok(rows
         .into_iter()
-        .map(|(date, total_seconds)| DailyUsage { date, total_seconds })
+        .map(|(date, total_seconds)| DailyUsage {
+            date,
+            total_seconds,
+        })
         .collect())
 }
 
@@ -382,7 +414,134 @@ pub fn list_focus_sessions(
     db: State<DbState>,
 ) -> Result<Vec<FocusSession>, String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
-    db::list_focus_sessions(&conn, start_at.as_deref(), end_at.as_deref()).map_err(|e| e.to_string())
+    db::list_focus_sessions(&conn, start_at.as_deref(), end_at.as_deref())
+        .map_err(|e| e.to_string())
+}
+
+// ── Focus rule commands ───────────────────────────────────────
+
+#[tauri::command]
+pub fn get_focus_rules(db: State<DbState>) -> Result<Vec<FocusRule>, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    db::get_focus_rules(&conn).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn save_focus_rule(rule: FocusRule, db: State<DbState>) -> Result<FocusRule, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    let id = db::upsert_focus_rule(&conn, &rule).map_err(|e| e.to_string())?;
+    Ok(FocusRule {
+        id: Some(id),
+        ..rule
+    })
+}
+
+#[tauri::command]
+pub fn delete_focus_rule(id: i64, db: State<DbState>) -> Result<(), String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    db::delete_focus_rule(&conn, id).map_err(|e| e.to_string())
+}
+
+pub fn evaluate_focus_rules_inner(
+    conn: &rusqlite::Connection,
+    status: &crate::monitor::MonitorStatus,
+) -> Result<Vec<FocusRuleMatch>, String> {
+    let rules = db::get_focus_rules(conn).map_err(|e| e.to_string())?;
+    let active_session_id = db::get_active_focus_session_id(conn).map_err(|e| e.to_string())?;
+    let now = chrono::Local::now();
+    let current_time = now.format("%H:%M").to_string();
+
+    let mut matches = Vec::new();
+    for rule in rules.into_iter().filter(|r| r.enabled) {
+        let condition: serde_json::Value =
+            serde_json::from_str(&rule.condition_json).unwrap_or_default();
+        let mut matched = false;
+        let mut match_reason = String::new();
+
+        match rule.rule_type.as_str() {
+            "keyword" => {
+                let match_type = condition["match_type"].as_str().unwrap_or("app_name");
+                let keyword = condition["keyword"]
+                    .as_str()
+                    .unwrap_or("")
+                    .to_ascii_lowercase();
+                let haystack = match match_type {
+                    "window_title" => status.current_title.to_ascii_lowercase(),
+                    "host" => status.current_title.to_ascii_lowercase(),
+                    _ => status.current_app.to_ascii_lowercase(),
+                };
+                if !keyword.is_empty() && haystack.contains(&keyword) {
+                    matched = true;
+                    match_reason = format!("matched keyword '{}' in {}", keyword, match_type);
+                }
+            }
+            "time_window" => {
+                let start = condition["start"].as_str().unwrap_or("");
+                let end = condition["end"].as_str().unwrap_or("");
+                if !start.is_empty()
+                    && !end.is_empty()
+                    && current_time.as_str() >= start
+                    && current_time.as_str() <= end
+                {
+                    matched = true;
+                    match_reason = format!("within time window {} - {}", start, end);
+                }
+            }
+            "app" => {
+                let target_app = condition["app_name"]
+                    .as_str()
+                    .unwrap_or("")
+                    .to_ascii_lowercase();
+                let target_exe = condition["exe_path"]
+                    .as_str()
+                    .unwrap_or("")
+                    .to_ascii_lowercase();
+                let current_app = status.current_app.to_ascii_lowercase();
+                let current_exe = status.current_exe_path.to_ascii_lowercase();
+                if (!target_app.is_empty() && current_app.contains(&target_app))
+                    || (!target_exe.is_empty() && current_exe.contains(&target_exe))
+                {
+                    matched = true;
+                    match_reason = "matched target app".to_string();
+                }
+            }
+            _ => {}
+        }
+
+        // Apply the action if matched.
+        if matched {
+            if rule.action == "enter_focus" && active_session_id.is_none() {
+                let _ = db::start_focus_session(conn, "rule", &rule.name);
+            } else if rule.action == "leave_focus" && active_session_id.is_some() {
+                let _ = db::stop_focus_session(conn, active_session_id.unwrap_or(0));
+            }
+        }
+
+        let rule_id = rule.id.unwrap_or(0);
+        matches.push(FocusRuleMatch {
+            rule_id,
+            rule_name: rule.name,
+            action: rule.action,
+            matched,
+            reason: if matched {
+                match_reason
+            } else {
+                "no match".to_string()
+            },
+        });
+    }
+
+    Ok(matches)
+}
+
+#[tauri::command]
+pub fn evaluate_focus_rules(
+    status: State<'_, crate::monitor::SharedMonitorStatus>,
+    db: State<DbState>,
+) -> Result<Vec<FocusRuleMatch>, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    let status = status.lock().map_err(|e| e.to_string())?;
+    evaluate_focus_rules_inner(&conn, &status)
 }
 
 // ── Todo commands ─────────────────────────────────────────────
@@ -398,7 +557,11 @@ pub fn add_todo(content: String, db: State<DbState>) -> Result<TodoItem, String>
     let conn = db.lock().map_err(|e| e.to_string())?;
     // Place at the end
     let max_order: i64 = conn
-        .query_row("SELECT COALESCE(MAX(order_index), -1) FROM todos", [], |r| r.get(0))
+        .query_row(
+            "SELECT COALESCE(MAX(order_index), -1) FROM todos",
+            [],
+            |r| r.get(0),
+        )
         .unwrap_or(-1);
     let id = db::insert_todo(&conn, &content, max_order + 1).map_err(|e| e.to_string())?;
     let now = chrono::Local::now().format("%Y-%m-%dT%H:%M:%S").to_string();
@@ -468,7 +631,10 @@ pub fn set_ignored_apps(exe_paths: Vec<String>, db: State<DbState>) -> Result<()
 }
 
 #[tauri::command]
-pub fn get_recent_executables(limit: Option<u32>, db: State<DbState>) -> Result<Vec<ExecutableOption>, String> {
+pub fn get_recent_executables(
+    limit: Option<u32>,
+    db: State<DbState>,
+) -> Result<Vec<ExecutableOption>, String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
     let rows = db::get_recent_executables(&conn, limit.unwrap_or(200) as i64)
         .map_err(|e| e.to_string())?;
@@ -495,8 +661,8 @@ pub fn get_running_executables() -> Result<Vec<ExecutableOption>, String> {
         }
 
         use std::collections::BTreeSet;
-        use std::process::Command;
         use std::os::windows::process::CommandExt;
+        use std::process::Command;
 
         let output = Command::new("tasklist")
             .args(["/fo", "csv", "/nh"])
@@ -633,7 +799,9 @@ pub fn get_app_usage_page(
         _ => {
             let where_sql = "";
             let count = conn
-                .query_row("SELECT COUNT(1) FROM app_usage", [], |row| row.get::<_, i64>(0))
+                .query_row("SELECT COUNT(1) FROM app_usage", [], |row| {
+                    row.get::<_, i64>(0)
+                })
                 .map_err(|e| e.to_string())?;
             let stmt = conn
                 .prepare(
@@ -684,7 +852,11 @@ pub fn get_app_usage_page(
     };
 
     let consumed = off + rows.len() as i64;
-    let next_offset = if consumed < count { Some(consumed) } else { None };
+    let next_offset = if consumed < count {
+        Some(consumed)
+    } else {
+        None
+    };
 
     Ok(AppUsagePage {
         rows,
@@ -705,7 +877,9 @@ pub fn export_data_csv(db: State<DbState>) -> Result<String, String> {
         .map_err(|e| e.to_string())?;
 
     let mut rows = stmt.query([]).map_err(|e| e.to_string())?;
-    let mut csv = String::from("date,app_name,exe_path,window_title,active_seconds,first_seen_at,last_seen_at\n");
+    let mut csv = String::from(
+        "date,app_name,exe_path,window_title,active_seconds,first_seen_at,last_seen_at\n",
+    );
 
     while let Some(row) = rows.next().map_err(|e| e.to_string())? {
         let date: String = row.get(0).map_err(|e| e.to_string())?;
@@ -757,7 +931,8 @@ pub fn export_data_json(db: State<DbState>) -> Result<String, String> {
                 })
             })
             .map_err(|e| e.to_string())?;
-        rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())?
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(|e| e.to_string())?
     };
 
     let todos = {
@@ -775,10 +950,12 @@ pub fn export_data_json(db: State<DbState>) -> Result<String, String> {
                 })
             })
             .map_err(|e| e.to_string())?;
-        rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())?
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(|e| e.to_string())?
     };
 
-    let browser_sessions = db::get_recent_browser_sessions(&conn, 100_000).map_err(|e| e.to_string())?;
+    let browser_sessions =
+        db::get_recent_browser_sessions(&conn, 100_000).map_err(|e| e.to_string())?;
 
     let widget_configs = db::get_all_widget_configs(&conn).map_err(|e| e.to_string())?;
     let ignored_apps = db::get_ignored_apps(&conn).map_err(|e| e.to_string())?;
@@ -795,7 +972,8 @@ pub fn export_data_json(db: State<DbState>) -> Result<String, String> {
                 })
             })
             .map_err(|e| e.to_string())?;
-        rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())?
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(|e| e.to_string())?
     };
 
     let bundle = ExportBundle {
@@ -843,7 +1021,13 @@ pub fn import_data_json(payload: String, db: State<DbState>) -> Result<(), Strin
                done = excluded.done,
                created_at = excluded.created_at,
                order_index = excluded.order_index",
-            params![row.id, row.content, row.done as i32, row.created_at, row.order_index],
+            params![
+                row.id,
+                row.content,
+                row.done as i32,
+                row.created_at,
+                row.order_index
+            ],
         )
         .map_err(|e| e.to_string())?;
     }
@@ -958,11 +1142,14 @@ pub fn get_recent_daily_totals_range(
     db: State<DbState>,
 ) -> Result<Vec<DailyUsage>, String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
-    let rows = db::get_daily_totals_in_range(&conn, &start_date, &end_date)
-        .map_err(|e| e.to_string())?;
+    let rows =
+        db::get_daily_totals_in_range(&conn, &start_date, &end_date).map_err(|e| e.to_string())?;
     Ok(rows
         .into_iter()
-        .map(|(date, total_seconds)| DailyUsage { date, total_seconds })
+        .map(|(date, total_seconds)| DailyUsage {
+            date,
+            total_seconds,
+        })
         .collect())
 }
 

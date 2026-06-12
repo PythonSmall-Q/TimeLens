@@ -1,8 +1,8 @@
-use chrono::Local;
-use tauri::State;
 use crate::commands::storage_cmd::DbState;
 use crate::db;
 use crate::monitor::{MonitorStatus, SharedMonitorStatus};
+use chrono::Local;
+use tauri::State;
 
 /// Get the current monitoring status (active/paused) and last known app.
 #[tauri::command]

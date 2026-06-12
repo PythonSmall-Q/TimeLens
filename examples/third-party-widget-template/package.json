@@ -1,0 +1,14 @@
+{
+  "name": "timelens-third-party-widget-template",
+  "version": "2.0.0",
+  "description": "TimeLens Widget SDK v2 template",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "dev": "tsc -w"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

@@ -157,7 +157,6 @@ function DomainRow({
                 <span>{formatDuration(stat.total_seconds)} / {formatDuration(limit!.daily_limit_seconds)}</span>
               </div>
               <div className="h-1 bg-surface-hover rounded-full overflow-hidden">
-                {/* eslint-disable-next-line react/forbid-dom-props */}
                 <div
                   className={clsx("h-full rounded-full transition-all", barColor)}
                   style={{ width: `${Math.min(100, ratio * 100).toFixed(1)}%` }}

@@ -113,27 +113,26 @@ fn default_shortcuts() -> ShortcutSettings {
 pub fn get_app_settings(app: AppHandle, db: State<DbState>) -> Result<AppSettingsPayload, String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
 
-    let launch_at_startup = app
-        .autolaunch()
-        .is_enabled()
-        .unwrap_or(false);
-    let silent_startup = crate::db::get_bool_setting(&conn, "silent_startup", true)
-        .map_err(|e| e.to_string())?;
-    let auto_open_widgets = crate::db::get_bool_setting(&conn, "auto_open_widgets", true)
-        .map_err(|e| e.to_string())?;
-    let ignore_system_processes = crate::db::get_bool_setting(&conn, "ignore_system_processes", false)
-        .map_err(|e| e.to_string())?;
+    let launch_at_startup = app.autolaunch().is_enabled().unwrap_or(false);
+    let silent_startup =
+        crate::db::get_bool_setting(&conn, "silent_startup", true).map_err(|e| e.to_string())?;
+    let auto_open_widgets =
+        crate::db::get_bool_setting(&conn, "auto_open_widgets", true).map_err(|e| e.to_string())?;
+    let ignore_system_processes =
+        crate::db::get_bool_setting(&conn, "ignore_system_processes", false)
+            .map_err(|e| e.to_string())?;
     let idle_time_policy = crate::db::get_setting(&conn, "idle_time_policy")
         .map_err(|e| e.to_string())?
         .unwrap_or_else(|| "count".to_string());
     let track_window_titles = crate::db::get_bool_setting(&conn, "track_window_titles", true)
         .map_err(|e| e.to_string())?;
-    let browser_extension_enabled = crate::db::get_bool_setting(&conn, "browser_extension_enabled", true)
-        .map_err(|e| e.to_string())?;
+    let browser_extension_enabled =
+        crate::db::get_bool_setting(&conn, "browser_extension_enabled", true)
+            .map_err(|e| e.to_string())?;
 
     let mut shortcuts = default_shortcuts();
-    if let Some(v) = crate::db::get_setting(&conn, "shortcut_open_widget_center")
-        .map_err(|e| e.to_string())?
+    if let Some(v) =
+        crate::db::get_setting(&conn, "shortcut_open_widget_center").map_err(|e| e.to_string())?
     {
         shortcuts.open_widget_center = v;
     }
@@ -142,13 +141,13 @@ pub fn get_app_settings(app: AppHandle, db: State<DbState>) -> Result<AppSetting
     {
         shortcuts.toggle_widget_visibility = v;
     }
-    if let Some(v) = crate::db::get_setting(&conn, "shortcut_start_recording")
-        .map_err(|e| e.to_string())?
+    if let Some(v) =
+        crate::db::get_setting(&conn, "shortcut_start_recording").map_err(|e| e.to_string())?
     {
         shortcuts.start_recording = v;
     }
-    if let Some(v) = crate::db::get_setting(&conn, "shortcut_pause_recording")
-        .map_err(|e| e.to_string())?
+    if let Some(v) =
+        crate::db::get_setting(&conn, "shortcut_pause_recording").map_err(|e| e.to_string())?
     {
         shortcuts.pause_recording = v;
     }
@@ -176,9 +175,10 @@ pub fn get_browser_extension_status(db: State<DbState>) -> Result<BrowserExtensi
         .map_err(|e| e.to_string())?;
     let last_locale = crate::db::get_setting(&conn, "browser_extension_last_locale")
         .map_err(|e| e.to_string())?;
-    let recent_sessions = crate::db::get_recent_browser_sessions(&conn, 6)
-        .map_err(|e| e.to_string())?;
-    let recent_session_count = crate::db::count_browser_sessions(&conn).map_err(|e| e.to_string())?;
+    let recent_sessions =
+        crate::db::get_recent_browser_sessions(&conn, 6).map_err(|e| e.to_string())?;
+    let recent_session_count =
+        crate::db::count_browser_sessions(&conn).map_err(|e| e.to_string())?;
 
     Ok(BrowserExtensionStatus {
         enabled,
@@ -195,11 +195,16 @@ pub fn get_browser_extension_status(db: State<DbState>) -> Result<BrowserExtensi
 #[tauri::command]
 pub fn set_browser_extension_enabled(enabled: bool, db: State<DbState>) -> Result<(), String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
-    crate::db::set_bool_setting(&conn, "browser_extension_enabled", enabled).map_err(|e| e.to_string())
+    crate::db::set_bool_setting(&conn, "browser_extension_enabled", enabled)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub fn set_launch_at_startup(app: AppHandle, enabled: bool, db: State<DbState>) -> Result<(), String> {
+pub fn set_launch_at_startup(
+    app: AppHandle,
+    enabled: bool,
+    db: State<DbState>,
+) -> Result<(), String> {
     if enabled {
         app.autolaunch().enable().map_err(|e| e.to_string())?;
     } else {
@@ -225,7 +230,8 @@ pub fn set_auto_open_widgets(enabled: bool, db: State<DbState>) -> Result<(), St
 #[tauri::command]
 pub fn set_ignore_system_processes(enabled: bool, db: State<DbState>) -> Result<(), String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
-    crate::db::set_bool_setting(&conn, "ignore_system_processes", enabled).map_err(|e| e.to_string())
+    crate::db::set_bool_setting(&conn, "ignore_system_processes", enabled)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -247,18 +253,30 @@ pub fn set_track_window_titles(enabled: bool, db: State<DbState>) -> Result<(), 
 #[tauri::command]
 pub fn set_shortcuts(shortcuts: ShortcutSettings, db: State<DbState>) -> Result<(), String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
-    crate::db::set_setting(&conn, "shortcut_open_widget_center", &shortcuts.open_widget_center)
-        .map_err(|e| e.to_string())?;
+    crate::db::set_setting(
+        &conn,
+        "shortcut_open_widget_center",
+        &shortcuts.open_widget_center,
+    )
+    .map_err(|e| e.to_string())?;
     crate::db::set_setting(
         &conn,
         "shortcut_toggle_widget_visibility",
         &shortcuts.toggle_widget_visibility,
     )
     .map_err(|e| e.to_string())?;
-    crate::db::set_setting(&conn, "shortcut_start_recording", &shortcuts.start_recording)
-        .map_err(|e| e.to_string())?;
-    crate::db::set_setting(&conn, "shortcut_pause_recording", &shortcuts.pause_recording)
-        .map_err(|e| e.to_string())?;
+    crate::db::set_setting(
+        &conn,
+        "shortcut_start_recording",
+        &shortcuts.start_recording,
+    )
+    .map_err(|e| e.to_string())?;
+    crate::db::set_setting(
+        &conn,
+        "shortcut_pause_recording",
+        &shortcuts.pause_recording,
+    )
+    .map_err(|e| e.to_string())?;
 
     Ok(())
 }
@@ -309,7 +327,11 @@ fn send_windows_toast(title: &str, body: &str, alarm: bool) -> Result<(), String
 }
 
 #[tauri::command]
-pub fn send_native_notification(title: String, body: String, alarm: Option<bool>) -> Result<(), String> {
+pub fn send_native_notification(
+    title: String,
+    body: String,
+    alarm: Option<bool>,
+) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
         return send_windows_toast(&title, &body, alarm.unwrap_or(false));
@@ -329,8 +351,7 @@ pub fn open_log_directory(app: AppHandle) -> Result<String, String> {
         .app_log_dir()
         .map_err(|e| format!("resolve log dir failed: {e}"))?;
 
-    std::fs::create_dir_all(&log_dir)
-        .map_err(|e| format!("create log dir failed: {e}"))?;
+    std::fs::create_dir_all(&log_dir).map_err(|e| format!("create log dir failed: {e}"))?;
 
     #[cfg(target_os = "windows")]
     {
@@ -371,17 +392,22 @@ pub fn get_tray_icon_style(db: State<DbState>) -> Result<String, String> {
 }
 
 #[tauri::command]
-pub fn set_tray_icon_style(app: AppHandle, style: String, db: State<DbState>) -> Result<(), String> {
+pub fn set_tray_icon_style(
+    app: AppHandle,
+    style: String,
+    db: State<DbState>,
+) -> Result<(), String> {
     let normalized = match style.as_str() {
         "auto" | "color" | "black" | "white" => style.clone(),
-        _ => return Err("tray_icon_style must be 'auto', 'color', 'black', or 'white'".to_string()),
+        _ => {
+            return Err("tray_icon_style must be 'auto', 'color', 'black', or 'white'".to_string())
+        }
     };
 
     // Persist to DB
     {
         let conn = db.lock().map_err(|e| e.to_string())?;
-        crate::db::set_setting(&conn, "tray_icon_style", &normalized)
-            .map_err(|e| e.to_string())?;
+        crate::db::set_setting(&conn, "tray_icon_style", &normalized).map_err(|e| e.to_string())?;
     }
 
     // Update tray icon immediately

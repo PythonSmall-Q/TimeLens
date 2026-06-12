@@ -1,8 +1,11 @@
-use rusqlite::params;
+use chrono::{Datelike, Timelike};
+use rusqlite::{params, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
 use crate::commands::storage_cmd::DbState;
+use crate::db;
+use crate::models::{CategoryComparison, DistractionHotspot, GoalRiskAlert, ProjectComparison};
 
 // ── Types ─────────────────────────────────────────────────────
 
@@ -191,9 +194,7 @@ pub fn get_interruption_periods(
 
     // Fetch all app_usage segments for the date, ordered by start time
     let mut stmt = conn
-        .prepare(
-            "SELECT first_seen_at FROM app_usage WHERE date = ?1 ORDER BY first_seen_at",
-        )
+        .prepare("SELECT first_seen_at FROM app_usage WHERE date = ?1 ORDER BY first_seen_at")
         .map_err(|e| e.to_string())?;
 
     let timestamps: Vec<String> = stmt
@@ -213,10 +214,7 @@ pub fn get_interruption_periods(
         Some(h * 3600 + m * 60 + s)
     }
 
-    let secs: Vec<i64> = timestamps
-        .iter()
-        .filter_map(|ts| parse_secs(ts))
-        .collect();
+    let secs: Vec<i64> = timestamps.iter().filter_map(|ts| parse_secs(ts)).collect();
 
     // Per-hour switch counts
     let mut hour_switches: [u32; 24] = [0; 24];
@@ -282,7 +280,9 @@ pub fn suggest_focus_windows(
         .map_err(|e| e.to_string())?;
 
     let rows: Vec<(i64, i64)> = stmt
-        .query_map(params![start_date], |row| Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?)))
+        .query_map(params![start_date], |row| {
+            Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?))
+        })
         .map_err(|e| e.to_string())?
         .collect::<Result<_, _>>()
         .map_err(|e: rusqlite::Error| e.to_string())?;
@@ -322,11 +322,14 @@ pub fn suggest_goal_adjustments(
 
     let mut out = Vec::new();
     for item in progress {
-        let Some(goal_id) = item.goal.id else { continue };
+        let Some(goal_id) = item.goal.id else {
+            continue;
+        };
         let (recommendation, reason) = if item.progress_ratio >= 1.5 {
             (
                 "increase_target".to_string(),
-                "Goal has been consistently exceeded; consider a realistic stretch target.".to_string(),
+                "Goal has been consistently exceeded; consider a realistic stretch target."
+                    .to_string(),
             )
         } else if item.progress_ratio <= 0.4 {
             (
@@ -360,11 +363,15 @@ pub fn detect_usage_anomalies(
     let conn = db.lock().map_err(|e| e.to_string())?;
     let baseline_days = baseline_days.unwrap_or(14).clamp(7, 60);
     let baseline_start = match chrono::NaiveDate::parse_from_str(&date, "%Y-%m-%d") {
-        Ok(d) => (d - chrono::Duration::days(baseline_days)).format("%Y-%m-%d").to_string(),
+        Ok(d) => (d - chrono::Duration::days(baseline_days))
+            .format("%Y-%m-%d")
+            .to_string(),
         Err(_) => return Err("date must be in YYYY-MM-DD format".to_string()),
     };
     let baseline_end = match chrono::NaiveDate::parse_from_str(&date, "%Y-%m-%d") {
-        Ok(d) => (d - chrono::Duration::days(1)).format("%Y-%m-%d").to_string(),
+        Ok(d) => (d - chrono::Duration::days(1))
+            .format("%Y-%m-%d")
+            .to_string(),
         Err(_) => return Err("date must be in YYYY-MM-DD format".to_string()),
     };
 
@@ -406,7 +413,10 @@ pub fn detect_usage_anomalies(
     let reason = if delta_ratio > 0.0 {
         format!("Usage is {:.0}% above recent baseline", delta_ratio * 100.0)
     } else {
-        format!("Usage is {:.0}% below recent baseline", delta_ratio.abs() * 100.0)
+        format!(
+            "Usage is {:.0}% below recent baseline",
+            delta_ratio.abs() * 100.0
+        )
     };
 
     Ok(vec![UsageAnomalyMarker {
@@ -418,4 +428,340 @@ pub fn detect_usage_anomalies(
         direction,
         reason,
     }])
+}
+
+// ── Phase 4: local intelligence ───────────────────────────────
+
+/// Recompute derived metrics tables from scratch (repair/scheduler entry point).
+#[tauri::command]
+pub fn rebuild_derived_metrics(db: State<DbState>) -> Result<(), String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    crate::db::rebuild_derived_metrics(&conn).map_err(|e| e.to_string())
+}
+
+/// Return the top distraction hotspots for a date range.
+#[tauri::command]
+pub fn get_distraction_hotspots(
+    start_date: String,
+    end_date: String,
+    limit: Option<i64>,
+    db: State<DbState>,
+) -> Result<Vec<DistractionHotspot>, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    let limit = limit.unwrap_or(10).max(1);
+
+    // Per-hour app switch density joined with daily totals for app names.
+    let mut stmt = conn
+        .prepare(
+            "SELECT d.date,
+                    d.hour,
+                    d.switch_count,
+                    d.app_switch_count,
+                    COALESCE(i.fragment_score_avg, 0.0) as fragment_score
+             FROM app_switch_density d
+             LEFT JOIN interruption_summary i
+               ON i.date = d.date AND i.hour = d.hour
+             WHERE d.date >= ?1 AND d.date <= ?2
+             ORDER BY (d.switch_count * CAST(COALESCE(i.fragment_score_avg, 0.0) * 100 AS INTEGER)) DESC
+             LIMIT ?3",
+        )
+        .map_err(|e| e.to_string())?;
+
+    let rows: Vec<(String, i32, i64, i64, f64)> = stmt
+        .query_map(params![start_date, end_date, limit], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, i32>(1)?,
+                row.get::<_, i64>(2)?,
+                row.get::<_, i64>(3)?,
+                row.get::<_, f64>(4)?,
+            ))
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<_, _>>()
+        .map_err(|e: rusqlite::Error| e.to_string())?;
+
+    let mut out = Vec::new();
+    for (date, hour, switch_count, _app_switch_count, fragment_score) in rows {
+        // Find the top app by daily usage for this date/hour from raw usage.
+        let top_app: Option<(String, i64, i64)> = conn
+            .query_row(
+                "SELECT app_name,
+                        COUNT(1) as sessions,
+                        SUM(CASE WHEN active_seconds < 300 THEN 1 ELSE 0 END) as short_sessions
+                 FROM app_usage
+                 WHERE date = ?1
+                   AND CAST(substr(first_seen_at, 12, 2) AS INTEGER) = ?2
+                 GROUP BY app_name
+                 ORDER BY COUNT(1) DESC
+                 LIMIT 1",
+                params![date, hour],
+                |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, i64>(1)?,
+                        row.get::<_, i64>(2)?,
+                    ))
+                },
+            )
+            .optional()
+            .map_err(|e| e.to_string())?;
+
+        let (app_name, sessions, short_sessions) =
+            top_app.unwrap_or_else(|| ("Unknown".to_string(), 1, 0));
+        let short_session_ratio = if sessions > 0 {
+            short_sessions as f64 / sessions as f64
+        } else {
+            0.0
+        };
+
+        let reason = if fragment_score >= 0.5 {
+            "Highly fragmented hour with frequent context switches".to_string()
+        } else if switch_count >= 20 {
+            "High switch count indicates frequent interruptions".to_string()
+        } else {
+            "Moderate context switching in this window".to_string()
+        };
+
+        out.push(DistractionHotspot {
+            date,
+            hour,
+            app_name,
+            switch_count,
+            short_session_ratio,
+            fragment_score,
+            reason,
+        });
+    }
+
+    out.sort_by(|a, b| {
+        let score_a = a.switch_count as f64 * a.fragment_score;
+        let score_b = b.switch_count as f64 * b.fragment_score;
+        score_b
+            .partial_cmp(&score_a)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    out.truncate(limit as usize);
+    Ok(out)
+}
+
+/// Compare category usage between two date ranges.
+#[tauri::command]
+pub fn get_category_comparison_in_ranges(
+    current_start: String,
+    current_end: String,
+    previous_start: String,
+    previous_end: String,
+    db: State<DbState>,
+) -> Result<Vec<CategoryComparison>, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    let current = db::get_category_totals_in_range(&conn, &current_start, &current_end)
+        .map_err(|e| e.to_string())?;
+    let previous = db::get_category_totals_in_range(&conn, &previous_start, &previous_end)
+        .map_err(|e| e.to_string())?;
+
+    let mut map: std::collections::BTreeMap<String, (i64, i64)> = std::collections::BTreeMap::new();
+    for (category, secs) in current {
+        map.insert(category, (secs, 0));
+    }
+    for (category, secs) in previous {
+        if let Some(v) = map.get_mut(&category) {
+            v.1 = secs;
+        } else {
+            map.insert(category, (0, secs));
+        }
+    }
+
+    let mut rows: Vec<CategoryComparison> = map
+        .into_iter()
+        .map(|(category, (current_seconds, previous_seconds))| {
+            let delta_seconds = current_seconds - previous_seconds;
+            let delta_ratio = if previous_seconds > 0 {
+                delta_seconds as f64 / previous_seconds as f64
+            } else if current_seconds > 0 {
+                1.0
+            } else {
+                0.0
+            };
+            CategoryComparison {
+                category,
+                current_seconds,
+                previous_seconds,
+                delta_seconds,
+                delta_ratio,
+            }
+        })
+        .collect();
+
+    rows.sort_by(|a, b| b.current_seconds.cmp(&a.current_seconds));
+    Ok(rows)
+}
+
+/// Compare VS Code project usage between two date ranges.
+#[tauri::command]
+pub fn get_project_comparison_in_ranges(
+    current_start: String,
+    current_end: String,
+    previous_start: String,
+    previous_end: String,
+    db: State<DbState>,
+) -> Result<Vec<ProjectComparison>, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    let current = db::get_vscode_project_stats_in_range(&conn, &current_start, &current_end)
+        .map_err(|e| e.to_string())?;
+    let previous = db::get_vscode_project_stats_in_range(&conn, &previous_start, &previous_end)
+        .map_err(|e| e.to_string())?;
+
+    let mut map: std::collections::BTreeMap<(String, String), (i64, i64)> =
+        std::collections::BTreeMap::new();
+    for item in current {
+        map.insert(
+            (item.project_name, item.project_path),
+            (item.total_seconds, 0),
+        );
+    }
+    for item in previous {
+        if let Some(v) = map.get_mut(&(item.project_name.clone(), item.project_path.clone())) {
+            v.1 = item.total_seconds;
+        } else {
+            map.insert(
+                (item.project_name, item.project_path),
+                (0, item.total_seconds),
+            );
+        }
+    }
+
+    let mut rows: Vec<ProjectComparison> = map
+        .into_iter()
+        .map(
+            |((project_name, project_path), (current_seconds, previous_seconds))| {
+                let delta_seconds = current_seconds - previous_seconds;
+                let delta_ratio = if previous_seconds > 0 {
+                    delta_seconds as f64 / previous_seconds as f64
+                } else if current_seconds > 0 {
+                    1.0
+                } else {
+                    0.0
+                };
+                ProjectComparison {
+                    project_name,
+                    project_path,
+                    current_seconds,
+                    previous_seconds,
+                    delta_seconds,
+                    delta_ratio,
+                }
+            },
+        )
+        .collect();
+
+    rows.sort_by(|a, b| b.current_seconds.cmp(&a.current_seconds));
+    Ok(rows)
+}
+
+pub fn evaluate_goal_risks_inner(
+    conn: &rusqlite::Connection,
+) -> Result<Vec<GoalRiskAlert>, String> {
+    let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+    let now = chrono::Local::now();
+    let weekday = now.weekday().num_days_from_sunday() as i64;
+    let week_start = (now.date_naive() - chrono::Duration::days(weekday))
+        .format("%Y-%m-%d")
+        .to_string();
+    let week_end = (now.date_naive() + chrono::Duration::days(6 - weekday))
+        .format("%Y-%m-%d")
+        .to_string();
+
+    let _goals = db::get_usage_goals(&conn).map_err(|e| e.to_string())?;
+    let progress =
+        db::get_goal_progress(&conn, &today, &week_start, &week_end).map_err(|e| e.to_string())?;
+
+    let mut out = Vec::new();
+    for item in progress
+        .into_iter()
+        .filter(|p| p.goal.enabled && p.goal.notify_risk)
+    {
+        let Some(goal_id) = item.goal.id else {
+            continue;
+        };
+
+        let (elapsed_ratio, projection_ratio) = if item.goal.period == "weekly" {
+            let elapsed = (weekday + 1).clamp(1, 7) as f64 / 7.0;
+            let projected = if elapsed > 0.0 {
+                item.progress_ratio / elapsed
+            } else {
+                item.progress_ratio
+            };
+            (elapsed, projected)
+        } else {
+            let seconds_since_midnight =
+                now.hour() as i64 * 3600 + now.minute() as i64 * 60 + now.second() as i64;
+            let elapsed = seconds_since_midnight as f64 / 86400.0;
+            let projected = if elapsed > 0.05 {
+                item.progress_ratio / elapsed
+            } else {
+                item.progress_ratio
+            };
+            (elapsed.max(0.05), projected)
+        };
+
+        let alert = if item.goal.operator == "at_least" {
+            if item.progress_ratio < elapsed_ratio - 0.1 {
+                Some((
+                    format!(
+                        "Behind schedule: {:.0}% of target achieved vs {:.0}% of time elapsed",
+                        item.progress_ratio * 100.0,
+                        elapsed_ratio * 100.0
+                    ),
+                    "medium",
+                ))
+            } else if projection_ratio < 0.8 {
+                Some((
+                    "Current pace suggests the goal may not be met today".to_string(),
+                    "high",
+                ))
+            } else {
+                None
+            }
+        } else {
+            // at_most
+            if item.progress_ratio > 0.9 {
+                Some((
+                    format!(
+                        "Approaching limit: {:.0}% of daily cap used",
+                        item.progress_ratio * 100.0
+                    ),
+                    "high",
+                ))
+            } else if item.progress_ratio > 0.8 {
+                Some((
+                    format!(
+                        "Nearing limit: {:.0}% of daily cap used",
+                        item.progress_ratio * 100.0
+                    ),
+                    "medium",
+                ))
+            } else {
+                None
+            }
+        };
+
+        if let Some((message, severity)) = alert {
+            out.push(GoalRiskAlert {
+                goal_id,
+                scope_value: item.goal.scope_value,
+                message,
+                severity: severity.to_string(),
+            });
+        }
+    }
+
+    Ok(out)
+}
+
+/// Evaluate usage goals and return any at-risk goals (command entry point).
+#[tauri::command]
+pub fn evaluate_goal_risks(db: State<DbState>) -> Result<Vec<GoalRiskAlert>, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    evaluate_goal_risks_inner(&conn)
 }

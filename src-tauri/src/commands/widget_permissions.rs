@@ -2,7 +2,7 @@ use std::fs;
 use tauri::{AppHandle, Manager, State};
 
 use crate::commands::storage_cmd::DbState;
-use crate::models::{WidgetPermissionAuditEntry, WidgetPermissionEntry};
+use crate::models::{IssuedApiToken, WidgetPermissionAuditEntry, WidgetPermissionEntry};
 use crate::widget_registry::{load_third_party_widget_from_manifest_path, WidgetRegistryItem};
 
 // ── Permission CRUD ───────────────────────────────────────────
@@ -66,7 +66,8 @@ pub fn record_widget_permission_access(
     db: State<'_, DbState>,
 ) -> Result<(), String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
-    crate::db::touch_widget_permission_access(&conn, &widget_id, &permission).map_err(|e| e.to_string())
+    crate::db::touch_widget_permission_access(&conn, &widget_id, &permission)
+        .map_err(|e| e.to_string())
 }
 
 // ── Import local widget ───────────────────────────────────────
@@ -74,31 +75,55 @@ pub fn record_widget_permission_access(
 /// Copy a local widget directory into app_data/widgets/<widget_type>/
 /// and return the parsed registry item.
 #[tauri::command]
-pub fn import_local_widget(
-    src_dir: String,
-    app: AppHandle,
-) -> Result<WidgetRegistryItem, String> {
+pub fn import_local_widget(src_dir: String, app: AppHandle) -> Result<WidgetRegistryItem, String> {
     let src = std::path::Path::new(&src_dir);
     let manifest_path = src.join("manifest.json");
 
     // Validate the manifest first (reuse existing registry logic).
-    let item = load_third_party_widget_from_manifest_path(&manifest_path)
-        .map_err(|e| e.message)?;
+    let item = load_third_party_widget_from_manifest_path(&manifest_path).map_err(|e| e.message)?;
 
     // Resolve destination: app_data/widgets/<widget_type>/
     let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     let dest = data_dir.join("widgets").join(&item.widget_type);
 
     if dest.exists() {
-        fs::remove_dir_all(&dest).map_err(|e| format!("failed to remove existing widget dir: {e}"))?;
+        fs::remove_dir_all(&dest)
+            .map_err(|e| format!("failed to remove existing widget dir: {e}"))?;
     }
     copy_dir_all(src, &dest)?;
 
     // Re-parse from the installed location so entry path is correct.
     let installed_manifest = dest.join("manifest.json");
-    let installed = load_third_party_widget_from_manifest_path(&installed_manifest)
-        .map_err(|e| e.message)?;
+    let installed =
+        load_third_party_widget_from_manifest_path(&installed_manifest).map_err(|e| e.message)?;
     Ok(installed)
+}
+
+/// Issue a scoped local API token for a widget that has the `local-api:call`
+/// permission. The plaintext token is returned only once.
+#[tauri::command]
+pub fn issue_widget_api_token(
+    widget_id: String,
+    scopes: Vec<String>,
+    db: State<'_, DbState>,
+) -> Result<IssuedApiToken, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    let permissions = crate::db::get_widget_permissions(&conn, &widget_id)
+        .map_err(|e| format!("failed to load widget permissions: {e}"))?;
+    let has_local_api = permissions
+        .iter()
+        .any(|p| p == "local-api:call" || p == "api:call");
+    if !has_local_api {
+        return Err("widget does not have local-api:call permission".to_string());
+    }
+
+    let label = format!("Widget: {}", widget_id);
+    crate::commands::extension_bridge_cmd::issue_api_token_impl(
+        &conn,
+        label,
+        scopes,
+        None,
+    )
 }
 
 fn copy_dir_all(src: &std::path::Path, dst: &std::path::Path) -> Result<(), String> {

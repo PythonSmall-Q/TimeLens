@@ -1,13 +1,15 @@
 pub mod api_server;
 pub mod commands;
 pub mod db;
+pub mod db_encryption;
 pub mod models;
 pub mod monitor;
 pub mod widget_registry;
 
-use std::sync::{Arc, Mutex};
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 
+use chrono::Timelike;
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{TrayIconBuilder, TrayIconEvent},
@@ -37,7 +39,11 @@ fn tray_texts(lang: &str, is_active: bool) -> TrayTexts {
             new_clock: "新建时钟小组件",
             new_todo: "新建待办小组件",
             new_timer: "新建计时器小组件",
-            pause_or_resume: if is_active { "暂停记录" } else { "恢复记录" },
+            pause_or_resume: if is_active {
+                "暂停记录"
+            } else {
+                "恢复记录"
+            },
             quit: "退出",
         }
     } else {
@@ -46,7 +52,11 @@ fn tray_texts(lang: &str, is_active: bool) -> TrayTexts {
             new_clock: "New Clock Widget",
             new_todo: "New Todo Widget",
             new_timer: "New Timer Widget",
-            pause_or_resume: if is_active { "Pause Tracking" } else { "Resume Tracking" },
+            pause_or_resume: if is_active {
+                "Pause Tracking"
+            } else {
+                "Resume Tracking"
+            },
             quit: "Quit",
         }
     }
@@ -74,7 +84,11 @@ fn set_tray_menu_texts<R: tauri::Runtime>(
 fn format_seconds(secs: i64) -> String {
     let h = secs / 3600;
     let m = (secs % 3600) / 60;
-    if h > 0 { format!("{}h {}m", h, m) } else { format!("{}m", m) }
+    if h > 0 {
+        format!("{}h {}m", h, m)
+    } else {
+        format!("{}m", m)
+    }
 }
 
 const LEGACY_APP_DIR_NAME: &str = "ShanWenxiao.TimeLens-TimeManagementAppwithWidgets";
@@ -111,7 +125,9 @@ fn legacy_db_path() -> Option<PathBuf> {
     #[cfg(target_os = "windows")]
     {
         let appdata = std::env::var_os("APPDATA")?;
-        let legacy_db = PathBuf::from(appdata).join(LEGACY_APP_DIR_NAME).join("timelens.db");
+        let legacy_db = PathBuf::from(appdata)
+            .join(LEGACY_APP_DIR_NAME)
+            .join("timelens.db");
         if legacy_db.exists() {
             return Some(legacy_db);
         }
@@ -145,7 +161,10 @@ fn legacy_db_path() -> Option<PathBuf> {
 }
 
 fn db_path_for_profile(data_dir: &Path, profile_id: &str) -> PathBuf {
-    data_dir.join("profiles").join(profile_id).join("timelens.db")
+    data_dir
+        .join("profiles")
+        .join(profile_id)
+        .join("timelens.db")
 }
 
 fn migrate_legacy_db(legacy_db: &Path, target_db: &Path) -> std::io::Result<()> {
@@ -159,15 +178,13 @@ fn resolve_database_path(data_dir: &Path, profile_id: Option<&str>) -> PathBuf {
     // Only the default profile attempts to auto-migrate from legacy 1.x paths.
     if profile_id == DEFAULT_PROFILE_ID {
         if let Some(legacy_path) = legacy_db_path() {
-            let current_size = std::fs::metadata(&target_db)
-                .map(|m| m.len())
-                .unwrap_or(0);
+            let current_size = std::fs::metadata(&target_db).map(|m| m.len()).unwrap_or(0);
             let legacy_size = std::fs::metadata(&legacy_path)
                 .map(|m| m.len())
                 .unwrap_or(0);
 
-            let should_migrate = !target_db.exists()
-                || (current_size <= 4096 && legacy_size > current_size);
+            let should_migrate =
+                !target_db.exists() || (current_size <= 4096 && legacy_size > current_size);
 
             if should_migrate {
                 match migrate_legacy_db(&legacy_path, &target_db) {
@@ -196,8 +213,13 @@ fn resolve_database_path(data_dir: &Path, profile_id: Option<&str>) -> PathBuf {
 }
 
 fn init_file_logger(log_dir: &Path) -> Result<(), String> {
-    std::fs::create_dir_all(log_dir)
-        .map_err(|e| format!("failed to create log directory {}: {}", log_dir.display(), e))?;
+    std::fs::create_dir_all(log_dir).map_err(|e| {
+        format!(
+            "failed to create log directory {}: {}",
+            log_dir.display(),
+            e
+        )
+    })?;
 
     let log_file = log_dir.join("timelens.log");
     let file = fern::log_file(&log_file)
@@ -271,8 +293,86 @@ pub(crate) fn apply_tray_icon_style(app: &AppHandle, style: &str) -> Result<(), 
     Ok(())
 }
 
+fn prepare_encrypted_database(db_path: &Path, data_dir: &Path) -> Result<(), String> {
+    let meta_path = db_encryption::encryption_meta_path(db_path);
+    let encrypted_path = db_encryption::encrypted_db_path(db_path);
+    let pending = db_encryption::read_pending_action(data_dir);
+
+    if meta_path.exists() {
+        let action = pending
+            .ok_or_else(|| "Database is encrypted but no passphrase is available.".to_string())?;
+        if action.passphrase.is_empty() {
+            return Err("Database encryption passphrase is empty".to_string());
+        }
+        let meta = db_encryption::read_metadata(&meta_path)?;
+        db_encryption::decrypt_file(&encrypted_path, db_path, &action.passphrase, &meta)?;
+
+        if action.action == "disable" {
+            std::fs::remove_file(&encrypted_path).map_err(|e| e.to_string())?;
+            std::fs::remove_file(&meta_path).map_err(|e| e.to_string())?;
+            db_encryption::delete_pending_action(data_dir).ok();
+        }
+        return Ok(());
+    }
+
+    if let Some(action) = pending {
+        if action.action == "enable" {
+            if action.passphrase.is_empty() {
+                return Err("Database encryption passphrase is empty".to_string());
+            }
+            if !db_path.exists() {
+                return Err("Cannot enable encryption: database file does not exist".to_string());
+            }
+            let meta = db_encryption::encrypt_file(db_path, &encrypted_path, &action.passphrase)?;
+            db_encryption::write_metadata(&meta_path, &meta)?;
+            db_encryption::decrypt_file(&encrypted_path, db_path, &action.passphrase, &meta)?;
+            return Ok(());
+        }
+        // Pending disable without encryption artifacts: nothing to do.
+        db_encryption::delete_pending_action(data_dir).ok();
+    }
+
+    Ok(())
+}
+
+fn cleanup_database_encryption(target_db_path: &Path, data_dir: &Path) {
+    let meta_path = db_encryption::encryption_meta_path(target_db_path);
+    if !meta_path.exists() {
+        let _ = db_encryption::delete_pending_action(data_dir);
+        return;
+    }
+
+    let pending = match db_encryption::read_pending_action(data_dir) {
+        Some(p) => p,
+        None => {
+            log::warn!(
+                "Database at {} is encrypted but pending passphrase file is missing; leaving runtime plaintext in place",
+                target_db_path.display()
+            );
+            return;
+        }
+    };
+
+    let encrypted_path = db_encryption::encrypted_db_path(target_db_path);
+    match db_encryption::encrypt_file(target_db_path, &encrypted_path, &pending.passphrase) {
+        Ok(_) => {
+            log::info!(
+                "Re-encrypted database on exit: {}",
+                encrypted_path.display()
+            );
+            if let Err(e) = db_encryption::wipe_plaintext_db(target_db_path) {
+                log::warn!("Failed to wipe runtime plaintext DB on exit: {}", e);
+            }
+            // Keep the pending passphrase file so the next startup can decrypt.
+        }
+        Err(e) => {
+            log::warn!("Failed to re-encrypt database on exit: {}", e);
+        }
+    }
+}
+
 pub fn run() {
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             Some(vec!["--autostart"]),
@@ -299,18 +399,42 @@ pub fn run() {
             // Open the default profile first to discover the active profile id, then
             // open the target profile database as the main DbState.
             let default_db_path = resolve_database_path(&data_dir, None);
+
+            // Prepare default database (handle at-rest encryption if enabled).
+            prepare_encrypted_database(&default_db_path, &data_dir)
+                .map_err(|e| format!("Failed to prepare default database: {}", e))?;
+
             let default_conn = db::open(&default_db_path)
                 .expect("Failed to open default SQLite database");
             let active_profile_id = db::migrations::current_profile_id_from_conn(&default_conn);
-            let target_db_path = if active_profile_id == db::migrations::DEFAULT_PROFILE_ID {
-                default_db_path
+            let target_db_path: PathBuf = if active_profile_id == db::migrations::DEFAULT_PROFILE_ID {
+                default_db_path.clone()
             } else {
                 db::migrations::db_path_for_profile(&data_dir, &active_profile_id)
             };
-            let conn = db::open(&target_db_path)
-                .expect("Failed to open active profile SQLite database");
+
+            let conn = if target_db_path == default_db_path {
+                default_conn
+            } else {
+                drop(default_conn);
+                prepare_encrypted_database(&target_db_path, &data_dir)
+                    .map_err(|e| format!("Failed to prepare target database: {}", e))?;
+                db::open(&target_db_path)
+                    .expect("Failed to open active profile SQLite database")
+            };
+
+            // Clear pending encryption settings now that the database is open.
+            {
+                let _ = conn.execute(
+                    "DELETE FROM app_settings WHERE key IN ('pending_db_encryption_enable', 'pending_db_encryption_disable', 'pending_db_encryption_passphrase')",
+                    [],
+                );
+            }
+
             let db_state: DbState = Arc::new(Mutex::new(conn));
 
+            // Remember the target DB path for exit cleanup.
+            app.manage(target_db_path.clone());
             // Register shared DB state before opening any extra windows.
             // Widget/main windows can start invoking commands immediately.
             app.manage(db_state.clone());
@@ -496,6 +620,179 @@ pub fn run() {
                 });
             }
 
+            // ── Archive scheduler background task ─────────────
+            {
+                let archive_db: DbState = {
+                    let conn = db::open(&target_db_path)
+                        .expect("Fifth db connection for archive scheduler");
+                    Arc::new(Mutex::new(conn))
+                };
+                tauri::async_runtime::spawn(async move {
+                    loop {
+                        tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+
+                        let Ok(conn) = archive_db.lock() else { continue };
+                        let settings: commands::ArchiveSchedulerSettings = {
+                            let result: Result<commands::ArchiveSchedulerSettings, rusqlite::Error> =
+                                conn.prepare(
+                                    "SELECT enabled, daily_run_hour, run_on_battery
+                                     FROM archive_scheduler_state WHERE id = 1",
+                                )
+                                .and_then(|mut stmt| {
+                                    stmt.query_row([], |row| {
+                                        Ok(commands::ArchiveSchedulerSettings {
+                                            enabled: row.get::<_, i32>(0)? != 0,
+                                            daily_run_hour: row.get(1)?,
+                                            run_on_battery: row.get::<_, i32>(2)? != 0,
+                                        })
+                                    })
+                                });
+                            match result {
+                                Ok(s) => s,
+                                Err(_) => continue,
+                            }
+                        };
+
+                        if !settings.enabled {
+                            continue;
+                        }
+
+                        let now = chrono::Local::now();
+                        let current_hour = now.hour() as i32;
+                        if current_hour != settings.daily_run_hour {
+                            continue;
+                        }
+
+                        let last_run_today: bool = conn
+                            .query_row(
+                                "SELECT COALESCE(date(last_run_at), '') = date('now')
+                                 FROM archive_scheduler_state WHERE id = 1",
+                                [],
+                                |row| row.get::<_, bool>(0),
+                            )
+                            .unwrap_or(false);
+                        if last_run_today {
+                            continue;
+                        }
+
+                        let policy = db::get_setting(&conn, "retention_policy")
+                            .ok()
+                            .flatten()
+                            .unwrap_or_else(|| "keep_all".to_string());
+
+                        let run_result: Result<(), String> = (|| {
+                            let result = commands::archive_by_policy(&conn, &policy)?;
+                            log::info!(
+                                "Archive scheduler ran policy {}: {} app usage rows, {} daily rows, {} warm, {} archive",
+                                result.policy,
+                                result.archived_app_usage_rows,
+                                result.archived_daily_rows,
+                                result.warm_rows,
+                                result.archive_rows
+                            );
+                            let now_str = now.format("%Y-%m-%dT%H:%M:%S").to_string();
+                            conn.execute(
+                                "INSERT INTO archive_scheduler_state (id, last_run_at) VALUES (1, ?1)
+                                 ON CONFLICT(id) DO UPDATE SET last_run_at = excluded.last_run_at",
+                                rusqlite::params![&now_str],
+                            )
+                            .map_err(|e| e.to_string())?;
+                            Ok(())
+                        })();
+
+                        if let Err(e) = run_result {
+                            log::warn!("Archive scheduler run failed: {}", e);
+                        }
+                    }
+                });
+            }
+
+            // ── Derived metrics scheduler ─────────────────────
+            {
+                let derived_db: DbState = {
+                    let conn = db::open(&target_db_path)
+                        .expect("Sixth db connection for derived metrics scheduler");
+                    Arc::new(Mutex::new(conn))
+                };
+                tauri::async_runtime::spawn(async move {
+                    loop {
+                        tokio::time::sleep(std::time::Duration::from_secs(300)).await;
+                        let Ok(conn) = derived_db.lock() else { continue };
+                        if let Err(e) = crate::db::rebuild_derived_metrics(&conn) {
+                            log::warn!("Derived metrics scheduler failed: {}", e);
+                        }
+                    }
+                });
+            }
+
+            // ── Goal risk notifier ────────────────────────────
+            {
+                let risk_db: DbState = {
+                    let conn = db::open(&target_db_path)
+                        .expect("Seventh db connection for goal risk notifier");
+                    Arc::new(Mutex::new(conn))
+                };
+                let app_handle_risk = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    loop {
+                        tokio::time::sleep(std::time::Duration::from_secs(900)).await;
+                        let Ok(conn) = risk_db.lock() else { continue };
+                        let alerts = match crate::commands::productivity_cmd::evaluate_goal_risks_inner(&conn) {
+                            Ok(a) => a,
+                            Err(e) => {
+                                log::warn!("Goal risk evaluation failed: {}", e);
+                                continue;
+                            }
+                        };
+                        drop(conn);
+                        for alert in alerts {
+                            let _ = app_handle_risk.emit("goal-risk-alert", &alert);
+                            let title = format!("TimeLens – Goal risk ({})", alert.severity);
+                            let body = format!("{}: {}", alert.scope_value, alert.message);
+                            #[cfg(target_os = "windows")]
+                            {
+                                let _ = crate::commands::app_cmd::send_native_notification(
+                                    title, body, Some(false),
+                                );
+                            }
+                            #[cfg(not(target_os = "windows"))]
+                            {
+                                let _ = app_handle_risk.emit("native-notification", serde_json::json!({
+                                    "title": title,
+                                    "body": body,
+                                }));
+                            }
+                        }
+                    }
+                });
+            }
+
+            // ── Focus rule evaluator ──────────────────────────
+            {
+                let focus_db: DbState = {
+                    let conn = db::open(&target_db_path)
+                        .expect("Eighth db connection for focus rule evaluator");
+                    Arc::new(Mutex::new(conn))
+                };
+                let focus_status = monitor_status.clone();
+                tauri::async_runtime::spawn(async move {
+                    loop {
+                        tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+                        let status = {
+                            let guard = focus_status.lock().unwrap();
+                            guard.clone()
+                        };
+                        if !status.active {
+                            continue;
+                        }
+                        let Ok(conn) = focus_db.lock() else { continue };
+                        if let Err(e) = crate::commands::storage_cmd::evaluate_focus_rules_inner(&conn, &status) {
+                            log::warn!("Focus rule evaluation failed: {}", e);
+                        }
+                    }
+                });
+            }
+
             // ── System tray ───────────────────────────────────
             let tray_icon_style = {
                 let db_state = app.state::<DbState>();
@@ -553,9 +850,16 @@ pub fn run() {
             commands::export_backup_v2,
             commands::import_backup_v2_validate,
             commands::import_backup_v2_apply,
+            commands::enable_database_encryption,
+            commands::disable_database_encryption,
+            commands::get_database_encryption_status,
             commands::get_retention_policy_info,
             commands::set_retention_policy,
             commands::run_local_archive_now,
+            commands::get_archive_scheduler_settings,
+            commands::set_archive_scheduler_settings,
+            commands::compress_archive_older_than_days,
+            commands::get_compressed_archive_for_date_app,
             commands::get_tracking_transparency,
             // Storage – screen time
             commands::get_today_app_totals,
@@ -651,6 +955,16 @@ pub fn run() {
             commands::suggest_focus_windows,
             commands::suggest_goal_adjustments,
             commands::detect_usage_anomalies,
+            // Phase 4: local intelligence + workflow
+            commands::rebuild_derived_metrics,
+            commands::get_distraction_hotspots,
+            commands::get_category_comparison_in_ranges,
+            commands::get_project_comparison_in_ranges,
+            commands::evaluate_goal_risks,
+            commands::get_focus_rules,
+            commands::save_focus_rule,
+            commands::delete_focus_rule,
+            commands::evaluate_focus_rules,
             // Phase A: widget permissions
             commands::get_widget_permissions,
             commands::get_widget_permission_matrix,
@@ -659,9 +973,26 @@ pub fn run() {
             commands::revoke_all_widget_permissions,
             commands::record_widget_permission_access,
             commands::import_local_widget,
+            commands::issue_widget_api_token,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running TimeLens");
+        .build(tauri::generate_context!())
+        .expect("error while building TimeLens");
+
+    app.run(|app_handle, event| {
+        if let tauri::RunEvent::Exit = event {
+            // Best-effort WAL checkpoint on the main connection before re-encryption.
+            if let Some(db_state) = app_handle.try_state::<DbState>() {
+                if let Ok(conn) = db_state.lock() {
+                    let _ = conn.execute("PRAGMA wal_checkpoint(TRUNCATE)", []);
+                }
+            }
+            if let Some(target_db_path) = app_handle.try_state::<PathBuf>() {
+                if let Ok(data_dir) = app_handle.path().app_data_dir() {
+                    cleanup_database_encryption(&target_db_path, &data_dir);
+                }
+            }
+        }
+    });
 }
 
 // ── Tray setup ────────────────────────────────────────────────
@@ -680,10 +1011,28 @@ fn setup_tray(
     let initial_texts = tray_texts(&initial_lang, initial_active);
 
     let show = MenuItem::with_id(app, "show", initial_texts.show, true, None::<&str>)?;
-    let clock = MenuItem::with_id(app, "new_clock", initial_texts.new_clock, true, None::<&str>)?;
+    let clock = MenuItem::with_id(
+        app,
+        "new_clock",
+        initial_texts.new_clock,
+        true,
+        None::<&str>,
+    )?;
     let todo = MenuItem::with_id(app, "new_todo", initial_texts.new_todo, true, None::<&str>)?;
-    let timer = MenuItem::with_id(app, "new_timer", initial_texts.new_timer, true, None::<&str>)?;
-    let pause = MenuItem::with_id(app, "pause", initial_texts.pause_or_resume, true, None::<&str>)?;
+    let timer = MenuItem::with_id(
+        app,
+        "new_timer",
+        initial_texts.new_timer,
+        true,
+        None::<&str>,
+    )?;
+    let pause = MenuItem::with_id(
+        app,
+        "pause",
+        initial_texts.pause_or_resume,
+        true,
+        None::<&str>,
+    )?;
     let quit = MenuItem::with_id(app, "quit", initial_texts.quit, true, None::<&str>)?;
 
     let menu = Menu::with_items(app, &[&show, &clock, &todo, &timer, &pause, &quit])?;
@@ -718,34 +1067,35 @@ fn setup_tray(
             let monitor_status = monitor_status.clone();
             let tray_language = tray_language.clone();
             move |app, event| match event.id.as_ref() {
-            "show" => toggle_main_window(app),
-            "new_clock" => spawn_widget(app, "clock"),
-            "new_todo" => spawn_widget(app, "todo"),
-            "new_timer" => spawn_widget(app, "timer"),
-            "pause" => {
-                let mut active_now = true;
-                if let Ok(mut s) = monitor_status.lock() {
-                    s.active = !s.active;
-                    active_now = s.active;
+                "show" => toggle_main_window(app),
+                "new_clock" => spawn_widget(app, "clock"),
+                "new_todo" => spawn_widget(app, "todo"),
+                "new_timer" => spawn_widget(app, "timer"),
+                "pause" => {
+                    let mut active_now = true;
+                    if let Ok(mut s) = monitor_status.lock() {
+                        s.active = !s.active;
+                        active_now = s.active;
+                    }
+                    let lang = tray_language
+                        .lock()
+                        .map(|l| l.clone())
+                        .unwrap_or_else(|_| "en".to_string());
+                    set_tray_menu_texts(
+                        &show_item,
+                        &clock_item,
+                        &todo_item,
+                        &timer_item,
+                        &pause_item,
+                        &quit_item,
+                        &lang,
+                        active_now,
+                    );
+                    app.emit("monitoring-changed", active_now)
+                        .unwrap_or_default();
                 }
-                let lang = tray_language
-                    .lock()
-                    .map(|l| l.clone())
-                    .unwrap_or_else(|_| "en".to_string());
-                set_tray_menu_texts(
-                    &show_item,
-                    &clock_item,
-                    &todo_item,
-                    &timer_item,
-                    &pause_item,
-                    &quit_item,
-                    &lang,
-                    active_now,
-                );
-                app.emit("monitoring-changed", active_now).unwrap_or_default();
-            }
-            "quit" => app.exit(0),
-            _ => {}
+                "quit" => app.exit(0),
+                _ => {}
             }
         })
         .build(app)?;
@@ -767,7 +1117,10 @@ fn setup_tray(
         if let Ok(mut l) = tray_language_for_lang.lock() {
             *l = lang.clone();
         }
-        let active_now = monitor_status_for_lang.lock().map(|s| s.active).unwrap_or(true);
+        let active_now = monitor_status_for_lang
+            .lock()
+            .map(|s| s.active)
+            .unwrap_or(true);
         set_tray_menu_texts(
             &show_item,
             &clock_item,

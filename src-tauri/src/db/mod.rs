@@ -1,6 +1,6 @@
-use rusqlite::{params, Connection, Result};
-use std::path::Path;
 use chrono::Timelike;
+use rusqlite::{params, Connection, OptionalExtension, Result};
+use std::path::Path;
 
 pub mod migrations;
 
@@ -301,10 +301,7 @@ pub fn initialize(conn: &Connection) -> Result<()> {
         )?;
     }
     if !widget_columns.iter().any(|c| c == "data_json") {
-        conn.execute(
-            "ALTER TABLE widget_configs ADD COLUMN data_json TEXT",
-            [],
-        )?;
+        conn.execute("ALTER TABLE widget_configs ADD COLUMN data_json TEXT", [])?;
     }
 
     let widget_permission_columns = table_columns(conn, "widget_permissions")?;
@@ -320,7 +317,10 @@ pub fn initialize(conn: &Connection) -> Result<()> {
             [],
         )?;
     }
-    if !widget_permission_columns.iter().any(|c| c == "last_access_at") {
+    if !widget_permission_columns
+        .iter()
+        .any(|c| c == "last_access_at")
+    {
         conn.execute(
             "ALTER TABLE widget_permissions ADD COLUMN last_access_at TEXT",
             [],
@@ -334,7 +334,10 @@ pub fn initialize(conn: &Connection) -> Result<()> {
             [],
         )?;
     }
-    if !widget_permission_audit_columns.iter().any(|c| c == "detail") {
+    if !widget_permission_audit_columns
+        .iter()
+        .any(|c| c == "detail")
+    {
         conn.execute(
             "ALTER TABLE widget_permission_audit_log ADD COLUMN detail TEXT NOT NULL DEFAULT ''",
             [],
@@ -429,7 +432,15 @@ pub fn insert_app_usage(
         "INSERT INTO app_usage
             (date, app_name, exe_path, window_title, active_seconds, first_seen_at, last_seen_at)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-        params![date, app_name, exe_path, window_title, seconds, first_seen, last_seen],
+        params![
+            date,
+            app_name,
+            exe_path,
+            window_title,
+            seconds,
+            first_seen,
+            last_seen
+        ],
     )?;
     conn.execute(
         "INSERT INTO daily_app_usage (date, app_name, exe_path, total_seconds, first_seen_at, last_seen_at)
@@ -443,11 +454,263 @@ pub fn insert_app_usage(
     Ok(conn.last_insert_rowid())
 }
 
+// ── Derived metrics ───────────────────────────────────────────
+
+/// Increment app_switch_density when the active window changes.
+/// `previous_*` may be empty/None for the first observation.
+pub fn update_derived_metrics_for_switch(
+    conn: &Connection,
+    previous_app: Option<&str>,
+    previous_title: Option<&str>,
+    current_app: &str,
+    current_title: &str,
+    switch_time: &str,
+) -> Result<()> {
+    let prev_app = previous_app.filter(|s| !s.is_empty());
+    let prev_title = previous_title.filter(|s| !s.is_empty());
+
+    let changed_app = prev_app.map(|p| p != current_app).unwrap_or(false);
+    let changed_title = if changed_app {
+        true
+    } else {
+        prev_title.map(|t| t != current_title).unwrap_or(false)
+    };
+
+    if !changed_app && !changed_title {
+        return Ok(());
+    }
+
+    let date = switch_time.get(..10).unwrap_or("");
+    let hour: i32 = switch_time
+        .get(11..13)
+        .and_then(|h| h.parse().ok())
+        .unwrap_or(0);
+
+    conn.execute(
+        "INSERT INTO app_switch_density (date, hour, switch_count, app_switch_count, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5)
+         ON CONFLICT(date, hour) DO UPDATE SET
+            switch_count = switch_count + excluded.switch_count,
+            app_switch_count = app_switch_count + excluded.app_switch_count,
+            updated_at = excluded.updated_at",
+        params![
+            date,
+            hour,
+            if changed_app { 1 } else { 0 },
+            if changed_title { 1 } else { 0 },
+            switch_time
+        ],
+    )?;
+    Ok(())
+}
+
+/// Recompute all derived metrics from scratch. Useful for repair and for the
+/// periodic scheduler that keeps interruption_summary and focus_streaks in sync.
+pub fn rebuild_derived_metrics(conn: &Connection) -> Result<()> {
+    conn.execute("DELETE FROM app_switch_density", [])?;
+    conn.execute("DELETE FROM interruption_summary", [])?;
+    conn.execute("DELETE FROM focus_streaks", [])?;
+
+    #[derive(Debug)]
+    struct Row {
+        date: String,
+        hour: i32,
+        app_name: String,
+        exe_path: String,
+        window_title: String,
+        active_seconds: i64,
+        first_seen_at: String,
+        last_seen_at: String,
+    }
+
+    let mut stmt = conn.prepare(
+        "SELECT date,
+                CAST(substr(first_seen_at, 12, 2) AS INTEGER) as hour,
+                app_name,
+                exe_path,
+                window_title,
+                active_seconds,
+                first_seen_at,
+                last_seen_at
+         FROM app_usage
+         ORDER BY first_seen_at",
+    )?;
+
+    let rows: Vec<Row> = stmt
+        .query_map([], |row| {
+            Ok(Row {
+                date: row.get(0)?,
+                hour: row.get(1)?,
+                app_name: row.get(2)?,
+                exe_path: row.get(3)?,
+                window_title: row.get(4)?,
+                active_seconds: row.get(5)?,
+                first_seen_at: row.get(6)?,
+                last_seen_at: row.get(7)?,
+            })
+        })?
+        .collect::<Result<Vec<_>>>()?;
+
+    // app_switch_density + interruption_summary
+    let mut density: std::collections::BTreeMap<(String, i32), (i64, i64)> =
+        std::collections::BTreeMap::new();
+    let mut interruption: std::collections::BTreeMap<(String, i32), (i64, i64)> =
+        std::collections::BTreeMap::new();
+
+    let mut prev_app: Option<String> = None;
+    let mut prev_title: Option<String> = None;
+
+    for row in &rows {
+        let key = (row.date.clone(), row.hour);
+
+        if let Some(ref p) = prev_app {
+            let changed_app = p != &row.app_name;
+            let changed_title =
+                changed_app || prev_title.as_deref().unwrap_or("") != row.window_title;
+            let entry = density.entry(key.clone()).or_insert((0, 0));
+            if changed_app {
+                entry.0 += 1;
+            }
+            if changed_title {
+                entry.1 += 1;
+            }
+        }
+
+        let ientry = interruption.entry(key).or_insert((0, 0));
+        ientry.0 += 1; // total segments
+        if row.active_seconds < 300 {
+            ientry.1 += 1; // short segments
+        }
+
+        prev_app = Some(row.app_name.clone());
+        prev_title = Some(row.window_title.clone());
+    }
+
+    let now = chrono::Local::now().format("%Y-%m-%dT%H:%M:%S").to_string();
+    for ((date, hour), (switch_count, app_switch_count)) in density {
+        conn.execute(
+            "INSERT INTO app_switch_density (date, hour, switch_count, app_switch_count, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5)
+             ON CONFLICT(date, hour) DO UPDATE SET
+                switch_count = excluded.switch_count,
+                app_switch_count = excluded.app_switch_count,
+                updated_at = excluded.updated_at",
+            params![date, hour, switch_count, app_switch_count, &now],
+        )?;
+    }
+
+    for ((date, hour), (total, short)) in interruption {
+        let fragment_score = if total > 0 {
+            short as f64 / total as f64
+        } else {
+            0.0
+        };
+        conn.execute(
+            "INSERT INTO interruption_summary (date, hour, interruption_count, fragment_score_avg, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5)
+             ON CONFLICT(date, hour) DO UPDATE SET
+                interruption_count = excluded.interruption_count,
+                fragment_score_avg = excluded.fragment_score_avg,
+                updated_at = excluded.updated_at",
+            params![date, hour, short, fragment_score, &now],
+        )?;
+    }
+
+    // focus_streaks: merge consecutive same-app segments with small gaps.
+    const GAP_SECONDS: i64 = 60;
+    const MIN_STREAK_SECONDS: i64 = 300;
+
+    let mut streak_start: Option<String> = None;
+    let mut streak_end: Option<String> = None;
+    let mut streak_app: Option<String> = None;
+    let mut streak_exe: Option<String> = None;
+    let mut streak_seconds: i64 = 0;
+
+    fn parse_ts(ts: &str) -> Option<chrono::NaiveDateTime> {
+        chrono::NaiveDateTime::parse_from_str(ts, "%Y-%m-%dT%H:%M:%S").ok()
+    }
+
+    fn streak_category(conn: &Connection, exe_path: &str) -> Result<String> {
+        let cat: Option<String> = conn
+            .query_row(
+                "SELECT category FROM app_categories WHERE lower(exe_path) = lower(?1) LIMIT 1",
+                params![exe_path],
+                |row| row.get(0),
+            )
+            .optional()?;
+        Ok(cat.unwrap_or_default())
+    }
+
+    fn save_streak(
+        conn: &Connection,
+        start: &str,
+        end: &str,
+        seconds: i64,
+        exe_path: &str,
+    ) -> Result<()> {
+        let category = streak_category(conn, exe_path).unwrap_or_default();
+        conn.execute(
+            "INSERT INTO focus_streaks (started_at, ended_at, duration_seconds, category)
+             VALUES (?1, ?2, ?3, ?4)",
+            params![start, end, seconds, category],
+        )?;
+        Ok(())
+    }
+
+    for row in &rows {
+        let continue_streak = if let (Some(ref app), Some(ref end)) = (&streak_app, &streak_end) {
+            app == &row.app_name
+                && parse_ts(end)
+                    .zip(parse_ts(&row.first_seen_at))
+                    .map(|(e, s)| (s - e).num_seconds() <= GAP_SECONDS)
+                    .unwrap_or(false)
+        } else {
+            false
+        };
+
+        if continue_streak {
+            streak_end = Some(row.last_seen_at.clone());
+            streak_seconds += row.active_seconds;
+        } else {
+            if let (Some(start), Some(end), Some(_app), Some(exe), secs) = (
+                streak_start.take(),
+                streak_end.take(),
+                streak_app.take(),
+                streak_exe.take(),
+                streak_seconds,
+            ) {
+                if secs >= MIN_STREAK_SECONDS {
+                    let _ = save_streak(conn, &start, &end, secs, &exe);
+                }
+            }
+            streak_start = Some(row.first_seen_at.clone());
+            streak_end = Some(row.last_seen_at.clone());
+            streak_app = Some(row.app_name.clone());
+            streak_exe = Some(row.exe_path.clone());
+            streak_seconds = row.active_seconds;
+        }
+    }
+
+    if let (Some(start), Some(end), Some(_app), Some(exe), secs) = (
+        streak_start,
+        streak_end,
+        streak_app,
+        streak_exe,
+        streak_seconds,
+    ) {
+        if secs >= MIN_STREAK_SECONDS {
+            let _ = save_streak(conn, &start, &end, secs, &exe);
+        }
+    }
+
+    Ok(())
+}
+
 /// Get per-app totals for a given date, sorted descending.
 pub fn get_daily_app_totals(conn: &Connection, date: &str) -> Result<Vec<(String, String, i64)>> {
-        let ignore_system = get_bool_setting(conn, "ignore_system_processes", false)? as i32;
-        let sql = format!(
-                "SELECT app_name,
+    let ignore_system = get_bool_setting(conn, "ignore_system_processes", false)? as i32;
+    let sql = format!(
+        "SELECT app_name,
                                 COALESCE(MAX(exe_path), '') as exe_path,
                                 SUM(total_seconds) as total
                  FROM daily_app_usage
@@ -456,10 +719,10 @@ pub fn get_daily_app_totals(conn: &Connection, date: &str) -> Result<Vec<(String
                      AND {}
                  GROUP BY app_name
                  ORDER BY total DESC",
-                system_process_filter_sql_with_param(2)
-        );
-        let mut stmt = conn.prepare(&sql)?;
-        let rows = stmt.query_map(params![date, ignore_system], |row| {
+        system_process_filter_sql_with_param(2)
+    );
+    let mut stmt = conn.prepare(&sql)?;
+    let rows = stmt.query_map(params![date, ignore_system], |row| {
         Ok((
             row.get::<_, String>(0)?,
             row.get::<_, String>(1)?,
@@ -474,9 +737,9 @@ pub fn get_app_totals_in_range(
     start_date: &str,
     end_date: &str,
 ) -> Result<Vec<(String, String, i64)>> {
-        let ignore_system = get_bool_setting(conn, "ignore_system_processes", false)? as i32;
-        let sql = format!(
-                "SELECT app_name,
+    let ignore_system = get_bool_setting(conn, "ignore_system_processes", false)? as i32;
+    let sql = format!(
+        "SELECT app_name,
                                 COALESCE(MAX(exe_path), '') as exe_path,
                                 SUM(total_seconds) as total
                  FROM daily_app_usage
@@ -485,10 +748,10 @@ pub fn get_app_totals_in_range(
                      AND {}
                  GROUP BY app_name
                  ORDER BY total DESC",
-                system_process_filter_sql_with_param(3)
-        );
-        let mut stmt = conn.prepare(&sql)?;
-        let rows = stmt.query_map(params![start_date, end_date, ignore_system], |row| {
+        system_process_filter_sql_with_param(3)
+    );
+    let mut stmt = conn.prepare(&sql)?;
+    let rows = stmt.query_map(params![start_date, end_date, ignore_system], |row| {
         Ok((
             row.get::<_, String>(0)?,
             row.get::<_, String>(1)?,
@@ -533,13 +796,23 @@ pub fn get_hourly_distribution(conn: &Connection, date: &str) -> Result<Vec<(i32
             continue;
         }
 
-        let Ok(start_raw) = chrono::NaiveDateTime::parse_from_str(&first_seen_at, "%Y-%m-%dT%H:%M:%S") else {
+        let Ok(start_raw) =
+            chrono::NaiveDateTime::parse_from_str(&first_seen_at, "%Y-%m-%dT%H:%M:%S")
+        else {
             continue;
         };
         let seg_end_raw = start_raw + chrono::Duration::seconds(active_seconds);
 
-        let seg_start = if start_raw < day_start { day_start } else { start_raw };
-        let seg_end = if seg_end_raw > day_end { day_end } else { seg_end_raw };
+        let seg_start = if start_raw < day_start {
+            day_start
+        } else {
+            start_raw
+        };
+        let seg_end = if seg_end_raw > day_end {
+            day_end
+        } else {
+            seg_end_raw
+        };
         if seg_end <= seg_start {
             continue;
         }
@@ -551,7 +824,11 @@ pub fn get_hourly_distribution(conn: &Connection, date: &str) -> Result<Vec<(i32
                 .and_hms_opt(cursor.time().hour(), 0, 0)
                 .unwrap_or(cursor);
             let next_hour = hour_start + chrono::Duration::hours(1);
-            let chunk_end = if next_hour < seg_end { next_hour } else { seg_end };
+            let chunk_end = if next_hour < seg_end {
+                next_hour
+            } else {
+                seg_end
+            };
             let chunk_secs = (chunk_end - cursor).num_seconds();
             if chunk_secs > 0 {
                 let hour_idx = cursor.time().hour() as usize;
@@ -837,17 +1114,15 @@ fn get_goal_used_seconds(
     end_date: &str,
 ) -> Result<i64> {
     match goal.scope_type.as_str() {
-        "category" => {
-            conn.query_row(
-                "SELECT COALESCE(SUM(d.total_seconds), 0)
+        "category" => conn.query_row(
+            "SELECT COALESCE(SUM(d.total_seconds), 0)
                  FROM daily_app_usage d
                  LEFT JOIN app_categories c ON lower(COALESCE(d.exe_path, '')) = c.exe_path
                  WHERE d.date >= ?1 AND d.date <= ?2
                    AND COALESCE(c.category, 'uncategorized') = ?3",
-                params![start_date, end_date, goal.scope_value],
-                |row| row.get::<_, i64>(0),
-            )
-        }
+            params![start_date, end_date, goal.scope_value],
+            |row| row.get::<_, i64>(0),
+        ),
         _ => conn.query_row(
             "SELECT COALESCE(SUM(total_seconds), 0)
              FROM daily_app_usage
@@ -965,6 +1240,90 @@ pub fn list_focus_sessions(
     Ok(out)
 }
 
+pub fn get_active_focus_session_id(conn: &Connection) -> Result<Option<i64>> {
+    let id: Option<i64> = conn
+        .query_row(
+            "SELECT id FROM focus_sessions WHERE ended_at IS NULL ORDER BY started_at DESC LIMIT 1",
+            [],
+            |row| row.get(0),
+        )
+        .optional()?;
+    Ok(id)
+}
+
+// ── Focus rules ───────────────────────────────────────────────
+
+pub fn get_focus_rules(conn: &Connection) -> Result<Vec<crate::models::FocusRule>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, name, enabled, rule_type, condition_json, action, auto_start, quiet_hours_respect, created_at
+         FROM focus_rules
+         ORDER BY id DESC",
+    )?;
+    let rows = stmt.query_map([], |row| {
+        Ok(crate::models::FocusRule {
+            id: Some(row.get(0)?),
+            name: row.get(1)?,
+            enabled: row.get::<_, i32>(2)? != 0,
+            rule_type: row.get(3)?,
+            condition_json: row.get(4)?,
+            action: row.get(5)?,
+            auto_start: row.get::<_, i32>(6)? != 0,
+            quiet_hours_respect: row.get::<_, i32>(7)? != 0,
+            created_at: row.get(8)?,
+        })
+    })?;
+    rows.collect()
+}
+
+pub fn upsert_focus_rule(conn: &Connection, rule: &crate::models::FocusRule) -> Result<i64> {
+    let now = chrono::Local::now().format("%Y-%m-%dT%H:%M:%S").to_string();
+    if let Some(id) = rule.id {
+        conn.execute(
+            "UPDATE focus_rules
+             SET name = ?1,
+                 enabled = ?2,
+                 rule_type = ?3,
+                 condition_json = ?4,
+                 action = ?5,
+                 auto_start = ?6,
+                 quiet_hours_respect = ?7
+             WHERE id = ?8",
+            params![
+                rule.name,
+                rule.enabled as i32,
+                rule.rule_type,
+                rule.condition_json,
+                rule.action,
+                rule.auto_start as i32,
+                rule.quiet_hours_respect as i32,
+                id
+            ],
+        )?;
+        return Ok(id);
+    }
+
+    conn.execute(
+        "INSERT INTO focus_rules (name, enabled, rule_type, condition_json, action, auto_start, quiet_hours_respect, created_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+        params![
+            rule.name,
+            rule.enabled as i32,
+            rule.rule_type,
+            rule.condition_json,
+            rule.action,
+            rule.auto_start as i32,
+            rule.quiet_hours_respect as i32,
+            now,
+        ],
+    )?;
+    Ok(conn.last_insert_rowid())
+}
+
+pub fn delete_focus_rule(conn: &Connection, id: i64) -> Result<()> {
+    conn.execute("DELETE FROM focus_rules WHERE id = ?1", params![id])?;
+    Ok(())
+}
+
 // ── Todo queries ──────────────────────────────────────────────
 
 pub fn get_all_todos(conn: &Connection) -> Result<Vec<crate::models::TodoItem>> {
@@ -1016,7 +1375,10 @@ pub fn reorder_todo(conn: &Connection, id: i64, order_index: i64) -> Result<()> 
 
 // ── Widget config queries ─────────────────────────────────────
 
-pub fn get_widget_config(conn: &Connection, id: &str) -> Result<Option<crate::models::WidgetConfig>> {
+pub fn get_widget_config(
+    conn: &Connection,
+    id: &str,
+) -> Result<Option<crate::models::WidgetConfig>> {
     let mut stmt = conn.prepare(
         "SELECT id, widget_type, monitor_index, x, y, width, height, opacity, always_on_top_mode, pinned, start_on_launch, data_json
          FROM widget_configs WHERE id = ?1",
@@ -1268,6 +1630,37 @@ pub fn find_active_api_token_id_by_hash(
     Ok(None)
 }
 
+pub fn find_active_api_token_by_hash(
+    conn: &Connection,
+    token_hash: &str,
+    now: &str,
+) -> Result<Option<crate::models::ApiTokenMetadata>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, label, token_hash, scopes_json, created_at, expires_at, revoked_at, last_used_at, last_client_id
+         FROM api_tokens
+         WHERE token_hash = ?1
+           AND revoked_at IS NULL
+           AND (expires_at IS NULL OR expires_at > ?2)
+         LIMIT 1",
+    )?;
+    let mut rows = stmt.query(params![token_hash, now])?;
+    if let Some(row) = rows.next()? {
+        let scopes_json: String = row.get(3)?;
+        return Ok(Some(crate::models::ApiTokenMetadata {
+            id: row.get(0)?,
+            label: row.get(1)?,
+            token_hash: row.get(2)?,
+            scopes: parse_scopes_json(scopes_json),
+            created_at: row.get(4)?,
+            expires_at: row.get(5)?,
+            revoked_at: row.get(6)?,
+            last_used_at: row.get(7)?,
+            last_client_id: row.get(8)?,
+        }));
+    }
+    Ok(None)
+}
+
 pub fn touch_api_token_use(
     conn: &Connection,
     id: &str,
@@ -1337,16 +1730,19 @@ pub fn insert_api_audit_log(
         "INSERT INTO api_audit_log
          (occurred_at, client_id, endpoint, method, status_code, detail)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-        params![occurred_at, client_id, endpoint, method, status_code, detail],
+        params![
+            occurred_at,
+            client_id,
+            endpoint,
+            method,
+            status_code,
+            detail
+        ],
     )?;
     Ok(conn.last_insert_rowid())
 }
 
-pub fn count_api_audit_log_since(
-    conn: &Connection,
-    client_id: &str,
-    since: &str,
-) -> Result<i64> {
+pub fn count_api_audit_log_since(conn: &Connection, client_id: &str, since: &str) -> Result<i64> {
     conn.query_row(
         "SELECT COUNT(1)
          FROM api_audit_log
@@ -1371,17 +1767,20 @@ pub fn list_api_audit_log(
          ORDER BY occurred_at DESC, id DESC
          LIMIT ?3 OFFSET ?4",
     )?;
-    let rows = stmt.query_map(params![client_id, endpoint, limit.max(1), offset.max(0)], |row| {
-        Ok(crate::models::ApiAuditLogEntry {
-            id: row.get(0)?,
-            occurred_at: row.get(1)?,
-            client_id: row.get(2)?,
-            endpoint: row.get(3)?,
-            method: row.get(4)?,
-            status_code: row.get(5)?,
-            detail: row.get(6)?,
-        })
-    })?;
+    let rows = stmt.query_map(
+        params![client_id, endpoint, limit.max(1), offset.max(0)],
+        |row| {
+            Ok(crate::models::ApiAuditLogEntry {
+                id: row.get(0)?,
+                occurred_at: row.get(1)?,
+                client_id: row.get(2)?,
+                endpoint: row.get(3)?,
+                method: row.get(4)?,
+                status_code: row.get(5)?,
+                detail: row.get(6)?,
+            })
+        },
+    )?;
     rows.collect()
 }
 
@@ -1436,10 +1835,15 @@ pub fn get_recent_browser_sessions(
 }
 
 pub fn count_browser_sessions(conn: &Connection) -> Result<i64> {
-    conn.query_row("SELECT COUNT(1) FROM browser_sessions", [], |row| row.get(0))
+    conn.query_row("SELECT COUNT(1) FROM browser_sessions", [], |row| {
+        row.get(0)
+    })
 }
 
-pub fn upsert_vscode_session(conn: &Connection, session: &crate::models::VsCodeSession) -> Result<()> {
+pub fn upsert_vscode_session(
+    conn: &Connection,
+    session: &crate::models::VsCodeSession,
+) -> Result<()> {
     let tx = conn.unchecked_transaction()?;
     tx.execute(
         "INSERT INTO vscode_sessions
@@ -1634,7 +2038,9 @@ pub fn set_browser_ignored_domains(conn: &Connection, hosts: &[String]) -> Resul
 
 // ── Browser domain limits ──────────────────────────────────────
 
-pub fn get_browser_domain_limits(conn: &Connection) -> Result<Vec<crate::models::BrowserDomainLimit>> {
+pub fn get_browser_domain_limits(
+    conn: &Connection,
+) -> Result<Vec<crate::models::BrowserDomainLimit>> {
     let mut stmt = conn.prepare(
         "SELECT host, daily_limit_seconds, enabled, updated_at
          FROM browser_domain_limits
@@ -1651,7 +2057,10 @@ pub fn get_browser_domain_limits(conn: &Connection) -> Result<Vec<crate::models:
     rows.collect()
 }
 
-pub fn upsert_browser_domain_limit(conn: &Connection, limit: &crate::models::BrowserDomainLimit) -> Result<()> {
+pub fn upsert_browser_domain_limit(
+    conn: &Connection,
+    limit: &crate::models::BrowserDomainLimit,
+) -> Result<()> {
     let now = chrono::Local::now().format("%Y-%m-%dT%H:%M:%S").to_string();
     conn.execute(
         "INSERT INTO browser_domain_limits (host, daily_limit_seconds, enabled, updated_at)
@@ -1777,7 +2186,11 @@ pub fn set_widget_permissions(
     Ok(())
 }
 
-pub fn revoke_all_widget_permissions(conn: &Connection, widget_id: &str, actor: Option<&str>) -> Result<()> {
+pub fn revoke_all_widget_permissions(
+    conn: &Connection,
+    widget_id: &str,
+    actor: Option<&str>,
+) -> Result<()> {
     let tx = conn.unchecked_transaction()?;
     let existing: Vec<String> = {
         let mut stmt = tx.prepare(

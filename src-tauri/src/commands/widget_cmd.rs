@@ -82,10 +82,7 @@ struct Rect {
 }
 
 fn overlaps(a: Rect, b: Rect) -> bool {
-    a.x < b.x + b.width
-        && a.x + a.width > b.x
-        && a.y < b.y + b.height
-        && a.y + a.height > b.y
+    a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y
 }
 
 fn clamp_to_bounds(mut rect: Rect, bounds: Rect) -> Rect {
@@ -167,7 +164,14 @@ fn collect_open_widget_rects(app: &AppHandle) -> Vec<Rect> {
     out
 }
 
-fn compute_spawn_position(app: &AppHandle, preferred_x: f64, preferred_y: f64, width: f64, height: f64, monitor_index: i32) -> (f64, f64) {
+fn compute_spawn_position(
+    app: &AppHandle,
+    preferred_x: f64,
+    preferred_y: f64,
+    width: f64,
+    height: f64,
+    monitor_index: i32,
+) -> (f64, f64) {
     let bounds = monitor_bounds_by_index(app, monitor_index).unwrap_or(Rect {
         x: 0.0,
         y: 0.0,
@@ -323,14 +327,8 @@ pub fn build_widget_window_sync(app: &AppHandle, config: &WidgetConfig) -> Resul
         (200.0, 120.0)
     };
 
-    let (x, y) = compute_spawn_position(
-        app,
-        config.x,
-        config.y,
-        width,
-        height,
-        config.monitor_index,
-    );
+    let (x, y) =
+        compute_spawn_position(app, config.x, config.y, width, height, config.monitor_index);
 
     WebviewWindowBuilder::new(app, &config.id, url)
         .title(&format!("TimeLens - {}", config.widget_type))

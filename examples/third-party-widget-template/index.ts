@@ -1,60 +1,46 @@
-/**
- * @typedef {Object} AppUsageSummary
- * @property {string} app_name
- * @property {string} exe_path
- * @property {number} total_seconds
- */
+export interface AppUsageSummary {
+  app_name: string;
+  exe_path: string;
+  total_seconds: number;
+}
 
-/**
- * @typedef {Object} ActiveWindowInfo
- * @property {string} app_name
- * @property {string} exe_path
- * @property {string} window_title
- * @property {string} timestamp
- */
+export interface ActiveWindowInfo {
+  app_name: string;
+  exe_path: string;
+  window_title: string;
+  timestamp: string;
+}
 
-/**
- * @typedef {Object} LocalApiCallOptions
- * @property {string} method - HTTP method, e.g. "GET" or "POST"
- * @property {string} path - API path, e.g. "/api/screen-time/today"
- * @property {unknown} [body] - JSON-serializable request body
- * @property {string[]} [scopes] - Required token scopes, e.g. ["screen-time:read"]
- */
+export interface LocalApiCallOptions {
+  method: string;
+  path: string;
+  body?: unknown;
+  scopes?: string[];
+}
 
-/**
- * @typedef {Object} WidgetChannel
- * @property {() => Promise<AppUsageSummary[]>} getTodayAppTotals
- * @property {(start: string, end: string) => Promise<AppUsageSummary[]>} getAppTotalsInRange
- * @property {(cb: (info: ActiveWindowInfo) => void) => Promise<() => void>} onActiveWindowChanged
- * @property {(options: LocalApiCallOptions) => Promise<unknown>} localApiCall
- */
+export interface WidgetChannel {
+  getTodayAppTotals(): Promise<AppUsageSummary[]>;
+  getAppTotalsInRange(start: string, end: string): Promise<AppUsageSummary[]>;
+  onActiveWindowChanged(cb: (info: ActiveWindowInfo) => void): Promise<() => void>;
+  localApiCall(options: LocalApiCallOptions): Promise<unknown>;
+}
 
-/**
- * @typedef {Object} WidgetContext
- * @property {string} widgetId
- * @property {string} widgetType
- * @property {WidgetChannel} channel
- */
+export interface WidgetContext {
+  widgetId: string;
+  widgetType: string;
+  channel: WidgetChannel;
+}
 
-/**
- * Create a new widget instance.
- * @returns {{
- *   mount: (container: HTMLElement, context: WidgetContext) => Promise<void>,
- *   unmount: () => Promise<void>
- * }}
- */
-export function createWidget() {
-  /** @type {HTMLElement | null} */
-  let rootEl = null;
-  /** @type {(() => void) | null} */
-  let stopListening = null;
+export interface WidgetInstance {
+  mount(container: HTMLElement, context: WidgetContext): Promise<void>;
+  unmount(): Promise<void>;
+}
+
+export function createWidget(): WidgetInstance {
+  let rootEl: HTMLElement | null = null;
+  let stopListening: (() => void) | null = null;
 
   return {
-    /**
-     * Mount the widget into the provided container.
-     * @param {HTMLElement} container
-     * @param {WidgetContext} context
-     */
     async mount(container, context) {
       rootEl = document.createElement("div");
       rootEl.style.height = "100%";
@@ -98,11 +84,10 @@ export function createWidget() {
         stopListening = await context.channel.onActiveWindowChanged((info) => {
           title.textContent = `Sample Hello Widget · ${info.app_name || "Unknown"}`;
         });
-      } catch (err) {
-        title.textContent = `Sample Hello Widget · active window unavailable`;
+      } catch {
+        title.textContent = "Sample Hello Widget · active window unavailable";
       }
 
-      // Example: call the local HTTP API through the widget bridge.
       try {
         const result = await context.channel.localApiCall({
           method: "GET",

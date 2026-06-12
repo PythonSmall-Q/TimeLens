@@ -167,5 +167,21 @@
     "loading": "Loading widget module...",
     "noDescription": "No description provided.",
     "noWidgets": "No third-party widgets installed. Click \"Import Local Widget\" to add one."
+  },
+  "devHarness": {
+    "open": "Dev Harness",
+    "title": "Widget Dev Harness",
+    "subtitle": "Load and debug local widgets without installing them.",
+    "selectFolder": "Select widget folder",
+    "selectFolderHint": "Select a widget folder to load it in the harness.",
+    "reload": "Reload",
+    "capabilities": "Capabilities",
+    "autoReload": "Auto-reload on change",
+    "widgetType": "Widget type",
+    "manifestVersion": "Manifest version",
+    "permissions": "Permissions",
+    "logs": "Logs",
+    "noLogs": "No logs yet.",
+    "loadingManifest": "Loading manifest..."
   }
 }

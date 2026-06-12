@@ -167,5 +167,21 @@
     "loading": "正在加载小组件模块...",
     "noDescription": "暂无描述。",
     "noWidgets": "暂无第三方小组件，点击「导入本地组件」添加。"
+  },
+  "devHarness": {
+    "open": "开发调试",
+    "title": "小组件开发调试台",
+    "subtitle": "无需安装即可加载并调试本地小组件。",
+    "selectFolder": "选择组件文件夹",
+    "selectFolderHint": "选择一个组件文件夹以在调试台中加载。",
+    "reload": "重新加载",
+    "capabilities": "能力",
+    "autoReload": "变更时自动重载",
+    "widgetType": "组件类型",
+    "manifestVersion": "清单版本",
+    "permissions": "权限",
+    "logs": "日志",
+    "noLogs": "暂无日志。",
+    "loadingManifest": "正在加载清单..."
   }
 }

@@ -1,6 +1,6 @@
-use tauri::State;
 use crate::commands::storage_cmd::DbState;
-use crate::models::{BrowserDomainStats, BrowserDomainLimit, BrowserHourDomainStats};
+use crate::models::{BrowserDomainLimit, BrowserDomainStats, BrowserHourDomainStats};
+use tauri::State;
 
 #[tauri::command]
 pub fn get_browser_domain_stats(
@@ -22,10 +22,7 @@ pub fn get_browser_ignored_domains(db: State<DbState>) -> Result<Vec<String>, St
 }
 
 #[tauri::command]
-pub fn set_browser_ignored_domains(
-    db: State<DbState>,
-    hosts: Vec<String>,
-) -> Result<(), String> {
+pub fn set_browser_ignored_domains(db: State<DbState>, hosts: Vec<String>) -> Result<(), String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
     crate::db::set_browser_ignored_domains(&conn, &hosts).map_err(|e| e.to_string())
 }

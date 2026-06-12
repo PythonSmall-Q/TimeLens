@@ -129,6 +129,10 @@ export interface WidgetRegistryItem {
   default_width: number;
   default_height: number;
   permissions: string[];
+  manifest_version: number;
+  capabilities: string[];
+  sdk_version?: string | null;
+  csp?: string | null;
 }
 
 export interface WidgetRegistryLoadError {

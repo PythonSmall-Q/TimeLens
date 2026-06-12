@@ -1,6 +1,6 @@
+use crate::db;
 use rusqlite::{params, Connection, Result};
 use std::path::{Path, PathBuf};
-use crate::db;
 
 /// A single numbered schema migration.
 pub struct Migration {
@@ -11,11 +11,7 @@ pub struct Migration {
 
 impl Migration {
     pub const fn new(version: i64, name: &'static str, up: fn(&Connection) -> Result<()>) -> Self {
-        Self {
-            version,
-            name,
-            up,
-        }
+        Self { version, name, up }
     }
 }
 
@@ -484,7 +480,8 @@ fn migration_005_derived_metrics(conn: &Connection) -> Result<()> {
             last_run_at         TEXT,
             run_on_battery      INTEGER NOT NULL DEFAULT 1
         );
-        ")?;
+        ",
+    )?;
     Ok(())
 }
 
@@ -541,7 +538,8 @@ fn migration_006_focus_rules(conn: &Connection) -> Result<()> {
             );
 
             CREATE INDEX IF NOT EXISTS idx_focus_rules_enabled ON focus_rules(enabled);
-            ")?;
+            ",
+        )?;
     }
     Ok(())
 }
@@ -567,7 +565,8 @@ fn migration_008_encryption_metadata(conn: &Connection) -> Result<()> {
             created_at          TEXT,
             rotated_at          TEXT
         );
-        ")?;
+        ",
+    )?;
     Ok(())
 }
 
@@ -584,7 +583,8 @@ fn migration_009_profile_settings(conn: &Connection) -> Result<()> {
 
         INSERT OR IGNORE INTO profiles (id, name, is_default, created_at)
         VALUES ('default', 'Default', 1, datetime('now'));
-        ")?;
+        ",
+    )?;
     Ok(())
 }
 
@@ -607,29 +607,19 @@ fn migration_010_compressed_archive(conn: &Connection) -> Result<()> {
             ON app_usage_archive_compressed(date);
         CREATE INDEX IF NOT EXISTS idx_app_usage_archive_compressed_app
             ON app_usage_archive_compressed(app_name);
-        ")?;
+        ",
+    )?;
     Ok(())
 }
 
 pub const DEFAULT_PROFILE_ID: &str = "default";
-    conn.execute_batch(
-        "
-        CREATE TABLE IF NOT EXISTS profiles (
-            id              TEXT    PRIMARY KEY,
-            name            TEXT    NOT NULL,
-            is_default      INTEGER NOT NULL DEFAULT 0,
-            created_at      TEXT    NOT NULL
-        );
-
-        INSERT OR IGNORE INTO profiles (id, name, is_default, created_at)
-        VALUES ('default', 'Default', 1, datetime('now'));
-        ")?;
-    Ok(())
-}
 
 /// Compute the database file path for a given profile.
 pub fn db_path_for_profile(data_dir: &Path, profile_id: &str) -> PathBuf {
-    data_dir.join("profiles").join(profile_id).join("timelens.db")
+    data_dir
+        .join("profiles")
+        .join(profile_id)
+        .join("timelens.db")
 }
 
 /// Read the current profile id from a connection's app_settings.
@@ -645,11 +635,23 @@ pub fn current_profile_id_from_conn(conn: &Connection) -> String {
 const MIGRATIONS: &[Migration] = &[
     Migration::new(1, "baseline_schema", migration_001_baseline),
     Migration::new(2, "add_columns", migration_002_add_columns),
-    Migration::new(3, "backfill_daily_app_usage", migration_003_backfill_daily_app_usage),
-    Migration::new(4, "archive_tier_compression", migration_004_archive_tier_compression),
+    Migration::new(
+        3,
+        "backfill_daily_app_usage",
+        migration_003_backfill_daily_app_usage,
+    ),
+    Migration::new(
+        4,
+        "archive_tier_compression",
+        migration_004_archive_tier_compression,
+    ),
     Migration::new(5, "derived_metrics", migration_005_derived_metrics),
     Migration::new(6, "focus_rules", migration_006_focus_rules),
-    Migration::new(7, "goal_notification_settings", migration_007_goal_notification_settings),
+    Migration::new(
+        7,
+        "goal_notification_settings",
+        migration_007_goal_notification_settings,
+    ),
     Migration::new(8, "encryption_metadata", migration_008_encryption_metadata),
     Migration::new(9, "profile_settings", migration_009_profile_settings),
     Migration::new(10, "compressed_archive", migration_010_compressed_archive),
@@ -747,8 +749,14 @@ pub fn run_migration_rehearsal(
 
     // Copy main DB and WAL sidecars if present.
     std::fs::copy(source_path, &temp_db)?;
-    let _ = std::fs::copy(format!("{}-wal", source_path.display()), format!("{}-wal", temp_db.display()));
-    let _ = std::fs::copy(format!("{}-shm", source_path.display()), format!("{}-shm", temp_db.display()));
+    let _ = std::fs::copy(
+        format!("{}-wal", source_path.display()),
+        format!("{}-wal", temp_db.display()),
+    );
+    let _ = std::fs::copy(
+        format!("{}-shm", source_path.display()),
+        format!("{}-shm", temp_db.display()),
+    );
 
     let conn = Connection::open(&temp_db)?;
     let start_version: i64 = conn.pragma_query_value(None, "user_version", |row| row.get(0))?;
@@ -768,11 +776,12 @@ pub fn run_migration_rehearsal(
     };
 
     if report.success {
-        let integrity: String = conn
-            .pragma_query_value(None, "integrity_check", |row| row.get(0))?;
+        let integrity: String =
+            conn.pragma_query_value(None, "integrity_check", |row| row.get(0))?;
         report.integrity_check = integrity;
 
-        let mut stmt = conn.prepare("SELECT version, name, applied_at FROM _migration_log ORDER BY version")?;
+        let mut stmt =
+            conn.prepare("SELECT version, name, applied_at FROM _migration_log ORDER BY version")?;
         let rows = stmt.query_map([], |row| {
             Ok(MigrationLogEntry {
                 version: row.get(0)?,
@@ -812,7 +821,10 @@ pub struct MigrationLogEntry {
 /// Ensure the core indexes required by the app exist.
 pub fn ensure_core_indexes(conn: &Connection) -> Result<i64> {
     let specs = [
-        ("idx_app_usage_date", "CREATE INDEX IF NOT EXISTS idx_app_usage_date ON app_usage(date)"),
+        (
+            "idx_app_usage_date",
+            "CREATE INDEX IF NOT EXISTS idx_app_usage_date ON app_usage(date)",
+        ),
         (
             "idx_app_usage_app_date",
             "CREATE INDEX IF NOT EXISTS idx_app_usage_app_date ON app_usage(app_name, date)",

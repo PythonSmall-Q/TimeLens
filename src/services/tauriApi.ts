@@ -480,6 +480,12 @@ export const revokeAllWidgetPermissions = (widgetId: string, actor?: string): Pr
 export const importLocalWidget = (srcDir: string): Promise<WidgetRegistryItem> =>
   invoke("import_local_widget", { srcDir });
 
+export const issueWidgetApiToken = (
+  widgetId: string,
+  scopes: string[]
+): Promise<IssuedApiToken> =>
+  invoke("issue_widget_api_token", { widgetId, scopes });
+
 // ── Phase D+E: productivity + interruption ────────────────────
 
 export const getProductivityScore = (date: string): Promise<ProductivityScore> =>

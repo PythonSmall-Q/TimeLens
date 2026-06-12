@@ -1,3 +1,5 @@
+import { workspace } from "vscode";
+
 export interface VsCodeLanguageDuration {
   language: string;
   seconds: number;
@@ -101,6 +103,13 @@ export async function postVsCodeSession(
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
+
+  // Attach API token if the user has configured one (required when local API
+  // token mode is enabled).
+  const apiToken = workspace.getConfiguration("timelens").get<string>("apiToken", "").trim();
+  if (apiToken) {
+    headers["X-Api-Token"] = apiToken;
+  }
 
   // Only attach signature when desktop API explicitly requires bridge auth.
   if (bridgeKey && await shouldAttachBridgeSignature(apiBaseUrl)) {

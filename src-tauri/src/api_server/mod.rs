@@ -6,13 +6,12 @@
 ///   GET  /api/categories                 → Vec<AppCategoryRule>
 ///   GET  /api/status                     → { version, focus_active }
 ///   WS   /ws/active-window               → streams ActiveWindowInfo JSON
-
 use std::sync::{Arc, Mutex};
 
 use axum::{
-    extract::{Query, State, WebSocketUpgrade},
     extract::ws::{Message, WebSocket},
-    http::{Method, HeaderMap},
+    extract::{Query, State, WebSocketUpgrade},
+    http::{HeaderMap, Method},
     response::{IntoResponse, Json},
     routing::{get, post},
     Router,
@@ -20,10 +19,10 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use tower_http::cors::{Any, CorsLayer};
 
-use crate::db;
-use crate::monitor::SharedMonitorStatus;
-use crate::models::{AppUsageSummary, BrowserSession, VsCodeLanguageDuration, VsCodeSession};
 use crate::commands::extension_bridge_cmd;
+use crate::db;
+use crate::models::{AppUsageSummary, BrowserSession, VsCodeLanguageDuration, VsCodeSession};
+use crate::monitor::SharedMonitorStatus;
 
 /// Shared state threaded through axum handlers.
 #[derive(Clone)]
@@ -36,7 +35,7 @@ pub struct ApiState {
 #[derive(Deserialize)]
 struct RangeParams {
     start: Option<String>,
-    end:   Option<String>,
+    end: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -108,9 +107,12 @@ fn write_api_audit_log(
     let _ = db::insert_api_audit_log(conn, &now, client_id, endpoint, method, status_code, detail);
 }
 
-fn enforce_api_write_governance(
+/// Central API governance: allowlist, rate-limit, and token (+ scope) checks.
+/// Returns the resolved `X-Client-Id` on success.
+fn enforce_api_governance(
     conn: &rusqlite::Connection,
     headers: &HeaderMap,
+    required_scope: Option<&str>,
 ) -> Result<String, axum::http::StatusCode> {
     let client_id = headers
         .get("X-Client-Id")
@@ -119,15 +121,20 @@ fn enforce_api_write_governance(
         .trim()
         .to_string();
 
-    let allowlist_enforced = db::get_bool_setting(conn, "local_api_allowlist_enforced", false)
-        .unwrap_or(false);
+    let allowlist_enforced =
+        db::get_bool_setting(conn, "local_api_allowlist_enforced", false).unwrap_or(false);
     if allowlist_enforced {
         if client_id.is_empty() {
             return Err(axum::http::StatusCode::FORBIDDEN);
         }
-        let allowed = db::is_api_client_allowed(conn, &client_id).unwrap_or(false);
-        if !allowed {
-            return Err(axum::http::StatusCode::FORBIDDEN);
+        // Widgets identify with client IDs starting with "widget-"; they are
+        // allowed through the allowlist but still subject to token checks.
+        let is_widget = client_id.starts_with("widget-");
+        if !is_widget {
+            let allowed = db::is_api_client_allowed(conn, &client_id).unwrap_or(false);
+            if !allowed {
+                return Err(axum::http::StatusCode::FORBIDDEN);
+            }
         }
     }
 
@@ -144,109 +151,214 @@ fn enforce_api_write_governance(
         }
     }
 
-    let token_required = db::get_bool_setting(conn, "local_api_token_required", false)
-        .unwrap_or(false);
-    if token_required {
-        let token = headers
-            .get("X-Api-Token")
-            .and_then(|h| h.to_str().ok())
-            .map(|v| v.trim())
-            .unwrap_or("");
-        if token.is_empty() {
-            return Err(axum::http::StatusCode::FORBIDDEN);
-        }
-        let ok = extension_bridge_cmd::verify_api_token(conn, token, &client_id).unwrap_or(false);
-        if !ok {
-            return Err(axum::http::StatusCode::FORBIDDEN);
+    let token_required =
+        db::get_bool_setting(conn, "local_api_token_required", false).unwrap_or(false);
+    let token = headers
+        .get("X-Api-Token")
+        .and_then(|h| h.to_str().ok())
+        .map(|v| v.trim())
+        .unwrap_or("")
+        .to_string();
+
+    if token_required && token.is_empty() {
+        return Err(axum::http::StatusCode::FORBIDDEN);
+    }
+
+    // If a token is provided (or required), verify it and enforce scopes.
+    if !token.is_empty() {
+        let scopes = extension_bridge_cmd::verify_api_token(conn, &token, &client_id)
+            .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+        match scopes {
+            Some(scopes) => {
+                if let Some(scope) = required_scope {
+                    if !scopes.iter().any(|s| s == scope) {
+                        return Err(axum::http::StatusCode::FORBIDDEN);
+                    }
+                }
+            }
+            None => return Err(axum::http::StatusCode::FORBIDDEN),
         }
     }
 
     Ok(client_id)
 }
 
-async fn get_today(State(s): State<ApiState>) -> impl IntoResponse {
-    let today = chrono::Local::now().format("%Y-%m-%d").to_string();
-    match s.db.lock() {
-        Ok(conn) => {
-            let rows: Vec<AppUsageSummary> = db::get_app_totals_in_range(&conn, &today, &today)
-                .unwrap_or_default()
-                .into_iter()
-                .map(|(app_name, exe_path, total_seconds)| AppUsageSummary { app_name, exe_path, total_seconds })
-                .collect();
-            Json(rows).into_response()
+async fn get_today(State(s): State<ApiState>, headers: HeaderMap) -> impl IntoResponse {
+    let endpoint = "/api/screen-time/today";
+    let method = "GET";
+    let Ok(conn) = s.db.lock() else {
+        return axum::http::StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    };
+
+    let client_id = match enforce_api_governance(&conn, &headers, Some("screen-time:read")) {
+        Ok(client_id) => client_id,
+        Err(code) => {
+            write_api_audit_log(
+                &conn,
+                "",
+                endpoint,
+                method,
+                code.as_u16() as i64,
+                "governance_check_failed",
+            );
+            return code.into_response();
         }
-        Err(_) => axum::http::StatusCode::INTERNAL_SERVER_ERROR.into_response(),
-    }
+    };
+
+    let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+    let rows: Vec<AppUsageSummary> = db::get_app_totals_in_range(&conn, &today, &today)
+        .unwrap_or_default()
+        .into_iter()
+        .map(|(app_name, exe_path, total_seconds)| AppUsageSummary {
+            app_name,
+            exe_path,
+            total_seconds,
+        })
+        .collect();
+    write_api_audit_log(&conn, &client_id, endpoint, method, 200, "ok");
+    Json(rows).into_response()
 }
 
-async fn get_range(
-    State(s): State<ApiState>,
-    Query(p): Query<RangeParams>,
-) -> impl IntoResponse {
+async fn get_range(State(s): State<ApiState>, headers: HeaderMap, Query(p): Query<RangeParams>) -> impl IntoResponse {
+    let endpoint = "/api/screen-time/range";
+    let method = "GET";
+    let Ok(conn) = s.db.lock() else {
+        return axum::http::StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    };
+
+    let client_id = match enforce_api_governance(&conn, &headers, Some("screen-time:read")) {
+        Ok(client_id) => client_id,
+        Err(code) => {
+            write_api_audit_log(
+                &conn,
+                "",
+                endpoint,
+                method,
+                code.as_u16() as i64,
+                "governance_check_failed",
+            );
+            return code.into_response();
+        }
+    };
+
     let today = chrono::Local::now().format("%Y-%m-%d").to_string();
     let start = p.start.as_deref().unwrap_or(&today).to_string();
-    let end   = p.end.as_deref().unwrap_or(&today).to_string();
-    match s.db.lock() {
-        Ok(conn) => {
-            let rows: Vec<AppUsageSummary> = db::get_app_totals_in_range(&conn, &start, &end)
-                .unwrap_or_default()
-                .into_iter()
-                .map(|(app_name, exe_path, total_seconds)| AppUsageSummary { app_name, exe_path, total_seconds })
-                .collect();
-            Json(rows).into_response()
-        }
-        Err(_) => axum::http::StatusCode::INTERNAL_SERVER_ERROR.into_response(),
-    }
-}
-
-async fn get_categories(State(s): State<ApiState>) -> impl IntoResponse {
-    match s.db.lock() {
-        Ok(conn) => {
-            let rows = db::get_all_app_categories(&conn).unwrap_or_default();
-            Json(rows).into_response()
-        }
-        Err(_) => axum::http::StatusCode::INTERNAL_SERVER_ERROR.into_response(),
-    }
-}
-
-async fn get_status(State(s): State<ApiState>) -> impl IntoResponse {
-    let (focus_active, browser_extension_enabled, extension_bridge_auth_required) = s
-        .db
-        .lock()
-        .ok()
-        .map(|conn| {
-            (
-                db::get_bool_setting(&conn, "focus_mode_active", false).unwrap_or(false),
-                db::get_bool_setting(&conn, "browser_extension_enabled", true).unwrap_or(true),
-                db::get_setting(&conn, "extension_bridge_key")
-                    .ok()
-                    .flatten()
-                    .map(|k| !k.trim().is_empty())
-                    .unwrap_or(false),
-            )
+    let end = p.end.as_deref().unwrap_or(&today).to_string();
+    let rows: Vec<AppUsageSummary> = db::get_app_totals_in_range(&conn, &start, &end)
+        .unwrap_or_default()
+        .into_iter()
+        .map(|(app_name, exe_path, total_seconds)| AppUsageSummary {
+            app_name,
+            exe_path,
+            total_seconds,
         })
-        .unwrap_or((false, true, false));
+        .collect();
+    write_api_audit_log(&conn, &client_id, endpoint, method, 200, "ok");
+    Json(rows).into_response()
+}
+
+async fn get_categories(State(s): State<ApiState>, headers: HeaderMap) -> impl IntoResponse {
+    let endpoint = "/api/categories";
+    let method = "GET";
+    let Ok(conn) = s.db.lock() else {
+        return axum::http::StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    };
+
+    let client_id = match enforce_api_governance(&conn, &headers, Some("screen-time:read")) {
+        Ok(client_id) => client_id,
+        Err(code) => {
+            write_api_audit_log(
+                &conn,
+                "",
+                endpoint,
+                method,
+                code.as_u16() as i64,
+                "governance_check_failed",
+            );
+            return code.into_response();
+        }
+    };
+
+    let rows = db::get_all_app_categories(&conn).unwrap_or_default();
+    write_api_audit_log(&conn, &client_id, endpoint, method, 200, "ok");
+    Json(rows).into_response()
+}
+
+async fn get_status(State(s): State<ApiState>, headers: HeaderMap) -> impl IntoResponse {
+    let endpoint = "/api/status";
+    let method = "GET";
+    let Ok(conn) = s.db.lock() else {
+        return axum::http::StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    };
+
+    let client_id = match enforce_api_governance(&conn, &headers, None) {
+        Ok(client_id) => client_id,
+        Err(code) => {
+            write_api_audit_log(
+                &conn,
+                "",
+                endpoint,
+                method,
+                code.as_u16() as i64,
+                "governance_check_failed",
+            );
+            return code.into_response();
+        }
+    };
+
+    let (focus_active, browser_extension_enabled, extension_bridge_auth_required) = {
+        (
+            db::get_bool_setting(&conn, "focus_mode_active", false).unwrap_or(false),
+            db::get_bool_setting(&conn, "browser_extension_enabled", true).unwrap_or(true),
+            db::get_setting(&conn, "extension_bridge_key")
+                .ok()
+                .flatten()
+                .map(|k| !k.trim().is_empty())
+                .unwrap_or(false),
+        )
+    };
+    write_api_audit_log(&conn, &client_id, endpoint, method, 200, "ok");
     Json(StatusResponse {
         version: env!("CARGO_PKG_VERSION"),
         focus_active,
         browser_extension_enabled,
         extension_bridge_auth_required,
     })
+    .into_response()
 }
 
-async fn get_browser_link(State(s): State<ApiState>) -> impl IntoResponse {
-    let enabled = s
-        .db
-        .lock()
-        .ok()
-        .and_then(|conn| db::get_bool_setting(&conn, "browser_extension_enabled", true).ok())
-        .unwrap_or(true);
+async fn get_browser_link(State(s): State<ApiState>, headers: HeaderMap) -> impl IntoResponse {
+    let endpoint = "/api/browser/link";
+    let method = "GET";
+    let Ok(conn) = s.db.lock() else {
+        return axum::http::StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    };
+
+    let client_id = match enforce_api_governance(&conn, &headers, Some("browser:read")) {
+        Ok(client_id) => client_id,
+        Err(code) => {
+            write_api_audit_log(
+                &conn,
+                "",
+                endpoint,
+                method,
+                code.as_u16() as i64,
+                "governance_check_failed",
+            );
+            return code.into_response();
+        }
+    };
+
+    let enabled =
+        db::get_bool_setting(&conn, "browser_extension_enabled", true).unwrap_or(true);
+    write_api_audit_log(&conn, &client_id, endpoint, method, 200, "ok");
     Json(BrowserLinkResponse {
         enabled,
         app_name: "TimeLens",
         version: env!("CARGO_PKG_VERSION"),
         api_base_url: "http://127.0.0.1:49152",
     })
+    .into_response()
 }
 
 async fn post_browser_session(
@@ -260,10 +372,17 @@ async fn post_browser_session(
         return axum::http::StatusCode::INTERNAL_SERVER_ERROR;
     };
 
-    let client_id = match enforce_api_write_governance(&conn, &headers) {
+    let client_id = match enforce_api_governance(&conn, &headers, Some("browser:write")) {
         Ok(client_id) => client_id,
         Err(code) => {
-            write_api_audit_log(&conn, "", endpoint, method, code.as_u16() as i64, "governance_check_failed");
+            write_api_audit_log(
+                &conn,
+                "",
+                endpoint,
+                method,
+                code.as_u16() as i64,
+                "governance_check_failed",
+            );
             return code;
         }
     };
@@ -280,24 +399,52 @@ async fn post_browser_session(
             let body_json = match serde_json::to_string(&payload) {
                 Ok(j) => j,
                 Err(_) => {
-                    write_api_audit_log(&conn, &client_id, endpoint, method, 500, "payload_serialization_failed");
+                    write_api_audit_log(
+                        &conn,
+                        &client_id,
+                        endpoint,
+                        method,
+                        500,
+                        "payload_serialization_failed",
+                    );
                     return axum::http::StatusCode::INTERNAL_SERVER_ERROR;
                 }
             };
             if !extension_bridge_cmd::verify_request_signature(body_json.as_bytes(), sig, &key) {
-                write_api_audit_log(&conn, &client_id, endpoint, method, 403, "invalid_extension_signature");
+                write_api_audit_log(
+                    &conn,
+                    &client_id,
+                    endpoint,
+                    method,
+                    403,
+                    "invalid_extension_signature",
+                );
                 return axum::http::StatusCode::FORBIDDEN;
             }
         } else {
             // Key is set but no signature provided
-            write_api_audit_log(&conn, &client_id, endpoint, method, 403, "missing_extension_signature");
+            write_api_audit_log(
+                &conn,
+                &client_id,
+                endpoint,
+                method,
+                403,
+                "missing_extension_signature",
+            );
             return axum::http::StatusCode::FORBIDDEN;
         }
     }
 
     let enabled = db::get_bool_setting(&conn, "browser_extension_enabled", true).unwrap_or(true);
     if !enabled {
-        write_api_audit_log(&conn, &client_id, endpoint, method, 403, "browser_extension_disabled");
+        write_api_audit_log(
+            &conn,
+            &client_id,
+            endpoint,
+            method,
+            403,
+            "browser_extension_disabled",
+        );
         return axum::http::StatusCode::FORBIDDEN;
     }
 
@@ -316,11 +463,22 @@ async fn post_browser_session(
     };
 
     if db::insert_browser_session(&conn, &session).is_err() {
-        write_api_audit_log(&conn, &client_id, endpoint, method, 500, "insert_browser_session_failed");
+        write_api_audit_log(
+            &conn,
+            &client_id,
+            endpoint,
+            method,
+            500,
+            "insert_browser_session_failed",
+        );
         return axum::http::StatusCode::INTERNAL_SERVER_ERROR;
     }
     let _ = db::set_setting(&conn, "browser_extension_last_sync_at", &synced_at);
-    let _ = db::set_setting(&conn, "browser_extension_last_browser_name", &payload.browser_name);
+    let _ = db::set_setting(
+        &conn,
+        "browser_extension_last_browser_name",
+        &payload.browser_name,
+    );
     let _ = db::set_setting(&conn, "browser_extension_last_locale", &payload.locale);
     write_api_audit_log(&conn, &client_id, endpoint, method, 204, "ok");
     axum::http::StatusCode::NO_CONTENT
@@ -337,10 +495,17 @@ async fn post_vscode_session(
         return axum::http::StatusCode::INTERNAL_SERVER_ERROR;
     };
 
-    let client_id = match enforce_api_write_governance(&conn, &headers) {
+    let client_id = match enforce_api_governance(&conn, &headers, Some("vscode:write")) {
         Ok(client_id) => client_id,
         Err(code) => {
-            write_api_audit_log(&conn, "", endpoint, method, code.as_u16() as i64, "governance_check_failed");
+            write_api_audit_log(
+                &conn,
+                "",
+                endpoint,
+                method,
+                code.as_u16() as i64,
+                "governance_check_failed",
+            );
             return code;
         }
     };
@@ -357,24 +522,52 @@ async fn post_vscode_session(
             let body_json = match serde_json::to_string(&payload) {
                 Ok(j) => j,
                 Err(_) => {
-                    write_api_audit_log(&conn, &client_id, endpoint, method, 500, "payload_serialization_failed");
+                    write_api_audit_log(
+                        &conn,
+                        &client_id,
+                        endpoint,
+                        method,
+                        500,
+                        "payload_serialization_failed",
+                    );
                     return axum::http::StatusCode::INTERNAL_SERVER_ERROR;
                 }
             };
             if !extension_bridge_cmd::verify_request_signature(body_json.as_bytes(), sig, &key) {
-                write_api_audit_log(&conn, &client_id, endpoint, method, 403, "invalid_extension_signature");
+                write_api_audit_log(
+                    &conn,
+                    &client_id,
+                    endpoint,
+                    method,
+                    403,
+                    "invalid_extension_signature",
+                );
                 return axum::http::StatusCode::FORBIDDEN;
             }
         } else {
             // Key is set but no signature provided
-            write_api_audit_log(&conn, &client_id, endpoint, method, 403, "missing_extension_signature");
+            write_api_audit_log(
+                &conn,
+                &client_id,
+                endpoint,
+                method,
+                403,
+                "missing_extension_signature",
+            );
             return axum::http::StatusCode::FORBIDDEN;
         }
     }
 
     let enabled = db::get_bool_setting(&conn, "vscode_tracking_enabled", true).unwrap_or(true);
     if !enabled {
-        write_api_audit_log(&conn, &client_id, endpoint, method, 403, "vscode_tracking_disabled");
+        write_api_audit_log(
+            &conn,
+            &client_id,
+            endpoint,
+            method,
+            403,
+            "vscode_tracking_disabled",
+        );
         return axum::http::StatusCode::FORBIDDEN;
     }
 
@@ -408,7 +601,14 @@ async fn post_vscode_session(
     };
 
     if db::upsert_vscode_session(&conn, &session).is_err() {
-        write_api_audit_log(&conn, &client_id, endpoint, method, 500, "upsert_vscode_session_failed");
+        write_api_audit_log(
+            &conn,
+            &client_id,
+            endpoint,
+            method,
+            500,
+            "upsert_vscode_session_failed",
+        );
         return axum::http::StatusCode::INTERNAL_SERVER_ERROR;
     }
 
@@ -416,77 +616,172 @@ async fn post_vscode_session(
     axum::http::StatusCode::NO_CONTENT
 }
 
-async fn get_vscode_stats_today(State(s): State<ApiState>) -> impl IntoResponse {
-    let today = chrono::Local::now().format("%Y-%m-%d").to_string();
-    match s.db.lock() {
-        Ok(conn) => {
-            let stats = db::get_vscode_stats_in_range(&conn, &today, &today).unwrap_or(crate::models::VsCodeStatsSummary {
-                total_seconds: 0,
-                session_count: 0,
-            });
-            Json(stats).into_response()
+async fn get_vscode_stats_today(State(s): State<ApiState>, headers: HeaderMap) -> impl IntoResponse {
+    let endpoint = "/api/vscode/stats/today";
+    let method = "GET";
+    let Ok(conn) = s.db.lock() else {
+        return axum::http::StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    };
+
+    let client_id = match enforce_api_governance(&conn, &headers, Some("vscode:read")) {
+        Ok(client_id) => client_id,
+        Err(code) => {
+            write_api_audit_log(
+                &conn,
+                "",
+                endpoint,
+                method,
+                code.as_u16() as i64,
+                "governance_check_failed",
+            );
+            return code.into_response();
         }
-        Err(_) => axum::http::StatusCode::INTERNAL_SERVER_ERROR.into_response(),
-    }
+    };
+
+    let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+    let stats = db::get_vscode_stats_in_range(&conn, &today, &today).unwrap_or(
+        crate::models::VsCodeStatsSummary {
+            total_seconds: 0,
+            session_count: 0,
+        },
+    );
+    write_api_audit_log(&conn, &client_id, endpoint, method, 200, "ok");
+    Json(stats).into_response()
 }
 
 async fn get_vscode_stats_range(
     State(s): State<ApiState>,
+    headers: HeaderMap,
     Query(p): Query<RangeParams>,
 ) -> impl IntoResponse {
+    let endpoint = "/api/vscode/stats/range";
+    let method = "GET";
+    let Ok(conn) = s.db.lock() else {
+        return axum::http::StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    };
+
+    let client_id = match enforce_api_governance(&conn, &headers, Some("vscode:read")) {
+        Ok(client_id) => client_id,
+        Err(code) => {
+            write_api_audit_log(
+                &conn,
+                "",
+                endpoint,
+                method,
+                code.as_u16() as i64,
+                "governance_check_failed",
+            );
+            return code.into_response();
+        }
+    };
+
     let today = chrono::Local::now().format("%Y-%m-%d").to_string();
     let start = p.start.as_deref().unwrap_or(&today).to_string();
     let end = p.end.as_deref().unwrap_or(&today).to_string();
-    match s.db.lock() {
-        Ok(conn) => {
-            let stats = db::get_vscode_stats_in_range(&conn, &start, &end).unwrap_or(crate::models::VsCodeStatsSummary {
-                total_seconds: 0,
-                session_count: 0,
-            });
-            Json(stats).into_response()
-        }
-        Err(_) => axum::http::StatusCode::INTERNAL_SERVER_ERROR.into_response(),
-    }
+    let stats = db::get_vscode_stats_in_range(&conn, &start, &end).unwrap_or(
+        crate::models::VsCodeStatsSummary {
+            total_seconds: 0,
+            session_count: 0,
+        },
+    );
+    write_api_audit_log(&conn, &client_id, endpoint, method, 200, "ok");
+    Json(stats).into_response()
 }
 
 async fn get_vscode_language_stats_range(
     State(s): State<ApiState>,
+    headers: HeaderMap,
     Query(p): Query<RangeParams>,
 ) -> impl IntoResponse {
+    let endpoint = "/api/vscode/languages/range";
+    let method = "GET";
+    let Ok(conn) = s.db.lock() else {
+        return axum::http::StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    };
+
+    let client_id = match enforce_api_governance(&conn, &headers, Some("vscode:read")) {
+        Ok(client_id) => client_id,
+        Err(code) => {
+            write_api_audit_log(
+                &conn,
+                "",
+                endpoint,
+                method,
+                code.as_u16() as i64,
+                "governance_check_failed",
+            );
+            return code.into_response();
+        }
+    };
+
     let today = chrono::Local::now().format("%Y-%m-%d").to_string();
     let start = p.start.as_deref().unwrap_or(&today).to_string();
     let end = p.end.as_deref().unwrap_or(&today).to_string();
-    match s.db.lock() {
-        Ok(conn) => {
-            let rows = db::get_vscode_language_stats_in_range(&conn, &start, &end).unwrap_or_default();
-            Json(rows).into_response()
-        }
-        Err(_) => axum::http::StatusCode::INTERNAL_SERVER_ERROR.into_response(),
-    }
+    let rows =
+        db::get_vscode_language_stats_in_range(&conn, &start, &end).unwrap_or_default();
+    write_api_audit_log(&conn, &client_id, endpoint, method, 200, "ok");
+    Json(rows).into_response()
 }
 
 async fn get_vscode_project_stats_range(
     State(s): State<ApiState>,
+    headers: HeaderMap,
     Query(p): Query<RangeParams>,
 ) -> impl IntoResponse {
+    let endpoint = "/api/vscode/projects/range";
+    let method = "GET";
+    let Ok(conn) = s.db.lock() else {
+        return axum::http::StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    };
+
+    let client_id = match enforce_api_governance(&conn, &headers, Some("vscode:read")) {
+        Ok(client_id) => client_id,
+        Err(code) => {
+            write_api_audit_log(
+                &conn,
+                "",
+                endpoint,
+                method,
+                code.as_u16() as i64,
+                "governance_check_failed",
+            );
+            return code.into_response();
+        }
+    };
+
     let today = chrono::Local::now().format("%Y-%m-%d").to_string();
     let start = p.start.as_deref().unwrap_or(&today).to_string();
     let end = p.end.as_deref().unwrap_or(&today).to_string();
-    match s.db.lock() {
-        Ok(conn) => {
-            let rows = db::get_vscode_project_stats_in_range(&conn, &start, &end).unwrap_or_default();
-            Json(rows).into_response()
-        }
-        Err(_) => axum::http::StatusCode::INTERNAL_SERVER_ERROR.into_response(),
-    }
+    let rows =
+        db::get_vscode_project_stats_in_range(&conn, &start, &end).unwrap_or_default();
+    write_api_audit_log(&conn, &client_id, endpoint, method, 200, "ok");
+    Json(rows).into_response()
 }
 
 async fn set_vscode_tracking_enabled(
     State(s): State<ApiState>,
+    headers: HeaderMap,
     Json(payload): Json<TrackingEnabledInput>,
 ) -> impl IntoResponse {
+    let endpoint = "/api/vscode/enabled";
+    let method = "POST";
     let Ok(conn) = s.db.lock() else {
         return axum::http::StatusCode::INTERNAL_SERVER_ERROR;
+    };
+
+    let client_id = match enforce_api_governance(&conn, &headers, Some("vscode:write")) {
+        Ok(client_id) => client_id,
+        Err(code) => {
+            write_api_audit_log(
+                &conn,
+                "",
+                endpoint,
+                method,
+                code.as_u16() as i64,
+                "governance_check_failed",
+            );
+            return code;
+        }
     };
 
     if db::set_bool_setting(&conn, "vscode_tracking_enabled", payload.enabled).is_err() {
@@ -499,28 +794,75 @@ async fn set_vscode_tracking_enabled(
         }
     }
 
+    write_api_audit_log(&conn, &client_id, endpoint, method, 204, "ok");
     axum::http::StatusCode::NO_CONTENT
 }
 
-async fn get_vscode_tracking_enabled(State(s): State<ApiState>) -> impl IntoResponse {
-    match s.db.lock() {
-        Ok(conn) => {
-            let enabled = db::get_bool_setting(&conn, "vscode_tracking_enabled", true).unwrap_or(true);
-            let tracking_level = db::get_setting(&conn, "vscode_tracking_level")
-                .ok()
-                .flatten()
-                .unwrap_or_else(|| "standard".to_string());
-            Json(TrackingEnabledResponse { enabled, tracking_level }).into_response()
+async fn get_vscode_tracking_enabled(State(s): State<ApiState>, headers: HeaderMap) -> impl IntoResponse {
+    let endpoint = "/api/vscode/enabled";
+    let method = "GET";
+    let Ok(conn) = s.db.lock() else {
+        return axum::http::StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    };
+
+    let client_id = match enforce_api_governance(&conn, &headers, Some("vscode:read")) {
+        Ok(client_id) => client_id,
+        Err(code) => {
+            write_api_audit_log(
+                &conn,
+                "",
+                endpoint,
+                method,
+                code.as_u16() as i64,
+                "governance_check_failed",
+            );
+            return code.into_response();
         }
-        Err(_) => axum::http::StatusCode::INTERNAL_SERVER_ERROR.into_response(),
-    }
+    };
+
+    let enabled =
+        db::get_bool_setting(&conn, "vscode_tracking_enabled", true).unwrap_or(true);
+    let tracking_level = db::get_setting(&conn, "vscode_tracking_level")
+        .ok()
+        .flatten()
+        .unwrap_or_else(|| "standard".to_string());
+    write_api_audit_log(&conn, &client_id, endpoint, method, 200, "ok");
+    Json(TrackingEnabledResponse {
+        enabled,
+        tracking_level,
+    })
+    .into_response()
 }
 
 async fn ws_handler(
     ws: WebSocketUpgrade,
+    headers: HeaderMap,
     State(s): State<ApiState>,
 ) -> impl IntoResponse {
-    ws.on_upgrade(move |socket| handle_ws(socket, s))
+    let endpoint = "/ws/active-window";
+    let method = "GET";
+    let state_for_ws = s.clone();
+    let Ok(conn) = s.db.lock() else {
+        return axum::http::StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    };
+
+    match enforce_api_governance(&conn, &headers, Some("active-window:subscribe")) {
+        Ok(client_id) => {
+            write_api_audit_log(&conn, &client_id, endpoint, method, 101, "ok");
+            ws.on_upgrade(move |socket| handle_ws(socket, state_for_ws))
+        }
+        Err(code) => {
+            write_api_audit_log(
+                &conn,
+                "",
+                endpoint,
+                method,
+                code.as_u16() as i64,
+                "governance_check_failed",
+            );
+            code.into_response()
+        }
+    }
 }
 
 async fn handle_ws(mut socket: WebSocket, state: ApiState) {
@@ -551,7 +893,11 @@ pub fn start_api_server(
     port: u16,
     api_token: String,
 ) {
-    let state = ApiState { db, monitor_status, api_token };
+    let state = ApiState {
+        db,
+        monitor_status,
+        api_token,
+    };
 
     let cors = CorsLayer::new()
         .allow_origin(Any)
@@ -568,8 +914,14 @@ pub fn start_api_server(
         .route("/api/vscode/sessions", post(post_vscode_session))
         .route("/api/vscode/stats/today", get(get_vscode_stats_today))
         .route("/api/vscode/stats/range", get(get_vscode_stats_range))
-        .route("/api/vscode/languages/range", get(get_vscode_language_stats_range))
-        .route("/api/vscode/projects/range", get(get_vscode_project_stats_range))
+        .route(
+            "/api/vscode/languages/range",
+            get(get_vscode_language_stats_range),
+        )
+        .route(
+            "/api/vscode/projects/range",
+            get(get_vscode_project_stats_range),
+        )
         .route("/api/vscode/enabled", get(get_vscode_tracking_enabled))
         .route("/api/vscode/enabled", post(set_vscode_tracking_enabled))
         .route("/ws/active-window", get(ws_handler))

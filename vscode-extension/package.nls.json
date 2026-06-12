@@ -3,6 +3,7 @@
   "timelens.enabled.description": "Enable local VS Code usage tracking for TimeLens.",
   "timelens.apiBaseUrl.description": "Local TimeLens API base URL.",
   "timelens.bridgeKey.description": "Extension bridge key for authenticating with TimeLens local API. Get this from Settings > Local API / Extension Bridge.",
+  "timelens.apiToken.description": "Local API token for authenticating with TimeLens when token-required mode is enabled. Get this from Settings > Local API / Tokens."
   "timelens.flushIntervalSeconds.description": "How often to flush queued sessions to TimeLens API.",
   "timelens.idleThresholdSeconds.description": "Split a session when editor activity is idle for this many seconds.",
   "timelens.trackingLevel.description": "How much data to record per VS Code session.",

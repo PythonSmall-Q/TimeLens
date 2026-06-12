@@ -114,7 +114,7 @@ export default function WidgetWindow({ widgetId }: Props) {
               height: size.height,
             });
           }
-        } catch (_) {}
+        } catch { /* ignore */ }
       }, 600);
     });
 

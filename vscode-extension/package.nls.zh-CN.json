@@ -3,6 +3,7 @@
   "timelens.enabled.description": "启用 TimeLens 本地 VS Code 使用时长追踪。",
   "timelens.apiBaseUrl.description": "TimeLens 本地 API 基础 URL。",
   "timelens.bridgeKey.description": "用于向 TimeLens 本地 API 认证的扩展桥接密钥，可在「设置 > 本地 API / 扩展桥接」中获取。",
+  "timelens.apiToken.description": "在启用「需要 API Token」模式时，用于向 TimeLens 本地 API 认证的令牌，可在「设置 > 本地 API / 令牌」中获取。"
   "timelens.flushIntervalSeconds.description": "将排队会话刷新到 TimeLens API 的频率（秒）。",
   "timelens.idleThresholdSeconds.description": "当编辑器活动空闲超过此秒数时，将当前会话拆分。",
   "timelens.trackingLevel.description": "每个 VS Code 会话记录的数据量。",

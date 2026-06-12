@@ -82,8 +82,8 @@ pub struct UsageGoal {
     pub id: Option<i64>,
     pub scope_type: String, // "category" | "app"
     pub scope_value: String,
-    pub period: String,     // "daily" | "weekly"
-    pub operator: String,   // "at_least" | "at_most"
+    pub period: String,   // "daily" | "weekly"
+    pub operator: String, // "at_least" | "at_most"
     pub target_seconds: i64,
     pub enabled: bool,
     #[serde(default = "default_true")]
@@ -122,6 +122,53 @@ pub struct FocusRule {
     pub auto_start: bool,
     pub quiet_hours_respect: bool,
     pub created_at: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct DistractionHotspot {
+    pub date: String,
+    pub hour: i32,
+    pub app_name: String,
+    pub switch_count: i64,
+    pub short_session_ratio: f64,
+    pub fragment_score: f64,
+    pub reason: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CategoryComparison {
+    pub category: String,
+    pub current_seconds: i64,
+    pub previous_seconds: i64,
+    pub delta_seconds: i64,
+    pub delta_ratio: f64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ProjectComparison {
+    pub project_name: String,
+    pub project_path: String,
+    pub current_seconds: i64,
+    pub previous_seconds: i64,
+    pub delta_seconds: i64,
+    pub delta_ratio: f64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct GoalRiskAlert {
+    pub goal_id: i64,
+    pub scope_value: String,
+    pub message: String,
+    pub severity: String, // "low" | "medium" | "high"
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct FocusRuleMatch {
+    pub rule_id: i64,
+    pub rule_name: String,
+    pub action: String,
+    pub matched: bool,
+    pub reason: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
