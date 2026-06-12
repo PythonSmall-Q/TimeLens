@@ -6,13 +6,17 @@ use chrono::{Duration, Local, NaiveDate};
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use tauri::State;
+use tauri::{Manager, State};
 use zip::{write::FileOptions, CompressionMethod, ZipArchive, ZipWriter};
 
 use crate::commands::storage_cmd::DbState;
 use crate::db;
 use crate::monitor::{MonitorStatus, SharedMonitorStatus};
-use crate::models::{AppUsageRecord, BrowserSession, TodoItem, WidgetConfig};
+use crate::models::{
+    ApiClientAllowlistEntry, ApiTokenMetadata, AppCategoryRule, AppUsageRecord, BrowserDomainLimit,
+    BrowserSession, FocusRule, FocusSession, TodoItem, UsageGoal, VsCodeLanguageDuration,
+    VsCodeSession, WidgetConfig, WidgetPermissionAuditEntry,
+};
 
 const BACKUP_VERSION: &str = "v2";
 const BACKUP_PACKAGE_FILE: &str = "backup.json";
@@ -26,6 +30,17 @@ pub struct BackupBundleCounts {
     pub widget_configs: usize,
     pub ignored_apps: usize,
     pub app_settings: usize,
+    pub app_categories: usize,
+    pub usage_goals: usize,
+    pub focus_sessions: usize,
+    pub focus_rules: usize,
+    pub browser_ignored_domains: usize,
+    pub browser_domain_limits: usize,
+    pub widget_permissions: usize,
+    pub widget_permission_audit_log: usize,
+    pub vscode_sessions: usize,
+    pub api_tokens: usize,
+    pub api_client_allowlist: usize,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -53,6 +68,27 @@ struct BackupBundle {
     widget_configs: Vec<WidgetConfig>,
     ignored_apps: Vec<String>,
     app_settings: Vec<SettingEntry>,
+    app_categories: Vec<AppCategoryRule>,
+    usage_goals: Vec<UsageGoal>,
+    focus_sessions: Vec<FocusSession>,
+    focus_rules: Vec<FocusRule>,
+    browser_ignored_domains: Vec<String>,
+    browser_domain_limits: Vec<BrowserDomainLimit>,
+    widget_permissions: Vec<WidgetPermissionBackupEntry>,
+    widget_permission_audit_log: Vec<WidgetPermissionAuditEntry>,
+    vscode_sessions: Vec<VsCodeSession>,
+    api_tokens: Vec<ApiTokenMetadata>,
+    api_client_allowlist: Vec<ApiClientAllowlistEntry>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct WidgetPermissionBackupEntry {
+    widget_id: String,
+    permission: String,
+    granted_at: String,
+    capability: String,
+    risk_label: String,
+    last_access_at: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -185,6 +221,10 @@ fn sha256_hex(bytes: &[u8]) -> String {
     format!("{:x}", hasher.finalize())
 }
 
+fn parse_scopes_json(raw: &str) -> Vec<String> {
+    serde_json::from_str::<Vec<String>>(raw).unwrap_or_default()
+}
+
 fn build_bundle(conn: &rusqlite::Connection) -> Result<BackupBundle, String> {
     let app_usage = {
         let mut stmt = conn
@@ -232,6 +272,9 @@ fn build_bundle(conn: &rusqlite::Connection) -> Result<BackupBundle, String> {
     let browser_sessions = db::get_recent_browser_sessions(conn, 100_000).map_err(|e| e.to_string())?;
     let widget_configs = db::get_all_widget_configs(conn).map_err(|e| e.to_string())?;
     let ignored_apps = db::get_ignored_apps(conn).map_err(|e| e.to_string())?;
+    let app_categories = db::get_all_app_categories(conn).map_err(|e| e.to_string())?;
+    let browser_ignored_domains = db::get_browser_ignored_domains(conn).map_err(|e| e.to_string())?;
+    let browser_domain_limits = db::get_browser_domain_limits(conn).map_err(|e| e.to_string())?;
 
     let app_settings = {
         let mut stmt = conn
@@ -248,6 +291,226 @@ fn build_bundle(conn: &rusqlite::Connection) -> Result<BackupBundle, String> {
         rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())?
     };
 
+    let usage_goals = {
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, scope_type, scope_value, period, operator, target_seconds, enabled, notify_risk
+                 FROM usage_goals
+                 ORDER BY id DESC",
+            )
+            .map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map([], |row| {
+                Ok(UsageGoal {
+                    id: row.get(0)?,
+                    scope_type: row.get(1)?,
+                    scope_value: row.get(2)?,
+                    period: row.get(3)?,
+                    operator: row.get(4)?,
+                    target_seconds: row.get(5)?,
+                    enabled: row.get::<_, i32>(6)? != 0,
+                    notify_risk: row.get::<_, Option<i32>>(7)?.unwrap_or(1) != 0,
+                })
+            })
+            .map_err(|e| e.to_string())?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())?
+    };
+
+    let focus_sessions = {
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, started_at, ended_at, trigger_type, reason
+                 FROM focus_sessions
+                 ORDER BY started_at DESC",
+            )
+            .map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map([], |row| {
+                Ok(FocusSession {
+                    id: row.get(0)?,
+                    started_at: row.get(1)?,
+                    ended_at: row.get(2)?,
+                    trigger_type: row.get(3)?,
+                    reason: row.get(4)?,
+                })
+            })
+            .map_err(|e| e.to_string())?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())?
+    };
+
+    let focus_rules = {
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, name, enabled, rule_type, condition_json, action, auto_start, quiet_hours_respect, created_at
+                 FROM focus_rules
+                 ORDER BY id DESC",
+            )
+            .map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map([], |row| {
+                Ok(FocusRule {
+                    id: row.get(0)?,
+                    name: row.get(1)?,
+                    enabled: row.get::<_, i32>(2)? != 0,
+                    rule_type: row.get(3)?,
+                    condition_json: row.get(4)?,
+                    action: row.get(5)?,
+                    auto_start: row.get::<_, i32>(6)? != 0,
+                    quiet_hours_respect: row.get::<_, i32>(7)? != 0,
+                    created_at: row.get(8)?,
+                })
+            })
+            .map_err(|e| e.to_string())?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())?
+    };
+
+    let widget_permissions = {
+        let mut stmt = conn
+            .prepare(
+                "SELECT widget_id, permission, granted_at, capability, risk_label, last_access_at
+                 FROM widget_permissions
+                 ORDER BY widget_id, permission",
+            )
+            .map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map([], |row| {
+                Ok(WidgetPermissionBackupEntry {
+                    widget_id: row.get(0)?,
+                    permission: row.get(1)?,
+                    granted_at: row.get(2)?,
+                    capability: row.get(3)?,
+                    risk_label: row.get(4)?,
+                    last_access_at: row.get(5)?,
+                })
+            })
+            .map_err(|e| e.to_string())?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())?
+    };
+
+    let widget_permission_audit_log = {
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, widget_id, permission, action, actor, occurred_at, detail
+                 FROM widget_permission_audit_log
+                 ORDER BY occurred_at DESC, id DESC",
+            )
+            .map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map([], |row| {
+                Ok(WidgetPermissionAuditEntry {
+                    id: row.get(0)?,
+                    widget_id: row.get(1)?,
+                    permission: row.get(2)?,
+                    action: row.get(3)?,
+                    actor: row.get(4)?,
+                    occurred_at: row.get(5)?,
+                    detail: row.get(6)?,
+                })
+            })
+            .map_err(|e| e.to_string())?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())?
+    };
+
+    let vscode_sessions = {
+        let mut stmt = conn
+            .prepare(
+                "SELECT session_id, date, started_at, ended_at, duration_seconds, project_name, project_path, synced_at
+                 FROM vscode_sessions
+                 ORDER BY started_at DESC",
+            )
+            .map_err(|e| e.to_string())?;
+        let mut sessions = stmt
+            .query_map([], |row| {
+                Ok(VsCodeSession {
+                    session_id: row.get(0)?,
+                    date: row.get(1)?,
+                    started_at: row.get(2)?,
+                    ended_at: row.get(3)?,
+                    duration_seconds: row.get(4)?,
+                    project_name: row.get(5)?,
+                    project_path: row.get(6)?,
+                    synced_at: row.get(7)?,
+                    language_durations: Vec::new(),
+                })
+            })
+            .map_err(|e| e.to_string())?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| e.to_string())?;
+
+        let mut lang_stmt = conn
+            .prepare("SELECT session_id, language, duration_seconds FROM vscode_session_languages")
+            .map_err(|e| e.to_string())?;
+        let lang_rows = lang_stmt
+            .query_map([], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    VsCodeLanguageDuration {
+                        language: row.get(1)?,
+                        seconds: row.get(2)?,
+                    },
+                ))
+            })
+            .map_err(|e| e.to_string())?;
+        let mut by_session: std::collections::HashMap<String, Vec<VsCodeLanguageDuration>> =
+            std::collections::HashMap::new();
+        for row in lang_rows {
+            let (session_id, lang) = row.map_err(|e| e.to_string())?;
+            by_session.entry(session_id).or_default().push(lang);
+        }
+        for session in &mut sessions {
+            if let Some(langs) = by_session.remove(&session.session_id) {
+                session.language_durations = langs;
+            }
+        }
+        sessions
+    };
+
+    let api_tokens = {
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, label, token_hash, scopes_json, created_at, expires_at, revoked_at, last_used_at, last_client_id
+                 FROM api_tokens
+                 ORDER BY created_at DESC",
+            )
+            .map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map([], |row| {
+                let scopes_json: String = row.get(3)?;
+                Ok(ApiTokenMetadata {
+                    id: row.get(0)?,
+                    label: row.get(1)?,
+                    token_hash: row.get(2)?,
+                    scopes: parse_scopes_json(&scopes_json),
+                    created_at: row.get(4)?,
+                    expires_at: row.get(5)?,
+                    revoked_at: row.get(6)?,
+                    last_used_at: row.get(7)?,
+                    last_client_id: row.get(8)?,
+                })
+            })
+            .map_err(|e| e.to_string())?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())?
+    };
+
+    let api_client_allowlist = {
+        let mut stmt = conn
+            .prepare(
+                "SELECT client_id, created_at
+                 FROM api_client_allowlist
+                 ORDER BY client_id ASC",
+            )
+            .map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map([], |row| {
+                Ok(ApiClientAllowlistEntry {
+                    client_id: row.get(0)?,
+                    created_at: row.get(1)?,
+                })
+            })
+            .map_err(|e| e.to_string())?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())?
+    };
+
     Ok(BackupBundle {
         app_usage,
         browser_sessions,
@@ -255,6 +518,17 @@ fn build_bundle(conn: &rusqlite::Connection) -> Result<BackupBundle, String> {
         widget_configs,
         ignored_apps,
         app_settings,
+        app_categories,
+        usage_goals,
+        focus_sessions,
+        focus_rules,
+        browser_ignored_domains,
+        browser_domain_limits,
+        widget_permissions,
+        widget_permission_audit_log,
+        vscode_sessions,
+        api_tokens,
+        api_client_allowlist,
     })
 }
 
@@ -274,6 +548,17 @@ fn build_manifest(conn: &rusqlite::Connection, bundle: &BackupBundle, payload_js
             widget_configs: bundle.widget_configs.len(),
             ignored_apps: bundle.ignored_apps.len(),
             app_settings: bundle.app_settings.len(),
+            app_categories: bundle.app_categories.len(),
+            usage_goals: bundle.usage_goals.len(),
+            focus_sessions: bundle.focus_sessions.len(),
+            focus_rules: bundle.focus_rules.len(),
+            browser_ignored_domains: bundle.browser_ignored_domains.len(),
+            browser_domain_limits: bundle.browser_domain_limits.len(),
+            widget_permissions: bundle.widget_permissions.len(),
+            widget_permission_audit_log: bundle.widget_permission_audit_log.len(),
+            vscode_sessions: bundle.vscode_sessions.len(),
+            api_tokens: bundle.api_tokens.len(),
+            api_client_allowlist: bundle.api_client_allowlist.len(),
         },
     }
 }
@@ -333,18 +618,31 @@ fn clear_all_user_data(tx: &rusqlite::Transaction<'_>) -> Result<(), String> {
         "widget_configs",
         "ignored_apps",
         "app_settings",
+        "app_categories",
+        "usage_goals",
+        "focus_sessions",
+        "focus_rules",
+        "browser_ignored_domains",
+        "browser_domain_limits",
+        "widget_permissions",
+        "widget_permission_audit_log",
+        "vscode_sessions",
+        "vscode_session_languages",
+        "api_tokens",
+        "api_client_allowlist",
     ] {
         tx.execute(&format!("DELETE FROM {table}"), []).map_err(|e| e.to_string())?;
     }
     Ok(())
 }
 
-fn apply_bundle(tx: &rusqlite::Transaction<'_>, bundle: BackupBundle) -> Result<usize, String> {
+fn apply_bundle(tx: &rusqlite::Transaction<'_>, bundle: BackupBundle) -> Result<(usize, Vec<String>), String> {
     let mut imported_rows = 0usize;
+    let mut warnings = Vec::new();
 
     for row in bundle.app_usage {
         tx.execute(
-            "INSERT INTO app_usage (date, app_name, exe_path, window_title, active_seconds, first_seen_at, last_seen_at)
+            "INSERT OR IGNORE INTO app_usage (date, app_name, exe_path, window_title, active_seconds, first_seen_at, last_seen_at)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
             params![
                 row.date,
@@ -410,8 +708,8 @@ fn apply_bundle(tx: &rusqlite::Transaction<'_>, bundle: BackupBundle) -> Result<
     for cfg in bundle.widget_configs {
         tx.execute(
             "INSERT INTO widget_configs
-             (id, widget_type, monitor_index, x, y, width, height, opacity, always_on_top_mode, pinned, start_on_launch)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+             (id, widget_type, monitor_index, x, y, width, height, opacity, always_on_top_mode, pinned, start_on_launch, data_json)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
              ON CONFLICT(id) DO UPDATE SET
                  widget_type = excluded.widget_type,
                  monitor_index = excluded.monitor_index,
@@ -422,7 +720,8 @@ fn apply_bundle(tx: &rusqlite::Transaction<'_>, bundle: BackupBundle) -> Result<
                  opacity = excluded.opacity,
                  always_on_top_mode = excluded.always_on_top_mode,
                  pinned = excluded.pinned,
-                 start_on_launch = excluded.start_on_launch",
+                 start_on_launch = excluded.start_on_launch,
+                 data_json = excluded.data_json",
             params![
                 cfg.id,
                 cfg.widget_type,
@@ -435,6 +734,7 @@ fn apply_bundle(tx: &rusqlite::Transaction<'_>, bundle: BackupBundle) -> Result<
                 cfg.always_on_top_mode,
                 cfg.pinned as i32,
                 cfg.start_on_launch as i32,
+                cfg.data_json,
             ],
         )
         .map_err(|e| e.to_string())?;
@@ -459,7 +759,202 @@ fn apply_bundle(tx: &rusqlite::Transaction<'_>, bundle: BackupBundle) -> Result<
         imported_rows += 1;
     }
 
-    Ok(imported_rows)
+    for row in bundle.app_categories {
+        tx.execute(
+            "INSERT OR REPLACE INTO app_categories (app_name, exe_path, category, source, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![row.app_name, row.exe_path, row.category, row.source, row.updated_at],
+        )
+        .map_err(|e| e.to_string())?;
+        imported_rows += 1;
+    }
+
+    for row in bundle.usage_goals {
+        tx.execute(
+            "INSERT INTO usage_goals (id, scope_type, scope_value, period, operator, target_seconds, enabled, notify_risk)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+             ON CONFLICT(id) DO UPDATE SET
+               scope_type = excluded.scope_type,
+               scope_value = excluded.scope_value,
+               period = excluded.period,
+               operator = excluded.operator,
+               target_seconds = excluded.target_seconds,
+               enabled = excluded.enabled,
+               notify_risk = excluded.notify_risk",
+            params![
+                row.id,
+                row.scope_type,
+                row.scope_value,
+                row.period,
+                row.operator,
+                row.target_seconds,
+                row.enabled as i32,
+                row.notify_risk as i32,
+            ],
+        )
+        .map_err(|e| e.to_string())?;
+        imported_rows += 1;
+    }
+
+    for row in bundle.focus_sessions {
+        tx.execute(
+            "INSERT OR IGNORE INTO focus_sessions (id, started_at, ended_at, trigger_type, reason)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![row.id, row.started_at, row.ended_at, row.trigger_type, row.reason],
+        )
+        .map_err(|e| e.to_string())?;
+        imported_rows += 1;
+    }
+
+    for row in bundle.focus_rules {
+        tx.execute(
+            "INSERT OR IGNORE INTO focus_rules (id, name, enabled, rule_type, condition_json, action, auto_start, quiet_hours_respect, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            params![
+                row.id,
+                row.name,
+                row.enabled as i32,
+                row.rule_type,
+                row.condition_json,
+                row.action,
+                row.auto_start as i32,
+                row.quiet_hours_respect as i32,
+                row.created_at,
+            ],
+        )
+        .map_err(|e| e.to_string())?;
+        imported_rows += 1;
+    }
+
+    tx.execute("DELETE FROM browser_ignored_domains", [])
+        .map_err(|e| e.to_string())?;
+    for host in bundle.browser_ignored_domains {
+        tx.execute(
+            "INSERT OR IGNORE INTO browser_ignored_domains (host) VALUES (?1)",
+            params![host],
+        )
+        .map_err(|e| e.to_string())?;
+        imported_rows += 1;
+    }
+
+    for row in bundle.browser_domain_limits {
+        tx.execute(
+            "INSERT OR REPLACE INTO browser_domain_limits (host, daily_limit_seconds, enabled, updated_at)
+             VALUES (?1, ?2, ?3, ?4)",
+            params![
+                row.host,
+                row.daily_limit_seconds,
+                row.enabled as i32,
+                row.updated_at,
+            ],
+        )
+        .map_err(|e| e.to_string())?;
+        imported_rows += 1;
+    }
+
+    for row in bundle.widget_permissions {
+        tx.execute(
+            "INSERT OR REPLACE INTO widget_permissions (widget_id, permission, granted_at, capability, risk_label, last_access_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![
+                row.widget_id,
+                row.permission,
+                row.granted_at,
+                row.capability,
+                row.risk_label,
+                row.last_access_at,
+            ],
+        )
+        .map_err(|e| e.to_string())?;
+        imported_rows += 1;
+    }
+
+    for row in bundle.widget_permission_audit_log {
+        tx.execute(
+            "INSERT INTO widget_permission_audit_log (widget_id, permission, action, actor, occurred_at, detail)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![
+                row.widget_id,
+                row.permission,
+                row.action,
+                row.actor,
+                row.occurred_at,
+                row.detail,
+            ],
+        )
+        .map_err(|e| e.to_string())?;
+        imported_rows += 1;
+    }
+
+    for row in bundle.vscode_sessions {
+        tx.execute(
+            "INSERT OR REPLACE INTO vscode_sessions (session_id, date, started_at, ended_at, duration_seconds, project_name, project_path, synced_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![
+                row.session_id,
+                row.date,
+                row.started_at,
+                row.ended_at,
+                row.duration_seconds,
+                row.project_name,
+                row.project_path,
+                row.synced_at,
+            ],
+        )
+        .map_err(|e| e.to_string())?;
+        tx.execute(
+            "DELETE FROM vscode_session_languages WHERE session_id = ?1",
+            params![row.session_id],
+        )
+        .map_err(|e| e.to_string())?;
+        for lang in row.language_durations {
+            tx.execute(
+                "INSERT INTO vscode_session_languages (session_id, language, duration_seconds)
+                 VALUES (?1, ?2, ?3)",
+                params![row.session_id, lang.language, lang.seconds],
+            )
+            .map_err(|e| e.to_string())?;
+            imported_rows += 1;
+        }
+        imported_rows += 1;
+    }
+
+    for row in bundle.api_tokens {
+        let Some(token_hash) = row.token_hash else {
+            warnings.push(format!("api token {} skipped: missing token_hash", row.id));
+            continue;
+        };
+        let scopes_json = serde_json::to_string(&row.scopes).unwrap_or_else(|_| "[]".to_string());
+        tx.execute(
+            "INSERT OR REPLACE INTO api_tokens (id, label, token_hash, scopes_json, created_at, expires_at, revoked_at, last_used_at, last_client_id)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            params![
+                row.id,
+                row.label,
+                token_hash,
+                scopes_json,
+                row.created_at,
+                row.expires_at,
+                row.revoked_at,
+                row.last_used_at,
+                row.last_client_id,
+            ],
+        )
+        .map_err(|e| e.to_string())?;
+        imported_rows += 1;
+    }
+
+    for row in bundle.api_client_allowlist {
+        tx.execute(
+            "INSERT OR REPLACE INTO api_client_allowlist (client_id, created_at)
+             VALUES (?1, ?2)",
+            params![row.client_id, row.created_at],
+        )
+        .map_err(|e| e.to_string())?;
+        imported_rows += 1;
+    }
+
+    Ok((imported_rows, warnings))
 }
 
 fn date_days_ago(days: i64) -> String {
@@ -720,14 +1215,14 @@ pub fn import_backup_v2_apply(
         _ => return Err("invalid backup restore strategy".to_string()),
     };
 
-    let imported_rows = apply_bundle(&tx, bundle)?;
+    let (imported_rows, apply_warnings) = apply_bundle(&tx, bundle)?;
     tx.commit().map_err(|e| e.to_string())?;
 
     Ok(BackupApplyResult {
         manifest,
         strategy: strategy_name.to_string(),
         imported_rows,
-        warnings: Vec::new(),
+        warnings: apply_warnings,
     })
 }
 
@@ -989,4 +1484,275 @@ pub fn repair_data_issues(
     }
 
     run_result
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct DataIntegrityResult {
+    pub integrity_ok: bool,
+    pub foreign_key_ok: bool,
+    pub index_ok: bool,
+    pub integrity_message: String,
+    pub foreign_key_message: String,
+}
+
+#[tauri::command]
+pub fn check_data_integrity(db: State<DbState>) -> Result<DataIntegrityResult, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    let integrity: String = conn
+        .pragma_query_value(None, "integrity_check", |row| row.get(0))
+        .map_err(|e| e.to_string())?;
+    let fk_violations: Vec<String> = conn
+        .prepare("PRAGMA foreign_key_check")
+        .map_err(|e| e.to_string())?
+        .query_map([], |row| {
+            let table: String = row.get(0)?;
+            let rowid: i64 = row.get(1)?;
+            let parent: String = row.get(2)?;
+            let fkid: i64 = row.get(3)?;
+            Ok(format!(
+                "table={} rowid={} parent={} fkid={}",
+                table, rowid, parent, fkid
+            ))
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
+
+    let index_ok = db::migrations::ensure_core_indexes(&conn).is_ok();
+
+    Ok(DataIntegrityResult {
+        integrity_ok: integrity.eq_ignore_ascii_case("ok"),
+        foreign_key_ok: fk_violations.is_empty(),
+        index_ok,
+        integrity_message: integrity,
+        foreign_key_message: if fk_violations.is_empty() {
+            "No foreign key violations".to_string()
+        } else {
+            fk_violations.join("; ")
+        },
+    })
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct DataGapResult {
+    pub missing_days: Vec<String>,
+    pub zero_usage_days: Vec<String>,
+    pub earliest_date: Option<String>,
+    pub latest_date: Option<String>,
+}
+
+#[tauri::command]
+pub fn scan_data_gaps(db: State<DbState>) -> Result<DataGapResult, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    let (missing_days, zero_usage_days) = missing_and_zero_days(&conn)?;
+
+    let earliest: Option<String> = conn
+        .query_row(
+            "SELECT MIN(date) FROM daily_app_usage WHERE total_seconds > 0",
+            [],
+            |row| row.get(0),
+        )
+        .ok();
+    let latest: Option<String> = conn
+        .query_row(
+            "SELECT MAX(date) FROM daily_app_usage WHERE total_seconds > 0",
+            [],
+            |row| row.get(0),
+        )
+        .ok();
+
+    Ok(DataGapResult {
+        missing_days,
+        zero_usage_days,
+        earliest_date: earliest,
+        latest_date: latest,
+    })
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct OrphanRowResult {
+    pub table: String,
+    pub description: String,
+    pub count: i64,
+}
+
+#[tauri::command]
+pub fn check_orphan_rows(db: State<DbState>) -> Result<Vec<OrphanRowResult>, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    let mut results = Vec::new();
+
+    // daily_app_usage rows without underlying app_usage rows for that (date, app, exe).
+    let orphan_daily: i64 = conn
+        .query_row(
+            "SELECT COUNT(1) FROM daily_app_usage d
+             WHERE NOT EXISTS (
+                 SELECT 1 FROM app_usage a
+                 WHERE a.date = d.date
+                   AND a.app_name = d.app_name
+                   AND COALESCE(a.exe_path, '') = COALESCE(d.exe_path, '')
+             )",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(|e| e.to_string())?;
+    results.push(OrphanRowResult {
+        table: "daily_app_usage".to_string(),
+        description: "Daily aggregates with no matching raw usage rows".to_string(),
+        count: orphan_daily,
+    });
+
+    // vscode_session_languages rows without parent session.
+    let orphan_lang: i64 = conn
+        .query_row(
+            "SELECT COUNT(1) FROM vscode_session_languages l
+             WHERE NOT EXISTS (
+                 SELECT 1 FROM vscode_sessions s WHERE s.session_id = l.session_id
+             )",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(|e| e.to_string())?;
+    results.push(OrphanRowResult {
+        table: "vscode_session_languages".to_string(),
+        description: "Language rows with no matching VS Code session".to_string(),
+        count: orphan_lang,
+    });
+
+    // widget permission audit log entries for widgets no longer in configs.
+    let orphan_audit: i64 = conn
+        .query_row(
+            "SELECT COUNT(1) FROM widget_permission_audit_log a
+             WHERE NOT EXISTS (
+                 SELECT 1 FROM widget_configs c WHERE c.id = a.widget_id
+             )",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(|e| e.to_string())?;
+    results.push(OrphanRowResult {
+        table: "widget_permission_audit_log".to_string(),
+        description: "Permission audit entries for deleted widgets".to_string(),
+        count: orphan_audit,
+    });
+
+    Ok(results)
+}
+
+#[tauri::command]
+pub fn run_migration_rehearsal(db: State<DbState>) -> Result<db::migrations::MigrationRehearsalReport, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    let path: std::path::PathBuf = conn
+        .path()
+        .map(std::path::PathBuf::from)
+        .ok_or_else(|| "Database path is not available".to_string())?;
+    drop(conn);
+
+    db::migrations::run_migration_rehearsal(&path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_migration_status(db: State<DbState>) -> Result<db::migrations::MigrationStatus, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    db::migrations::get_status(&conn).map_err(|e| e.to_string())
+}
+
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ProfileInfo {
+    pub id: String,
+    pub name: String,
+    pub is_current: bool,
+    pub is_default: bool,
+    pub created_at: String,
+}
+
+#[tauri::command]
+pub fn list_profiles(db: State<DbState>) -> Result<Vec<ProfileInfo>, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    let current = crate::db::migrations::current_profile_id_from_conn(&conn);
+    let mut stmt = conn
+        .prepare("SELECT id, name, is_default, created_at FROM profiles ORDER BY created_at")
+        .map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map([], |row| {
+            let id: String = row.get(0)?;
+            Ok(ProfileInfo {
+                id: id.clone(),
+                name: row.get(1)?,
+                is_current: id == current,
+                is_default: row.get::<_, i32>(2)? != 0,
+                created_at: row.get(3)?,
+            })
+        })
+        .map_err(|e| e.to_string())?;
+    rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn create_profile(
+    name: String,
+    app: tauri::AppHandle,
+    db: State<DbState>,
+) -> Result<ProfileInfo, String> {
+    let id = name.trim().to_lowercase().replace(' ', "_");
+    if id.is_empty() || id == "default" {
+        return Err("Invalid profile id".to_string());
+    }
+    let now = now_ts();
+    {
+        let conn = db.lock().map_err(|e| e.to_string())?;
+        conn.execute(
+            "INSERT INTO profiles (id, name, is_default, created_at) VALUES (?1, ?2, 0, ?3)
+             ON CONFLICT(id) DO UPDATE SET name = excluded.name",
+            params![&id, name.trim(), &now],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+
+    // Ensure the profile database file can be created.
+    let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let profile_db = crate::db::migrations::db_path_for_profile(&data_dir, &id);
+    let _ = crate::db::open(&profile_db).map_err(|e| e.to_string())?;
+
+    Ok(ProfileInfo {
+        id: id.clone(),
+        name: name.trim().to_string(),
+        is_current: false,
+        is_default: false,
+        created_at: now,
+    })
+}
+
+#[tauri::command]
+pub fn switch_profile(profile_id: String, app: tauri::AppHandle, db: State<DbState>) -> Result<(), String> {
+    if profile_id.trim().is_empty() {
+        return Err("Profile id is required".to_string());
+    }
+    let profile_id = profile_id.trim().to_string();
+
+    {
+        let conn = db.lock().map_err(|e| e.to_string())?;
+        let exists: bool = conn
+            .query_row(
+                "SELECT 1 FROM profiles WHERE id = ?1",
+                params![&profile_id],
+                |_row| Ok(true),
+            )
+            .unwrap_or(false);
+        if !exists && profile_id != "default" {
+            return Err(format!("Profile '{}' does not exist", profile_id));
+        }
+
+        crate::db::set_setting(&conn, "current_profile_id", &profile_id)
+            .map_err(|e| e.to_string())?;
+    }
+
+    log::info!("Switching to profile {}; restarting app", profile_id);
+    app.restart();
+}
+
+#[tauri::command]
+pub fn get_current_profile(db: State<DbState>) -> Result<String, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    Ok(crate::db::migrations::current_profile_id_from_conn(&conn))
 }

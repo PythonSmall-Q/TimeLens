@@ -250,7 +250,7 @@ TimeLens is an open-source project. You are welcome to inspect the source code t
 If you have any questions, concerns, or requests regarding this Privacy Policy or our data practices, please contact us:
 
 - **GitHub Issues:** [https://github.com/seans/TimeLens/issues](https://github.com/seans/TimeLens/issues)
-- **Email:** privacy@timelens.app *(placeholder—update with real contact if available)*
+- **Email:** timelens@xmoj-script.uk
 
 We will make every effort to respond to legitimate inquiries within 30 days.
 

@@ -86,6 +86,12 @@ pub struct UsageGoal {
     pub operator: String,   // "at_least" | "at_most"
     pub target_seconds: i64,
     pub enabled: bool,
+    #[serde(default = "default_true")]
+    pub notify_risk: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -103,6 +109,19 @@ pub struct FocusSession {
     pub ended_at: Option<String>,
     pub trigger_type: String, // "manual" | "rule"
     pub reason: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct FocusRule {
+    pub id: Option<i64>,
+    pub name: String,
+    pub enabled: bool,
+    pub rule_type: String, // "keyword" | "time_window" | "app"
+    pub condition_json: String,
+    pub action: String, // "enter_focus" | "leave_focus"
+    pub auto_start: bool,
+    pub quiet_hours_respect: bool,
+    pub created_at: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -260,6 +279,8 @@ pub struct ApiTokenMetadata {
     pub revoked_at: Option<String>,
     pub last_used_at: Option<String>,
     pub last_client_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub token_hash: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -281,6 +302,12 @@ pub struct ApiAuditLogEntry {
     pub method: String,
     pub status_code: i64,
     pub detail: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ApiClientAllowlistEntry {
+    pub client_id: String,
+    pub created_at: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

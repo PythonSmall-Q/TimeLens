@@ -2,6 +2,8 @@ use rusqlite::{params, Connection, Result};
 use std::path::Path;
 use chrono::Timelike;
 
+pub mod migrations;
+
 const SYSTEM_INTERACTIVE_EXE_WHITELIST_SQL: &str = "
     lower(COALESCE(exe_path, '')) LIKE '%\\explorer.exe'
     OR lower(COALESCE(exe_path, '')) LIKE '%\\taskmgr.exe'
@@ -362,7 +364,7 @@ pub fn initialize(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
-fn table_columns(conn: &Connection, table: &str) -> Result<Vec<String>> {
+pub(crate) fn table_columns(conn: &Connection, table: &str) -> Result<Vec<String>> {
     let mut stmt = conn.prepare(&format!("PRAGMA table_info({table})"))?;
     let rows = stmt.query_map([], |row| row.get::<_, String>(1))?;
     rows.collect()
@@ -765,7 +767,7 @@ pub fn delete_app_category_rule(conn: &Connection, exe_path: &str) -> Result<()>
 
 pub fn get_usage_goals(conn: &Connection) -> Result<Vec<crate::models::UsageGoal>> {
     let mut stmt = conn.prepare(
-        "SELECT id, scope_type, scope_value, period, operator, target_seconds, enabled
+        "SELECT id, scope_type, scope_value, period, operator, target_seconds, enabled, notify_risk
          FROM usage_goals
          ORDER BY id DESC",
     )?;
@@ -778,6 +780,7 @@ pub fn get_usage_goals(conn: &Connection) -> Result<Vec<crate::models::UsageGoal
             operator: row.get(4)?,
             target_seconds: row.get(5)?,
             enabled: row.get::<_, i32>(6)? != 0,
+            notify_risk: row.get::<_, Option<i32>>(7)?.unwrap_or(1) != 0,
         })
     })?;
     rows.collect()
@@ -1190,22 +1193,23 @@ pub fn get_api_token_by_id(
     id: &str,
 ) -> Result<Option<crate::models::ApiTokenMetadata>> {
     let mut stmt = conn.prepare(
-        "SELECT id, label, scopes_json, created_at, expires_at, revoked_at, last_used_at, last_client_id
+        "SELECT id, label, token_hash, scopes_json, created_at, expires_at, revoked_at, last_used_at, last_client_id
          FROM api_tokens
          WHERE id = ?1",
     )?;
     let mut rows = stmt.query(params![id])?;
     if let Some(row) = rows.next()? {
-        let scopes_json: String = row.get(2)?;
+        let scopes_json: String = row.get(3)?;
         return Ok(Some(crate::models::ApiTokenMetadata {
             id: row.get(0)?,
             label: row.get(1)?,
+            token_hash: row.get(2)?,
             scopes: parse_scopes_json(scopes_json),
-            created_at: row.get(3)?,
-            expires_at: row.get(4)?,
-            revoked_at: row.get(5)?,
-            last_used_at: row.get(6)?,
-            last_client_id: row.get(7)?,
+            created_at: row.get(4)?,
+            expires_at: row.get(5)?,
+            revoked_at: row.get(6)?,
+            last_used_at: row.get(7)?,
+            last_client_id: row.get(8)?,
         }));
     }
     Ok(None)
@@ -1213,21 +1217,22 @@ pub fn get_api_token_by_id(
 
 pub fn list_api_tokens(conn: &Connection) -> Result<Vec<crate::models::ApiTokenMetadata>> {
     let mut stmt = conn.prepare(
-        "SELECT id, label, scopes_json, created_at, expires_at, revoked_at, last_used_at, last_client_id
+        "SELECT id, label, token_hash, scopes_json, created_at, expires_at, revoked_at, last_used_at, last_client_id
          FROM api_tokens
          ORDER BY created_at DESC",
     )?;
     let rows = stmt.query_map([], |row| {
-        let scopes_json: String = row.get(2)?;
+        let scopes_json: String = row.get(3)?;
         Ok(crate::models::ApiTokenMetadata {
             id: row.get(0)?,
             label: row.get(1)?,
+            token_hash: row.get(2)?,
             scopes: parse_scopes_json(scopes_json),
-            created_at: row.get(3)?,
-            expires_at: row.get(4)?,
-            revoked_at: row.get(5)?,
-            last_used_at: row.get(6)?,
-            last_client_id: row.get(7)?,
+            created_at: row.get(4)?,
+            expires_at: row.get(5)?,
+            revoked_at: row.get(6)?,
+            last_used_at: row.get(7)?,
+            last_client_id: row.get(8)?,
         })
     })?;
     rows.collect()

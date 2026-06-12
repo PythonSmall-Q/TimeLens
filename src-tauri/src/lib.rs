@@ -77,20 +77,9 @@ fn format_seconds(secs: i64) -> String {
     if h > 0 { format!("{}h {}m", h, m) } else { format!("{}m", m) }
 }
 
-#[cfg(target_os = "windows")]
-fn legacy_windows_db_path() -> Option<PathBuf> {
-    let appdata = std::env::var_os("APPDATA")?;
-    let legacy_dir = PathBuf::from(appdata)
-        .join("ShanWenxiao.TimeLens-TimeManagementAppwithWidgets");
-    let legacy_db = legacy_dir.join("timelens.db");
-    if legacy_db.exists() {
-        Some(legacy_db)
-    } else {
-        None
-    }
-}
+const LEGACY_APP_DIR_NAME: &str = "ShanWenxiao.TimeLens-TimeManagementAppwithWidgets";
+const DEFAULT_PROFILE_ID: &str = "default";
 
-#[cfg(target_os = "windows")]
 fn copy_if_exists(src: &Path, dst: &Path) -> std::io::Result<()> {
     if src.exists() {
         std::fs::copy(src, dst)?;
@@ -98,53 +87,102 @@ fn copy_if_exists(src: &Path, dst: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
-#[cfg(target_os = "windows")]
-fn migrate_legacy_windows_db(legacy_db: &Path, default_db_path: &Path) -> std::io::Result<()> {
-    if let Some(parent) = default_db_path.parent() {
+fn copy_db_with_sidecars(src: &Path, dst: &Path) -> std::io::Result<()> {
+    if let Some(parent) = dst.parent() {
         std::fs::create_dir_all(parent)?;
     }
 
-    // Copy main DB and SQLite sidecar files if present.
-    let legacy_db_wal = PathBuf::from(format!("{}-wal", legacy_db.display()));
-    let legacy_db_shm = PathBuf::from(format!("{}-shm", legacy_db.display()));
-    let default_db_wal = PathBuf::from(format!("{}-wal", default_db_path.display()));
-    let default_db_shm = PathBuf::from(format!("{}-shm", default_db_path.display()));
+    let src_wal = PathBuf::from(format!("{}-wal", src.display()));
+    let src_shm = PathBuf::from(format!("{}-shm", src.display()));
+    let dst_wal = PathBuf::from(format!("{}-wal", dst.display()));
+    let dst_shm = PathBuf::from(format!("{}-shm", dst.display()));
 
-    std::fs::copy(legacy_db, default_db_path)?;
-    copy_if_exists(&legacy_db_wal, &default_db_wal)?;
-    copy_if_exists(&legacy_db_shm, &default_db_shm)?;
+    std::fs::copy(src, dst)?;
+    copy_if_exists(&src_wal, &dst_wal)?;
+    copy_if_exists(&src_shm, &dst_shm)?;
 
     Ok(())
 }
 
-fn resolve_database_path(default_db_path: &Path) -> PathBuf {
+/// Best-effort detection of a legacy 1.x database path on all supported
+/// platforms. Tauri v1 placed app data differently than v2; this function
+/// probes the most likely locations without requiring Tauri APIs.
+fn legacy_db_path() -> Option<PathBuf> {
     #[cfg(target_os = "windows")]
     {
-        if let Some(legacy_path) = legacy_windows_db_path() {
-            let current_size = std::fs::metadata(default_db_path)
+        let appdata = std::env::var_os("APPDATA")?;
+        let legacy_db = PathBuf::from(appdata).join(LEGACY_APP_DIR_NAME).join("timelens.db");
+        if legacy_db.exists() {
+            return Some(legacy_db);
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let home = std::env::var_os("HOME")?;
+        let legacy_db = PathBuf::from(home)
+            .join("Library/Application Support")
+            .join(LEGACY_APP_DIR_NAME)
+            .join("timelens.db");
+        if legacy_db.exists() {
+            return Some(legacy_db);
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        let home = std::env::var_os("HOME")?;
+        let config_db = PathBuf::from(home)
+            .join(".config")
+            .join(LEGACY_APP_DIR_NAME)
+            .join("timelens.db");
+        if config_db.exists() {
+            return Some(config_db);
+        }
+    }
+
+    None
+}
+
+fn db_path_for_profile(data_dir: &Path, profile_id: &str) -> PathBuf {
+    data_dir.join("profiles").join(profile_id).join("timelens.db")
+}
+
+fn migrate_legacy_db(legacy_db: &Path, target_db: &Path) -> std::io::Result<()> {
+    copy_db_with_sidecars(legacy_db, target_db)
+}
+
+fn resolve_database_path(data_dir: &Path, profile_id: Option<&str>) -> PathBuf {
+    let profile_id = profile_id.unwrap_or(DEFAULT_PROFILE_ID);
+    let target_db = db_path_for_profile(data_dir, profile_id);
+
+    // Only the default profile attempts to auto-migrate from legacy 1.x paths.
+    if profile_id == DEFAULT_PROFILE_ID {
+        if let Some(legacy_path) = legacy_db_path() {
+            let current_size = std::fs::metadata(&target_db)
                 .map(|m| m.len())
                 .unwrap_or(0);
             let legacy_size = std::fs::metadata(&legacy_path)
                 .map(|m| m.len())
                 .unwrap_or(0);
 
-            let should_migrate = !default_db_path.exists()
+            let should_migrate = !target_db.exists()
                 || (current_size <= 4096 && legacy_size > current_size);
 
             if should_migrate {
-                match migrate_legacy_windows_db(&legacy_path, default_db_path) {
+                match migrate_legacy_db(&legacy_path, &target_db) {
                     Ok(()) => {
                         log::info!(
-                            "TimeLens DB migrated from legacy Roaming path to app data path: {} -> {}",
+                            "TimeLens DB migrated from legacy path to profile path: {} -> {}",
                             legacy_path.display(),
-                            default_db_path.display()
+                            target_db.display()
                         );
                     }
                     Err(err) => {
                         log::warn!(
                             "TimeLens DB migration failed ({} -> {}): {}. Falling back to legacy DB path.",
                             legacy_path.display(),
-                            default_db_path.display(),
+                            target_db.display(),
                             err
                         );
                         return legacy_path;
@@ -152,14 +190,9 @@ fn resolve_database_path(default_db_path: &Path) -> PathBuf {
                 }
             }
         }
-
-        return default_db_path.to_path_buf();
     }
 
-    #[cfg(not(target_os = "windows"))]
-    {
-        default_db_path.to_path_buf()
-    }
+    target_db
 }
 
 fn init_file_logger(log_dir: &Path) -> Result<(), String> {
@@ -262,9 +295,20 @@ pub fn run() {
             // ── Database ──────────────────────────────────────
             let data_dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&data_dir)?;
-            let db_path = resolve_database_path(&data_dir.join("timelens.db"));
-            let conn = db::open(&db_path)
-                .expect("Failed to open SQLite database");
+
+            // Open the default profile first to discover the active profile id, then
+            // open the target profile database as the main DbState.
+            let default_db_path = resolve_database_path(&data_dir, None);
+            let default_conn = db::open(&default_db_path)
+                .expect("Failed to open default SQLite database");
+            let active_profile_id = db::migrations::current_profile_id_from_conn(&default_conn);
+            let target_db_path = if active_profile_id == db::migrations::DEFAULT_PROFILE_ID {
+                default_db_path
+            } else {
+                db::migrations::db_path_for_profile(&data_dir, &active_profile_id)
+            };
+            let conn = db::open(&target_db_path)
+                .expect("Failed to open active profile SQLite database");
             let db_state: DbState = Arc::new(Mutex::new(conn));
 
             // Register shared DB state before opening any extra windows.
@@ -318,8 +362,12 @@ pub fn run() {
             }
 
             // ── Monitor ───────────────────────────────────────
+            let monitoring_active = {
+                let conn = db_state.lock().unwrap();
+                db::get_bool_setting(&conn, "tracking_monitoring_active", true).unwrap_or(true)
+            };
             let monitor_status: SharedMonitorStatus = Arc::new(Mutex::new(MonitorStatus {
-                active: true,
+                active: monitoring_active,
                 current_app: String::new(),
                 current_exe_path: String::new(),
                 current_title: String::new(),
@@ -330,7 +378,7 @@ pub fn run() {
             app.manage(tray_language.clone());
 
             let db_for_monitor: DbState = {
-                let conn = db::open(&db_path)
+                let conn = db::open(&target_db_path)
                     .expect("Second db connection for monitor");
                 Arc::new(Mutex::new(conn))
             };
@@ -346,7 +394,7 @@ pub fn run() {
             // ── Local HTTP API ────────────────────────────────
             {
                 let api_db: DbState = {
-                    let conn = db::open(&db_path)
+                    let conn = db::open(&target_db_path)
                         .expect("Third db connection for API server");
                     Arc::new(Mutex::new(conn))
                 };
@@ -362,7 +410,7 @@ pub fn run() {
             // ── Browser domain limit monitor ──────────────────
             {
                 let notif_db: DbState = {
-                    let conn = db::open(&db_path)
+                    let conn = db::open(&target_db_path)
                         .expect("Fourth db connection for domain limit notifier");
                     Arc::new(Mutex::new(conn))
                 };
@@ -492,6 +540,15 @@ pub fn run() {
             commands::get_monitor_status,
             commands::set_monitoring_active,
             commands::get_data_health_summary,
+            commands::check_data_integrity,
+            commands::scan_data_gaps,
+            commands::check_orphan_rows,
+            commands::run_migration_rehearsal,
+            commands::get_migration_status,
+            commands::list_profiles,
+            commands::create_profile,
+            commands::switch_profile,
+            commands::get_current_profile,
             commands::repair_data_issues,
             commands::export_backup_v2,
             commands::import_backup_v2_validate,

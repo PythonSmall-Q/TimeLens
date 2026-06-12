@@ -40,6 +40,7 @@ sha2 = "0.10"
 hmac = "0.12"
 hex = "0.4"
 zip = "0.6"
+zstd = "0.13"
 axum = { version = "0.7", features = ["ws"] }
 tower-http = { version = "0.5", features = ["cors"] }
 tokio-tungstenite = { version = "0.21", optional = true }

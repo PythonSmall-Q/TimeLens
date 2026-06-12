@@ -7,6 +7,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [2.0.0] - 2026-06-06
 
+### Added
+
+- **Unified migration runner** — replaced ad-hoc `ALTER TABLE` checks with a numbered migration framework using `PRAGMA user_version`, a `_migration_log` table, and `pre-check` / `apply` / `post-verify` phases.
+- **Migration rehearsal command** — `run_migration_rehearsal` copies the live database to a temporary path, runs all pending migrations, and returns a health report without modifying production data.
+- **Migration status command** — `get_migration_status` exposes current, latest, and pending migration versions.
+- **Roadmap-aligned data health commands** — added `check_data_integrity`, `scan_data_gaps`, and `check_orphan_rows` to match the v1.2.0 roadmap command surface.
+- **Profile-aware database layout** — databases now live under `app_data/profiles/<profile_id>/timelens.db`. Added `list_profiles`, `create_profile`, `switch_profile`, and `get_current_profile` commands.
+- **Cross-platform legacy 1.x migration** — startup now detects legacy database paths on Windows, macOS, and Linux and migrates them into the default profile.
+- **Restore monitoring active state on startup** — monitor no longer defaults to active when the user had paused tracking before quitting.
+- **Backup & Restore v2 completeness** — backup packages now include app categories, usage goals, focus sessions/rules, browser ignored domains/limits, widget permissions/audit log, VS Code sessions, API tokens, and client allowlist.
+
 ### Changed
 
 - Consolidated roadmap governance into a single canonical local-first source at `docs/ROADMAP_v2.0.0.md`.
