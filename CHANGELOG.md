@@ -83,6 +83,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Updated Rust transitive dependencies** — ran `cargo update` to pull in latest compatible versions of 46 crates, including `hyper`, `reqwest`, `rustls-native-certs`, `tao`, `zbus`, and `zerocopy`.
 - **CodeQL: hard-coded cryptographic value** — refactored salt/nonce generation in `src-tauri/src/db_encryption.rs` and `src-tauri/src/commands/data_reliability_cmd.rs` to use `OsRng.gen()` instead of zero-initialized arrays, eliminating false-positive hard-coded crypto alerts.
 - **CodeQL: workflow permissions** — added explicit `permissions: { contents: read, actions: write }` at workflow and job level in `.github/workflows/ci.yml`.
+- **CI `npm test` failure** — added frontend unit tests for `src/utils/format.ts` and a `vitest.config.ts` so `npm test` no longer exits with "No test files found".
 
 ## [1.4.4] - 2026-06-06
 

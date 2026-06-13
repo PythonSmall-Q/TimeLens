@@ -16,6 +16,7 @@
     "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true,
     "ignoreDeprecations": "5.0",
+    "types": ["vitest/globals"],
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
