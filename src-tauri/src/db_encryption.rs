@@ -4,11 +4,12 @@ use std::path::{Path, PathBuf};
 use std::thread;
 use std::time::Duration;
 
+use rand::Rng;
+
 use aes_gcm::aead::{Aead, KeyInit};
 use aes_gcm::{Aes256Gcm, Nonce};
 use argon2::{Algorithm, Argon2, Params, Version};
 use rand::rngs::OsRng;
-use rand::RngCore;
 use serde::{Deserialize, Serialize};
 
 const KEY_CHECK_PLAINTEXT: &str = "timelens-db-key-check";
@@ -42,15 +43,11 @@ pub fn derive_key(passphrase: &str, salt: &[u8]) -> [u8; 32] {
 }
 
 fn generate_salt() -> [u8; 16] {
-    let mut salt = [0u8; 16];
-    OsRng.fill_bytes(&mut salt);
-    salt
+    OsRng.gen()
 }
 
 fn generate_nonce() -> [u8; 12] {
-    let mut nonce = [0u8; 12];
-    OsRng.fill_bytes(&mut nonce);
-    nonce
+    OsRng.gen()
 }
 
 pub fn encryption_meta_path(db_path: &Path) -> PathBuf {

@@ -640,12 +640,10 @@ fn encrypt_bytes(plaintext: &[u8], passphrase: &str) -> Result<EncryptedBackupHe
     use aes_gcm::aead::{Aead, KeyInit};
     use aes_gcm::{Aes256Gcm, Nonce};
     use rand::rngs::OsRng;
-    use rand::RngCore;
+    use rand::Rng;
 
-    let mut salt = [0u8; 16];
-    let mut nonce_bytes = [0u8; 12];
-    OsRng.fill_bytes(&mut salt);
-    OsRng.fill_bytes(&mut nonce_bytes);
+    let salt: [u8; 16] = OsRng.gen();
+    let nonce_bytes: [u8; 12] = OsRng.gen();
 
     let key = derive_key(passphrase, &salt);
     let cipher = Aes256Gcm::new_from_slice(&key).map_err(|e| e.to_string())?;

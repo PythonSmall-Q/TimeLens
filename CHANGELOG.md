@@ -76,6 +76,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Database encryption disable flow** — fixed a bug where disabling encryption and restarting could corrupt or overwrite the latest plaintext with a stale encrypted backup. Disabling now preserves the current runtime plaintext and removes encrypted artifacts after verifying the plaintext is valid.
 - **Database open retry on restart** — added a short retry loop when opening the profile database during startup to avoid "localhost refused connection" / startup failures caused by Windows file-lock races after `app.restart()`.
 
+### Security
+
+- **Resolved npm audit findings** — updated `esbuild` to `^0.28.1` and `react-router-dom` to `^6.30.4` to address GHSA-gv7w-rqvm-qjhr, GHSA-g7r4-m6w7-qqqr, and GHSA-2j2x-hqr9-3h42.
+- **Updated VS Code extension dependencies** — ran `npm audit fix` in `vscode-extension/` to resolve `tmp` (GHSA-ph9p-34f9-6g65) and `qs` (GHSA-q8mj-m7cp-5q26) alerts.
+- **Updated Rust transitive dependencies** — ran `cargo update` to pull in latest compatible versions of 46 crates, including `hyper`, `reqwest`, `rustls-native-certs`, `tao`, `zbus`, and `zerocopy`.
+- **CodeQL: hard-coded cryptographic value** — refactored salt/nonce generation in `src-tauri/src/db_encryption.rs` and `src-tauri/src/commands/data_reliability_cmd.rs` to use `OsRng.gen()` instead of zero-initialized arrays, eliminating false-positive hard-coded crypto alerts.
+- **CodeQL: workflow permissions** — added explicit `permissions: { contents: read, actions: write }` at workflow and job level in `.github/workflows/ci.yml`.
+
 ## [1.4.4] - 2026-06-06
 
 ### Added
