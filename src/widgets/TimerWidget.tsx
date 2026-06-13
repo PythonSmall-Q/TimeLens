@@ -137,6 +137,8 @@ export default function TimerWidget({ widgetId: _widgetId }: Props) {
         <span className="text-text-muted text-xs">{t("timer.title")}</span>
         <button
           onClick={() => getCurrentWebviewWindow().close()}
+          aria-label={t("common:close")}
+          title={t("common:close")}
           className="text-text-muted hover:text-accent-red transition-colors"
         >
           <X size={13} />

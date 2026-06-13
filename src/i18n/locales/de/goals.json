@@ -1,0 +1,22 @@
+{
+  "title": "Nutzungsziele",
+  "subtitle": "Setzen Sie Zeit-Ziele für Apps oder Kategorien, um gesunde Gewohnheiten aufzubauen",
+  "addGoal": "Ziel hinzufügen",
+  "newGoal": "Neues Ziel",
+  "noGoals": "Noch keine Ziele. Klicken Sie auf \"Ziel hinzufügen\", um eines zu erstellen.",
+  "allApps": "Alle Apps",
+  "period_daily": "Täglich",
+  "period_weekly": "Wöchentlich",
+  "op_at_most": "Höchstens",
+  "op_at_least": "Mindestens",
+  "minutes": "Minuten",
+  "scopeValuePlaceholder": "Zielwert",
+  "scopeValueLabel": "Zielwert",
+  "scopeTypeLabel": "Zieltyp",
+  "scopeType_app": "App",
+  "scopeType_category": "Kategorie",
+  "searchAppPlaceholder": "App suchen und auswählen",
+  "periodLabel": "Zeitraum",
+  "operatorLabel": "Operator",
+  "minutesLabel": "Zielminuten"
+}

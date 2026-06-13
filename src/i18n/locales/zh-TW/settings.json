@@ -118,7 +118,28 @@
     "actionCount": "修復步驟",
     "repairing": "修復中...",
     "repairFailed": "修復失敗",
-    "repairTimeout": "修復超時，請重試"
+    "repairTimeout": "修復超時，請重試",
+    "advancedChecks": "進階檢查",
+    "checkIntegrity": "檢查完整性",
+    "scanGaps": "掃描缺口",
+    "checkOrphanRows": "檢查孤立行",
+    "foreignKeys": "外鍵",
+    "earliestDate": "最早日期：{{date}}",
+    "latestDate": "最新日期：{{date}}",
+    "missingDays": "缺失天數：{{count}}",
+    "zeroUsageDays": "零使用天數：{{count}}",
+    "noOrphans": "未發現孤立行",
+    "migrationStatus": "遷移狀態",
+    "currentVersion": "目前版本",
+    "latestVersion": "最新版本",
+    "pendingMigrations": "待處理",
+    "rehearsing": "預演中...",
+    "runRehearsal": "執行遷移預演",
+    "rehearsalSuccess": "預演成功（{{from}} → {{to}}）",
+    "rehearsalFailed": "預演失敗",
+    "rehearsalIntegrity": "完整性檢查：{{result}}",
+    "rehearsalLog": "已套用的遷移",
+    "actionFailed": "資料健康操作失敗"
   },
   "backup": {
     "title": "備份與恢復 v2",
@@ -144,7 +165,20 @@
     "previewSchema": "Schema：{{schema}}",
     "previewCounts": "記錄 {{appUsage}}，待辦 {{todos}}，小元件 {{widgets}}",
     "previewChecksum": "校驗和 {{checksum}}...",
-    "none": "無"
+    "none": "無",
+    "passphrase": "密碼短語",
+    "encryptExport": "加密匯出",
+    "passphraseRequired": "此備份需要密碼短語",
+    "passphraseRequiredForExport": "請輸入密碼短語以加密匯出",
+    "encrypted": "已加密備份",
+    "diffTitle": "差異摘要",
+    "diffBackupRows": "備份：{{count}}",
+    "diffCurrentRows": "目前：{{count}}",
+    "diffToAdd": "+{{count}} 待新增",
+    "diffToUpdate": "{{count}} 待更新",
+    "diffConflicts": "{{count}} 衝突",
+    "diffSettingsConflicts": "設定衝突",
+    "applySuccessProfile": "已恢復到新設定 '{{profile}}'"
   },
   "retention": {
     "title": "資料保留策略",
@@ -160,7 +194,19 @@
     "running": "歸檔中...",
     "lastRunPolicy": "最近執行策略：{{policy}}",
     "lastRunAppRows": "歸檔使用記錄：{{count}}",
-    "lastRunDailyRows": "歸檔日匯總：{{count}}"
+    "lastRunDailyRows": "歸檔日匯總：{{count}}",
+    "warmRows": "溫熱行：{{count}}",
+    "archiveRows": "歸檔行：{{count}}",
+    "schedulerTitle": "歸檔排程器",
+    "schedulerEnabled": "已啟用",
+    "schedulerHour": "每日執行小時",
+    "schedulerRunOnBattery": "電池時執行",
+    "schedulerSaveFailed": "儲存排程設定失敗",
+    "compressTitle": "壓縮舊歸檔",
+    "compressAction": "壓縮早於",
+    "compressing": "壓縮中...",
+    "compressResult": "已壓縮 {{groups}} 組（{{rows}} 行），節省 {{saved}}",
+    "compressFailed": "壓縮失敗"
   },
   "transparency": {
     "title": "追蹤透明面板",
@@ -249,7 +295,9 @@
     "openApiSecurity": "開啟 API 安全",
     "openBackup": "開啟備份恢復",
     "openDataHealth": "開啟資料健康",
-    "refresh": "重新整理全部面板"
+    "refresh": "重新整理全部面板",
+    "openProfiles": "開啟設定檔",
+    "openEncryption": "開啟加密"
   },
   "about": {
     "title": "關於",
@@ -265,5 +313,39 @@
     "viewRelease": "查看發布說明"
   },
   "saved": "設定已儲存",
-  "addLanguageHint": "如需新增新語言，請參閱 docs/ADD_LANGUAGE.md"
+  "addLanguageHint": "如需新增新語言，請參閱 docs/ADD_LANGUAGE.md",
+  "profiles": {
+    "title": "設定檔",
+    "current": "目前設定檔：{{profile}}",
+    "listTitle": "設定檔列表",
+    "default": "預設",
+    "switch": "切換",
+    "noProfiles": "未找到設定檔",
+    "create": "建立設定檔",
+    "createTitle": "建立新設定檔",
+    "createPlaceholder": "設定檔名稱",
+    "cancel": "取消",
+    "creating": "建立中...",
+    "createConfirm": "建立",
+    "switchConfirm": "切換到設定檔 '{{profile}}' 將重啟 TimeLens。是否繼續？",
+    "switchFailed": "切換設定檔失敗",
+    "createFailed": "建立設定檔失敗"
+  },
+  "encryption": {
+    "title": "資料庫加密",
+    "status": "加密狀態",
+    "enabled": "已啟用",
+    "disabled": "已停用",
+    "restartWarning": "操作影響",
+    "restartRequired": "應用將重啟",
+    "passphrase": "密碼短語",
+    "passphraseRequired": "需要密碼短語",
+    "enable": "啟用加密",
+    "disable": "停用加密",
+    "working": "套用中...",
+    "enableConfirm": "啟用加密將重啟 TimeLens。請確保記住密碼短語。是否繼續？",
+    "disableConfirm": "停用加密將重啟 TimeLens。是否繼續？",
+    "enableFailed": "啟用加密失敗",
+    "disableFailed": "停用加密失敗"
+  }
 }

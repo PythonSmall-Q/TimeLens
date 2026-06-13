@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { Search, X } from "lucide-react";
 import clsx from "clsx";
+import { useAnnouncer } from "@/hooks/useAnnouncer";
 import { NAV_ITEMS } from "@/components/layout/navItems";
 import AppDetailModal from "@/components/AppDetailModal";
 import * as api from "@/services/tauriApi";
@@ -29,6 +30,7 @@ const GROUP_ORDER: SearchResult["type"][] = ["page", "app", "category", "todo", 
 export default function GlobalSearch({ open, onClose }: Props) {
   const { t } = useTranslation(["common", "dashboard", "widgets", "categories", "goals", "focus", "limits", "browserUsage", "settings"]);
   const navigate = useNavigate();
+  const announce = useAnnouncer();
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [detailApp, setDetailApp] = useState<AppUsageSummary | null>(null);
@@ -50,6 +52,7 @@ export default function GlobalSearch({ open, onClose }: Props) {
     setSelectedIndex(0);
     setDetailApp(null);
     inputRef.current?.focus();
+    announce(t("common:search"));
 
     const today = new Date().toISOString().slice(0, 10);
     const week = new Date(Date.now() - 6 * 86400000).toISOString().slice(0, 10);
@@ -67,7 +70,7 @@ export default function GlobalSearch({ open, onClose }: Props) {
       setTodos(td);
       setGoals(g);
     });
-  }, [open]);
+  }, [open, announce, t]);
 
   const results = useMemo<SearchResult[]>(() => {
     const q = query.toLowerCase().trim();
@@ -189,6 +192,9 @@ export default function GlobalSearch({ open, onClose }: Props) {
   if (detailApp) {
     return (
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={detailApp.app_name}
         className="fixed inset-0 z-50 flex items-start justify-center pt-20 bg-black/50 backdrop-blur-sm"
         onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
       >
@@ -215,6 +221,9 @@ export default function GlobalSearch({ open, onClose }: Props) {
 
   return (
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={t("common:search")}
       className="fixed inset-0 z-50 flex items-start justify-center pt-20 bg-black/50 backdrop-blur-sm"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
@@ -232,7 +241,12 @@ export default function GlobalSearch({ open, onClose }: Props) {
             className="flex-1 bg-transparent outline-none text-sm text-text-primary placeholder:text-text-muted"
           />
           {query && (
-            <button onClick={() => setQuery("")} title="Clear" className="text-text-muted hover:text-text-primary">
+            <button
+              onClick={() => setQuery("")}
+              title={t("common:clearSearch")}
+              aria-label={t("common:clearSearch")}
+              className="text-text-muted hover:text-text-primary"
+            >
               <X size={14} />
             </button>
           )}

@@ -38,6 +38,15 @@ import type {
   RetentionPolicyInfo,
   RetentionRunResult,
   TrackingTransparencyReport,
+  DataIntegrityResult,
+  DataGapResult,
+  OrphanRowResult,
+  MigrationRehearsalReport,
+  MigrationStatus,
+  ArchiveSchedulerSettings,
+  CompressionResult,
+  ProfileInfo,
+  EncryptionStatus,
   WidgetRegistryResponse,
   WidgetRegistryItem,
   ProductivityScore,
@@ -45,6 +54,12 @@ import type {
   FocusWindowSuggestion,
   GoalAdjustmentSuggestion,
   UsageAnomalyMarker,
+  DistractionHotspot,
+  CategoryComparison,
+  ProjectComparison,
+  GoalRiskAlert,
+  FocusRule,
+  FocusRuleMatch,
   ApiTokenMetadata,
   IssuedApiToken,
   ApiAuditLogEntry,
@@ -278,17 +293,30 @@ export const getDataHealthSummary = (): Promise<DataHealthSummary> =>
 export const repairDataIssues = (dryRun: boolean): Promise<RepairAssistantResult> =>
   invoke("repair_data_issues", { dryRun });
 
-export const exportBackupV2 = (path: string): Promise<BackupManifest> =>
-  invoke("export_backup_v2", { path });
+export const exportBackupV2 = (
+  path: string,
+  passphrase?: string
+): Promise<BackupManifest> =>
+  passphrase === undefined
+    ? invoke("export_backup_v2", { path })
+    : invoke("export_backup_v2", { path, passphrase });
 
-export const importBackupV2Validate = (path: string): Promise<BackupPreview> =>
-  invoke("import_backup_v2_validate", { path });
+export const importBackupV2Validate = (
+  path: string,
+  passphrase?: string
+): Promise<BackupPreview> =>
+  passphrase === undefined
+    ? invoke("import_backup_v2_validate", { path })
+    : invoke("import_backup_v2_validate", { path, passphrase });
 
 export const importBackupV2Apply = (
   path: string,
-  strategy: "overwrite" | "merge" | "new_profile"
+  strategy: "overwrite" | "merge" | "new_profile",
+  passphrase?: string
 ): Promise<BackupApplyResult> =>
-  invoke("import_backup_v2_apply", { path, strategy });
+  passphrase === undefined
+    ? invoke("import_backup_v2_apply", { path, strategy })
+    : invoke("import_backup_v2_apply", { path, strategy, passphrase });
 
 export const getRetentionPolicyInfo = (): Promise<RetentionPolicyInfo> =>
   invoke("get_retention_policy_info");
@@ -301,8 +329,57 @@ export const setRetentionPolicy = (
 export const runLocalArchiveNow = (): Promise<RetentionRunResult> =>
   invoke("run_local_archive_now");
 
+export const getArchiveSchedulerSettings = (): Promise<ArchiveSchedulerSettings> =>
+  invoke("get_archive_scheduler_settings");
+
+export const setArchiveSchedulerSettings = (
+  settings: ArchiveSchedulerSettings
+): Promise<void> => invoke("set_archive_scheduler_settings", { settings });
+
+export const compressArchiveOlderThanDays = (days: number): Promise<CompressionResult> =>
+  invoke("compress_archive_older_than_days", { days });
+
 export const getTrackingTransparency = (): Promise<TrackingTransparencyReport> =>
   invoke("get_tracking_transparency");
+
+// ── Data health / migration ────────────────────────────────────
+
+export const checkDataIntegrity = (): Promise<DataIntegrityResult> =>
+  invoke("check_data_integrity");
+
+export const scanDataGaps = (): Promise<DataGapResult> => invoke("scan_data_gaps");
+
+export const checkOrphanRows = (): Promise<OrphanRowResult[]> =>
+  invoke("check_orphan_rows");
+
+export const runMigrationRehearsal = (): Promise<MigrationRehearsalReport> =>
+  invoke("run_migration_rehearsal");
+
+export const getMigrationStatus = (): Promise<MigrationStatus> =>
+  invoke("get_migration_status");
+
+// ── Profiles ───────────────────────────────────────────────────
+
+export const listProfiles = (): Promise<ProfileInfo[]> => invoke("list_profiles");
+
+export const createProfile = (name: string): Promise<ProfileInfo> =>
+  invoke("create_profile", { name });
+
+export const switchProfile = (profileId: string): Promise<void> =>
+  invoke("switch_profile", { profileId });
+
+export const getCurrentProfile = (): Promise<string> => invoke("get_current_profile");
+
+// ── Database encryption ────────────────────────────────────────
+
+export const enableDatabaseEncryption = (passphrase: string): Promise<void> =>
+  invoke("enable_database_encryption", { passphrase });
+
+export const disableDatabaseEncryption = (passphrase: string): Promise<void> =>
+  invoke("disable_database_encryption", { passphrase });
+
+export const getDatabaseEncryptionStatus = (): Promise<EncryptionStatus> =>
+  invoke("get_database_encryption_status");
 
 // ── Todos ─────────────────────────────────────────────────────
 export const getTodos = (): Promise<TodoItem[]> => invoke("get_todos");
@@ -508,6 +585,56 @@ export const detectUsageAnomalies = (
   baselineDays?: number
 ): Promise<UsageAnomalyMarker[]> =>
   invoke("detect_usage_anomalies", { date, baselineDays });
+
+// ── Phase 4: backend intelligence + focus rules ───────────────
+
+export const getDistractionHotspots = (
+  startDate: string,
+  endDate: string,
+  limit = 10
+): Promise<DistractionHotspot[]> =>
+  invoke("get_distraction_hotspots", { startDate, endDate, limit });
+
+export const getCategoryComparisonInRanges = (
+  currentStart: string,
+  currentEnd: string,
+  previousStart: string,
+  previousEnd: string
+): Promise<CategoryComparison[]> =>
+  invoke("get_category_comparison_in_ranges", {
+    currentStart,
+    currentEnd,
+    previousStart,
+    previousEnd,
+  });
+
+export const getProjectComparisonInRanges = (
+  currentStart: string,
+  currentEnd: string,
+  previousStart: string,
+  previousEnd: string
+): Promise<ProjectComparison[]> =>
+  invoke("get_project_comparison_in_ranges", {
+    currentStart,
+    currentEnd,
+    previousStart,
+    previousEnd,
+  });
+
+export const evaluateGoalRisks = (): Promise<GoalRiskAlert[]> =>
+  invoke("evaluate_goal_risks");
+
+export const getFocusRules = (): Promise<FocusRule[]> =>
+  invoke("get_focus_rules");
+
+export const saveFocusRule = (rule: FocusRule): Promise<FocusRule> =>
+  invoke("save_focus_rule", { rule });
+
+export const deleteFocusRule = (id: number): Promise<void> =>
+  invoke("delete_focus_rule", { id });
+
+export const evaluateFocusRules = (): Promise<FocusRuleMatch[]> =>
+  invoke("evaluate_focus_rules");
 
 // ── VS Code local API channel ────────────────────────────────
 

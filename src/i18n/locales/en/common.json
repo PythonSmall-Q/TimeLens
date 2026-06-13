@@ -47,5 +47,9 @@
   "searchTodos": "Todos",
   "searchGoals": "Goals",
   "searchNoResult": "No results found",
-  "searchHint": "⌘K"
+  "searchHint": "⌘K",
+  "skipToMainContent": "Skip to main content",
+  "mainNavigation": "Main navigation",
+  "clearSearch": "Clear search",
+  "openGlobalSearch": "Open global search"
 }

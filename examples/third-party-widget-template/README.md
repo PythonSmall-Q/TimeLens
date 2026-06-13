@@ -7,6 +7,7 @@ This template demonstrates the minimum files required to run a third-party JS wi
 - `manifest.json`: widget metadata and registry declaration (Widget SDK v2)
 - `index.js`: ESM widget entry implementing `createWidget().mount/unmount`
 - `index.ts`: TypeScript source for the same widget (optional)
+- `types.d.ts`: TypeScript declarations describing the widget context API
 - `package.json`: build scripts; run `npm install && npm run build` to compile `index.ts` to `dist/index.js`
 - `tsconfig.json`: TypeScript compiler options
 
@@ -14,22 +15,30 @@ This template demonstrates the minimum files required to run a third-party JS wi
 
 ```json
 {
-  "manifest_version": 2,
+  "manifest_version": "v2",
   "widget_type": "sample_hello",
   "name": "Sample Hello Widget",
   "entry": "index.js",
-  "capabilities": ["read_metrics", "automation_trigger"]
+  "capabilities": [
+    { "capability": "read_metrics", "permission": "screen-time:read" },
+    { "capability": "automation_trigger", "permission": "active-window:subscribe" },
+    { "capability": "local_api_call", "permission": "local-api:call" }
+  ]
 }
 ```
 
 ### Capabilities
 
-| Capability | Runtime permissions granted |
+| Capability | Default runtime permissions granted |
 |---|---|
 | `read_metrics` | `screen-time:read`, `todo:read` |
 | `write_data` | `todo:write`, `settings:write` |
 | `automation_trigger` | `active-window:subscribe` |
 | `local_api_call` | `local-api:call` |
+
+You can also declare capabilities as plain strings; in that case TimeLens expands
+each capability to its default permissions. Use the object form when you want to
+request only a specific permission from a capability group.
 
 ## How to test
 

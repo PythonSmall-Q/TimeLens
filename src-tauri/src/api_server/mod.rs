@@ -107,12 +107,18 @@ fn write_api_audit_log(
     let _ = db::insert_api_audit_log(conn, &now, client_id, endpoint, method, status_code, detail);
 }
 
-/// Central API governance: allowlist, rate-limit, and token (+ scope) checks.
+/// Central API governance: allowlist, rate-limit, token validity, and scope checks.
 /// Returns the resolved `X-Client-Id` on success.
-fn enforce_api_governance(
+///
+/// `bridge_authenticated` is set to `true` when the caller has already proven
+/// possession of the extension bridge key via a valid `X-Extension-Signature`.
+/// In that case the allowlist and token-required checks are bypassed, and
+/// scope enforcement is skipped unless a valid token is also provided.
+fn enforce_api_governance_internal(
     conn: &rusqlite::Connection,
     headers: &HeaderMap,
     required_scope: Option<&str>,
+    bridge_authenticated: bool,
 ) -> Result<String, axum::http::StatusCode> {
     let client_id = headers
         .get("X-Client-Id")
@@ -123,7 +129,7 @@ fn enforce_api_governance(
 
     let allowlist_enforced =
         db::get_bool_setting(conn, "local_api_allowlist_enforced", false).unwrap_or(false);
-    if allowlist_enforced {
+    if allowlist_enforced && !bridge_authenticated {
         if client_id.is_empty() {
             return Err(axum::http::StatusCode::FORBIDDEN);
         }
@@ -160,7 +166,7 @@ fn enforce_api_governance(
         .unwrap_or("")
         .to_string();
 
-    if token_required && token.is_empty() {
+    if token_required && token.is_empty() && !bridge_authenticated {
         return Err(axum::http::StatusCode::FORBIDDEN);
     }
 
@@ -176,11 +182,71 @@ fn enforce_api_governance(
                     }
                 }
             }
-            None => return Err(axum::http::StatusCode::FORBIDDEN),
+            None => {
+                // Invalid token. A valid bridge signature still grants access,
+                // but an invalid token on its own is not enough.
+                if !bridge_authenticated {
+                    return Err(axum::http::StatusCode::FORBIDDEN);
+                }
+            }
         }
     }
 
     Ok(client_id)
+}
+
+fn enforce_api_governance(
+    conn: &rusqlite::Connection,
+    headers: &HeaderMap,
+    required_scope: Option<&str>,
+) -> Result<String, axum::http::StatusCode> {
+    enforce_api_governance_internal(conn, headers, required_scope, false)
+}
+
+/// Verify an extension bridge signature for POST request bodies.
+/// Returns `true` when the signature is valid, `false` when no bridge key is
+/// configured, or an error when a key is configured but the signature is
+/// missing or invalid.
+fn verify_extension_bridge_signature(
+    conn: &rusqlite::Connection,
+    headers: &HeaderMap,
+    body_json: &str,
+    client_id: &str,
+    endpoint: &str,
+    method: &str,
+) -> Result<bool, axum::http::StatusCode> {
+    let Ok(Some(key)) = db::get_setting(conn, "extension_bridge_key") else {
+        return Ok(false);
+    };
+
+    let provided_signature = headers
+        .get("X-Extension-Signature")
+        .and_then(|h| h.to_str().ok());
+
+    if let Some(sig) = provided_signature {
+        if extension_bridge_cmd::verify_request_signature(body_json.as_bytes(), sig, &key) {
+            return Ok(true);
+        }
+        write_api_audit_log(
+            conn,
+            client_id,
+            endpoint,
+            method,
+            403,
+            "invalid_extension_signature",
+        );
+        return Err(axum::http::StatusCode::FORBIDDEN);
+    }
+
+    write_api_audit_log(
+        conn,
+        client_id,
+        endpoint,
+        method,
+        403,
+        "missing_extension_signature",
+    );
+    Err(axum::http::StatusCode::FORBIDDEN)
 }
 
 async fn get_today(State(s): State<ApiState>, headers: HeaderMap) -> impl IntoResponse {
@@ -372,7 +438,34 @@ async fn post_browser_session(
         return axum::http::StatusCode::INTERNAL_SERVER_ERROR;
     };
 
-    let client_id = match enforce_api_governance(&conn, &headers, Some("browser:write")) {
+    let body_json = match serde_json::to_string(&payload) {
+        Ok(j) => j,
+        Err(_) => {
+            write_api_audit_log(
+                &conn,
+                "",
+                endpoint,
+                method,
+                500,
+                "payload_serialization_failed",
+            );
+            return axum::http::StatusCode::INTERNAL_SERVER_ERROR;
+        }
+    };
+
+    let bridge_auth = match verify_extension_bridge_signature(
+        &conn, &headers, &body_json, "", endpoint, method,
+    ) {
+        Ok(b) => b,
+        Err(code) => return code,
+    };
+
+    let client_id = match enforce_api_governance_internal(
+        &conn,
+        &headers,
+        Some("browser:write"),
+        bridge_auth,
+    ) {
         Ok(client_id) => client_id,
         Err(code) => {
             write_api_audit_log(
@@ -386,54 +479,6 @@ async fn post_browser_session(
             return code;
         }
     };
-
-    // Check if extension bridge key is set up and validate signature if provided
-    if let Ok(Some(key)) = db::get_setting(&conn, "extension_bridge_key") {
-        // Key is set; signature is required
-        let provided_signature = headers
-            .get("X-Extension-Signature")
-            .and_then(|h| h.to_str().ok());
-
-        if let Some(sig) = provided_signature {
-            // Verify signature
-            let body_json = match serde_json::to_string(&payload) {
-                Ok(j) => j,
-                Err(_) => {
-                    write_api_audit_log(
-                        &conn,
-                        &client_id,
-                        endpoint,
-                        method,
-                        500,
-                        "payload_serialization_failed",
-                    );
-                    return axum::http::StatusCode::INTERNAL_SERVER_ERROR;
-                }
-            };
-            if !extension_bridge_cmd::verify_request_signature(body_json.as_bytes(), sig, &key) {
-                write_api_audit_log(
-                    &conn,
-                    &client_id,
-                    endpoint,
-                    method,
-                    403,
-                    "invalid_extension_signature",
-                );
-                return axum::http::StatusCode::FORBIDDEN;
-            }
-        } else {
-            // Key is set but no signature provided
-            write_api_audit_log(
-                &conn,
-                &client_id,
-                endpoint,
-                method,
-                403,
-                "missing_extension_signature",
-            );
-            return axum::http::StatusCode::FORBIDDEN;
-        }
-    }
 
     let enabled = db::get_bool_setting(&conn, "browser_extension_enabled", true).unwrap_or(true);
     if !enabled {
@@ -495,7 +540,34 @@ async fn post_vscode_session(
         return axum::http::StatusCode::INTERNAL_SERVER_ERROR;
     };
 
-    let client_id = match enforce_api_governance(&conn, &headers, Some("vscode:write")) {
+    let body_json = match serde_json::to_string(&payload) {
+        Ok(j) => j,
+        Err(_) => {
+            write_api_audit_log(
+                &conn,
+                "",
+                endpoint,
+                method,
+                500,
+                "payload_serialization_failed",
+            );
+            return axum::http::StatusCode::INTERNAL_SERVER_ERROR;
+        }
+    };
+
+    let bridge_auth = match verify_extension_bridge_signature(
+        &conn, &headers, &body_json, "", endpoint, method,
+    ) {
+        Ok(b) => b,
+        Err(code) => return code,
+    };
+
+    let client_id = match enforce_api_governance_internal(
+        &conn,
+        &headers,
+        Some("vscode:write"),
+        bridge_auth,
+    ) {
         Ok(client_id) => client_id,
         Err(code) => {
             write_api_audit_log(
@@ -509,54 +581,6 @@ async fn post_vscode_session(
             return code;
         }
     };
-
-    // Check if extension bridge key is set up and validate signature if provided
-    if let Ok(Some(key)) = db::get_setting(&conn, "extension_bridge_key") {
-        // Key is set; signature is required
-        let provided_signature = headers
-            .get("X-Extension-Signature")
-            .and_then(|h| h.to_str().ok());
-
-        if let Some(sig) = provided_signature {
-            // Verify signature
-            let body_json = match serde_json::to_string(&payload) {
-                Ok(j) => j,
-                Err(_) => {
-                    write_api_audit_log(
-                        &conn,
-                        &client_id,
-                        endpoint,
-                        method,
-                        500,
-                        "payload_serialization_failed",
-                    );
-                    return axum::http::StatusCode::INTERNAL_SERVER_ERROR;
-                }
-            };
-            if !extension_bridge_cmd::verify_request_signature(body_json.as_bytes(), sig, &key) {
-                write_api_audit_log(
-                    &conn,
-                    &client_id,
-                    endpoint,
-                    method,
-                    403,
-                    "invalid_extension_signature",
-                );
-                return axum::http::StatusCode::FORBIDDEN;
-            }
-        } else {
-            // Key is set but no signature provided
-            write_api_audit_log(
-                &conn,
-                &client_id,
-                endpoint,
-                method,
-                403,
-                "missing_extension_signature",
-            );
-            return axum::http::StatusCode::FORBIDDEN;
-        }
-    }
 
     let enabled = db::get_bool_setting(&conn, "vscode_tracking_enabled", true).unwrap_or(true);
     if !enabled {

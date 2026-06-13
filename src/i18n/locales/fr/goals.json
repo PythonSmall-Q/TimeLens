@@ -1,0 +1,22 @@
+{
+  "title": "Objectifs d'utilisation",
+  "subtitle": "Définissez des objectifs de temps pour les apps ou catégories afin de créer de bonnes habitudes",
+  "addGoal": "Ajouter un objectif",
+  "newGoal": "Nouvel objectif",
+  "noGoals": "Aucun objectif pour le moment. Cliquez sur \"Ajouter un objectif\" pour en créer un.",
+  "allApps": "Toutes les apps",
+  "period_daily": "Quotidien",
+  "period_weekly": "Hebdomadaire",
+  "op_at_most": "Au plus",
+  "op_at_least": "Au moins",
+  "minutes": "minutes",
+  "scopeValuePlaceholder": "Valeur cible",
+  "scopeValueLabel": "Valeur cible",
+  "scopeTypeLabel": "Type de cible",
+  "scopeType_app": "App",
+  "scopeType_category": "Catégorie",
+  "searchAppPlaceholder": "Rechercher et sélectionner une app",
+  "periodLabel": "Période",
+  "operatorLabel": "Opérateur",
+  "minutesLabel": "Minutes cibles"
+}

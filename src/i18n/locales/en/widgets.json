@@ -19,6 +19,7 @@
   "permissionTodoRead": "Read your todos",
   "permissionTodoWrite": "Create / modify todos",
   "permissionSettingsWrite": "Change app settings",
+  "permissionLocalApi": "Call the local TimeLens API",
   "permissionsGranted": "Permissions granted",
   "registryErrors": "Load errors ({{count}})",
   "loading": "Loading...",

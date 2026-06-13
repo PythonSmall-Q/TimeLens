@@ -12,7 +12,7 @@
   "triggerAuto": "自动触发",
   "automation": {
     "title": "规则自动化",
-    "hint": "创建本地规则，用于模拟专注会话自动触发。",
+    "hint": "创建后端规则，自动开始或结束专注会话。",
     "ruleNamePlaceholder": "规则名称（例如：晨间深度工作）",
     "minRecentFocus": "近 7 天最少专注分钟",
     "addRule": "添加规则",
@@ -26,6 +26,24 @@
     "outOfWindow": "当前时间不在规则时段内（{{start}} - {{end}}）。",
     "notEnoughFocus": "近期专注 {{recent}} 分，低于要求 {{required}} 分。",
     "alreadyActive": "规则已匹配，且专注模式已开启。",
-    "readyToStart": "规则已匹配，可以立即开始专注会话。"
+    "readyToStart": "规则已匹配，可以立即开始专注会话。",
+    "ruleTypeKeyword": "关键词",
+    "ruleTypeTimeWindow": "时间段",
+    "ruleTypeApp": "应用",
+    "matchTypeContains": "包含",
+    "matchTypeExact": "精确",
+    "matchTypeRegex": "正则",
+    "keywordPlaceholder": "关键词或短语",
+    "appNamePlaceholder": "应用名称",
+    "actionLabel": "动作",
+    "actionEnterFocus": "进入专注",
+    "actionLeaveFocus": "离开专注",
+    "autoStart": "自动开始",
+    "respectQuietHours": "遵守静音时段",
+    "ruleMetaKeyword": "关键词：{{matchType}} '{{keyword}}'",
+    "ruleMetaTimeWindow": "时段：{{start}} - {{end}}",
+    "ruleMetaApp": "应用：{{app}}",
+    "noMatch": "规则未匹配当前条件。",
+    "simulationError": "当前无法评估规则。"
   }
 }

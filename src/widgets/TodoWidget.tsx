@@ -156,6 +156,8 @@ export default function TodoWidget({ widgetId: _widgetId }: Props) {
           )}
           <button
             onClick={() => getCurrentWebviewWindow().close()}
+            aria-label={t("common:close")}
+            title={t("common:close")}
             className="text-text-muted hover:text-accent-red transition-colors"
           >
             <X size={13} />

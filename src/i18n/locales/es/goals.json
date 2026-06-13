@@ -1,0 +1,22 @@
+{
+  "title": "Metas de uso",
+  "subtitle": "Establece metas de tiempo para apps o categorías para crear hábitos saludables",
+  "addGoal": "Agregar meta",
+  "newGoal": "Nueva meta",
+  "noGoals": "Aún no hay metas. Haz clic en \"Agregar meta\" para crear una.",
+  "allApps": "Todas las apps",
+  "period_daily": "Diaria",
+  "period_weekly": "Semanal",
+  "op_at_most": "Como máximo",
+  "op_at_least": "Al menos",
+  "minutes": "minutos",
+  "scopeValuePlaceholder": "Valor objetivo",
+  "scopeValueLabel": "Valor objetivo",
+  "scopeTypeLabel": "Tipo de objetivo",
+  "scopeType_app": "App",
+  "scopeType_category": "Categoría",
+  "searchAppPlaceholder": "Buscar y seleccionar una app",
+  "periodLabel": "Período",
+  "operatorLabel": "Operador",
+  "minutesLabel": "Minutos objetivo"
+}

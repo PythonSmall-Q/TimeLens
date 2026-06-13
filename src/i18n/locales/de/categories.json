@@ -1,0 +1,24 @@
+{
+  "title": "App-Kategorien",
+  "subtitle": "Markieren Sie Apps mit Kategorien, um Einblicke nach Aktivitätstyp zu erhalten",
+  "addRule": "App-Kategorie hinzufügen",
+  "exePlaceholder": "Kürzliche App auswählen…",
+  "categoryLabel": "Kategorie",
+  "drilldownHint": "Drilldown-Kontext für {{app}} erkannt. Sie können die Kategorieregel direkt hinzufügen oder anpassen.",
+  "noRules": "Noch keine Kategorieregeln. Fügen Sie oben eine App hinzu.",
+  "suggestedCategory": "Vorschlag: {{cat}} — zum Anwenden klicken",
+  "applySuggestion": "Vorgeschlagene Kategorie anwenden",
+  "presets": {
+    "Work": "Arbeit",
+    "Social": "Sozial",
+    "Entertainment": "Unterhaltung",
+    "Development": "Entwicklung",
+    "Productivity": "Produktivität",
+    "Education": "Bildung",
+    "Gaming": "Spiele",
+    "Browsing": "Browsen",
+    "Communication": "Kommunikation",
+    "System": "System",
+    "uncategorized": "Nicht kategorisiert"
+  }
+}

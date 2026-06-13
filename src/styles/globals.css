@@ -359,6 +359,25 @@ body {
   background: var(--scrollbar-thumb-hover);
 }
 
+/* ── Focus-visible styles ───────────────────────────────────── */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[role="button"]:focus-visible,
+[role="link"]:focus-visible {
+  outline: 2px solid #6c8ebf;
+  outline-offset: 2px;
+}
+
+.ui-field:focus-visible,
+.ui-select:focus-visible {
+  outline: 2px solid #6c8ebf;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 3px var(--field-focus-ring);
+}
+
 /* ── Utility ────────────────────────────────────────────────── */
 .text-gradient {
   background: linear-gradient(135deg, #4ea5a0, #6c8ebf 58%, #e09050);

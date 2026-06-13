@@ -1561,8 +1561,9 @@ pub fn import_backup_v2_apply(
                 crate::db::migrations::db_path_for_profile(&data_dir, &profile_id);
 
             {
-                let conn = db.lock().map_err(|e| e.to_string())?;
-                conn.execute(
+                let app_state_conn = db::migrations::open_app_state_db(&data_dir)
+                    .map_err(|e| e.to_string())?;
+                app_state_conn.execute(
                     "INSERT INTO profiles (id, name, is_default, created_at) VALUES (?1, ?2, 0, ?3)",
                     params![&profile_id, &profile_id, now_ts()],
                 )
@@ -1578,8 +1579,9 @@ pub fn import_backup_v2_apply(
             drop(profile_conn);
 
             {
-                let conn = db.lock().map_err(|e| e.to_string())?;
-                crate::db::set_setting(&conn, "current_profile_id", &profile_id)
+                let app_state_conn = db::migrations::open_app_state_db(&data_dir)
+                    .map_err(|e| e.to_string())?;
+                db::migrations::set_current_profile_id_in_app_state(&app_state_conn, &profile_id)
                     .map_err(|e| e.to_string())?;
             }
 
@@ -1916,12 +1918,10 @@ pub fn set_archive_scheduler_settings(
     Ok(())
 }
 
-#[tauri::command]
-pub fn compress_archive_older_than_days(
+fn compress_archive_older_than_days_inner(
+    conn: &rusqlite::Connection,
     days: i64,
-    db: State<DbState>,
 ) -> Result<CompressionResult, String> {
-    let conn = db.lock().map_err(|e| e.to_string())?;
     if days < 0 {
         return Err("days must be non-negative".to_string());
     }
@@ -2026,6 +2026,15 @@ pub fn compress_archive_older_than_days(
         original_rows,
         saved_bytes,
     })
+}
+
+#[tauri::command]
+pub fn compress_archive_older_than_days(
+    days: i64,
+    db: State<DbState>,
+) -> Result<CompressionResult, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    compress_archive_older_than_days_inner(&conn, days)
 }
 
 #[tauri::command]
@@ -2434,9 +2443,11 @@ pub struct ProfileInfo {
 }
 
 #[tauri::command]
-pub fn list_profiles(db: State<DbState>) -> Result<Vec<ProfileInfo>, String> {
-    let conn = db.lock().map_err(|e| e.to_string())?;
-    let current = crate::db::migrations::current_profile_id_from_conn(&conn);
+pub fn list_profiles(app: tauri::AppHandle) -> Result<Vec<ProfileInfo>, String> {
+    let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let conn = db::migrations::open_app_state_db(&data_dir)
+        .map_err(|e| e.to_string())?;
+    let current = db::migrations::current_profile_id_from_app_state(&conn);
     let mut stmt = conn
         .prepare("SELECT id, name, is_default, created_at FROM profiles ORDER BY created_at")
         .map_err(|e| e.to_string())?;
@@ -2460,7 +2471,6 @@ pub fn list_profiles(db: State<DbState>) -> Result<Vec<ProfileInfo>, String> {
 pub fn create_profile(
     name: String,
     app: tauri::AppHandle,
-    db: State<DbState>,
 ) -> Result<ProfileInfo, String> {
     let id = name.trim().to_lowercase().replace(' ', "_");
     if id.is_empty() || id == "default" {
@@ -2468,7 +2478,9 @@ pub fn create_profile(
     }
     let now = now_ts();
     {
-        let conn = db.lock().map_err(|e| e.to_string())?;
+        let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+        let conn = db::migrations::open_app_state_db(&data_dir)
+            .map_err(|e| e.to_string())?;
         conn.execute(
             "INSERT INTO profiles (id, name, is_default, created_at) VALUES (?1, ?2, 0, ?3)
              ON CONFLICT(id) DO UPDATE SET name = excluded.name",
@@ -2495,36 +2507,120 @@ pub fn create_profile(
 pub fn switch_profile(
     profile_id: String,
     app: tauri::AppHandle,
-    db: State<DbState>,
 ) -> Result<(), String> {
     if profile_id.trim().is_empty() {
         return Err("Profile id is required".to_string());
     }
     let profile_id = profile_id.trim().to_string();
 
-    {
-        let conn = db.lock().map_err(|e| e.to_string())?;
-        let exists: bool = conn
-            .query_row(
-                "SELECT 1 FROM profiles WHERE id = ?1",
-                params![&profile_id],
-                |_row| Ok(true),
-            )
-            .unwrap_or(false);
-        if !exists && profile_id != "default" {
-            return Err(format!("Profile '{}' does not exist", profile_id));
-        }
-
-        crate::db::set_setting(&conn, "current_profile_id", &profile_id)
-            .map_err(|e| e.to_string())?;
+    let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let conn = db::migrations::open_app_state_db(&data_dir)
+        .map_err(|e| e.to_string())?;
+    let exists: bool = conn
+        .query_row(
+            "SELECT 1 FROM profiles WHERE id = ?1",
+            params![&profile_id],
+            |_row| Ok(true),
+        )
+        .unwrap_or(false);
+    if !exists && profile_id != "default" {
+        return Err(format!("Profile '{}' does not exist", profile_id));
     }
+
+    db::migrations::set_current_profile_id_in_app_state(&conn, &profile_id)
+        .map_err(|e| e.to_string())?;
 
     log::info!("Switching to profile {}; restarting app", profile_id);
     app.restart();
 }
 
 #[tauri::command]
-pub fn get_current_profile(db: State<DbState>) -> Result<String, String> {
-    let conn = db.lock().map_err(|e| e.to_string())?;
-    Ok(crate::db::migrations::current_profile_id_from_conn(&conn))
+pub fn get_current_profile(app: tauri::AppHandle) -> Result<String, String> {
+    let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let conn = db::migrations::open_app_state_db(&data_dir)
+        .map_err(|e| e.to_string())?;
+    Ok(db::migrations::current_profile_id_from_app_state(&conn))
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db;
+    use std::path::PathBuf;
+
+    fn temp_db_path(name: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join("timelens_cmd_tests");
+        std::fs::create_dir_all(&dir).unwrap();
+        dir.join(format!("{}.db", name))
+    }
+
+    #[test]
+    fn test_backup_roundtrip_no_passphrase() {
+        let path = temp_db_path("backup_roundtrip");
+        let _ = std::fs::remove_file(&path);
+        let conn = db::open(&path).unwrap();
+        db::upsert_app_usage(
+            &conn,
+            "2026-06-01",
+            "TestApp",
+            "C:\\test.exe",
+            "Test Window",
+            60,
+            "2026-06-01T10:00:00",
+            "2026-06-01T10:01:00",
+        )
+        .unwrap();
+        db::insert_todo(&conn, "offline test todo", 0).unwrap();
+        drop(conn);
+
+        let backup_path = temp_db_path("backup_roundtrip.timelens-backup");
+        let _ = std::fs::remove_file(&backup_path);
+
+        let conn = db::open(&path).unwrap();
+        let bundle = build_bundle(&conn).unwrap();
+        let payload_json = bundle_to_json(&bundle).unwrap();
+        let manifest = build_manifest(&conn, &bundle, &payload_json, false);
+        write_backup_package(backup_path.to_string_lossy().as_ref(), &manifest, &payload_json).unwrap();
+        drop(conn);
+
+        assert!(!manifest.checksum.is_empty());
+
+        let (read_manifest, _, _) = read_backup_package(backup_path.to_string_lossy().as_ref(), None).unwrap();
+        assert_eq!(read_manifest.version, "v2");
+
+        let _ = std::fs::remove_file(&path);
+        let _ = std::fs::remove_file(&backup_path);
+    }
+
+    #[test]
+    fn test_archive_and_compression_offline() {
+        let path = temp_db_path("archive_compression");
+        let _ = std::fs::remove_file(&path);
+        let conn = db::open(&path).unwrap();
+        db::upsert_app_usage(
+            &conn,
+            "2025-01-01",
+            "OldApp",
+            "C:\\old.exe",
+            "Old Window",
+            3600,
+            "2025-01-01T10:00:00",
+            "2025-01-01T11:00:00",
+        )
+        .unwrap();
+        drop(conn);
+
+        let conn = db::open(&path).unwrap();
+        let result = archive_by_policy(&conn, "12m").unwrap();
+        assert!(result.archived_app_usage_rows >= 0);
+        drop(conn);
+
+        let conn = db::open(&path).unwrap();
+        let compressed = compress_archive_older_than_days_inner(&conn, 1).unwrap();
+        assert!(compressed.compressed_groups >= 0);
+        drop(conn);
+
+        let _ = std::fs::remove_file(&path);
+    }
 }

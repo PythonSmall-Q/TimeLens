@@ -23,9 +23,6 @@ impl Migration {
 fn migration_001_baseline(conn: &Connection) -> Result<()> {
     conn.execute_batch(
         "
-        PRAGMA journal_mode=WAL;
-        PRAGMA foreign_keys=ON;
-
         CREATE TABLE IF NOT EXISTS app_usage (
             id              INTEGER PRIMARY KEY AUTOINCREMENT,
             date            TEXT    NOT NULL,
@@ -622,6 +619,112 @@ pub fn db_path_for_profile(data_dir: &Path, profile_id: &str) -> PathBuf {
         .join("timelens.db")
 }
 
+/// Path to the unencrypted application state database.
+pub fn app_state_db_path(data_dir: &Path) -> PathBuf {
+    data_dir.join("app_state.db")
+}
+
+/// Open (or create) the unencrypted app state database and initialize the
+/// global profile metadata schema.
+pub fn open_app_state_db(data_dir: &Path) -> Result<Connection> {
+    let path = app_state_db_path(data_dir);
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|e| rusqlite::Error::InvalidPath(e.to_string().into()))?;
+    }
+    let conn = Connection::open(&path)?;
+    conn.execute_batch(
+        "
+        CREATE TABLE IF NOT EXISTS profiles (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            is_default INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL
+        );
+        INSERT OR IGNORE INTO profiles (id, name, is_default, created_at) VALUES ('default', 'Default', 1, datetime('now'));
+        CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+        ",
+    )?;
+    Ok(conn)
+}
+
+/// Read the current profile id from the app state database.
+pub fn current_profile_id_from_app_state(conn: &Connection) -> String {
+    db::get_setting(conn, "current_profile_id")
+        .ok()
+        .flatten()
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or_else(|| DEFAULT_PROFILE_ID.to_string())
+}
+
+/// Set the current profile id in the app state database.
+pub fn set_current_profile_id_in_app_state(conn: &Connection, profile_id: &str) -> Result<()> {
+    db::set_setting(conn, "current_profile_id", profile_id)
+}
+
+/// One-time migration: copy profile metadata from the default profile DB into
+/// the unencrypted app state DB. This is safe to call repeatedly; once the
+/// app state has a current_profile_id it becomes a no-op.
+pub fn migrate_profile_state_from_default_db(
+    app_state_conn: &Connection,
+    default_db_path: &Path,
+) -> Result<()> {
+    // Already migrated?
+    if db::get_setting(app_state_conn, "current_profile_id")?.is_some() {
+        return Ok(());
+    }
+
+    if !default_db_path.exists() {
+        return Ok(());
+    }
+
+    // Open the default profile DB through the regular initializer so its
+    // schema (including the legacy profiles table) is up to date. If it is
+    // encrypted we cannot read the legacy metadata and will fall back to the
+    // default profile; the user can switch profiles manually.
+    let default_conn = match db::open(default_db_path) {
+        Ok(c) => c,
+        Err(e) => {
+            log::warn!(
+                "Skipping profile metadata migration; default profile DB at {} could not be opened: {}",
+                default_db_path.display(),
+                e
+            );
+            return Ok(());
+        }
+    };
+
+    if let Ok(Some(current)) = db::get_setting(&default_conn, "current_profile_id") {
+        if !current.trim().is_empty() {
+            set_current_profile_id_in_app_state(app_state_conn, &current)?;
+            log::info!(
+                "Migrated current_profile_id from default profile DB: {}",
+                current
+            );
+        }
+    }
+
+    let mut stmt = default_conn
+        .prepare("SELECT id, name, is_default, created_at FROM profiles")?;
+    let rows = stmt.query_map([], |row| {
+        Ok((
+            row.get::<_, String>(0)?,
+            row.get::<_, String>(1)?,
+            row.get::<_, i32>(2)?,
+            row.get::<_, String>(3)?,
+        ))
+    })?;
+    for row in rows {
+        let (id, name, is_default, created_at) = row?;
+        app_state_conn.execute(
+            "INSERT OR IGNORE INTO profiles (id, name, is_default, created_at) VALUES (?1, ?2, ?3, ?4)",
+            params![&id, &name, is_default, &created_at],
+        )?;
+    }
+
+    Ok(())
+}
+
 /// Read the current profile id from a connection's app_settings.
 pub fn current_profile_id_from_conn(conn: &Connection) -> String {
     db::get_setting(conn, "current_profile_id")
@@ -686,6 +789,19 @@ fn bootstrap_user_version(conn: &Connection) -> Result<()> {
 /// transaction and logged to `_migration_log`.
 pub fn run_migrations(conn: &Connection) -> Result<()> {
     bootstrap_user_version(conn)?;
+
+    // If the database was bootstrapped from a legacy schema_version setting,
+    // the _migration_log table may not exist yet. Ensure it exists before
+    // inserting migration log rows.
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS _migration_log (
+            version     INTEGER PRIMARY KEY,
+            name        TEXT    NOT NULL,
+            applied_at  TEXT    NOT NULL
+        )",
+        [],
+    )?;
+
     let mut current: i64 = conn.pragma_query_value(None, "user_version", |row| row.get(0))?;
     let target = latest_version();
 
@@ -883,4 +999,36 @@ pub fn initialize(conn: &Connection) -> Result<()> {
     run_migrations(conn)?;
     let _ = ensure_core_indexes(conn)?;
     Ok(())
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    fn temp_db_path(name: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join("timelens_migration_tests");
+        std::fs::create_dir_all(&dir).unwrap();
+        dir.join(format!("{}.db", name))
+    }
+
+    #[test]
+    fn test_rehearsal_on_fresh_unmigrated_db() {
+        let path = temp_db_path("fresh_unmigrated");
+        let _ = std::fs::remove_file(&path);
+        // Create a raw connection without running migrations.
+        let conn = rusqlite::Connection::open(&path).unwrap();
+        drop(conn);
+
+        let report = run_migration_rehearsal(&path).unwrap();
+        assert!(
+            report.success,
+            "migration rehearsal failed: {:?}",
+            report.error
+        );
+        assert_eq!(report.start_version, 0);
+        assert_eq!(report.end_version, latest_version());
+        assert_eq!(report.integrity_check, "ok");
+    }
 }

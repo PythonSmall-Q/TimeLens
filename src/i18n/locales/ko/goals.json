@@ -1,0 +1,22 @@
+{
+  "title": "사용 목표",
+  "subtitle": "건강한 습관을 기르기 위해 앱 또는 카테고리의 시간 목표 설정",
+  "addGoal": "목표 추가",
+  "newGoal": "새 목표",
+  "noGoals": "아직 목표가 없습니다. \"목표 추가\"를 클릭하여 만드세요.",
+  "allApps": "모든 앱",
+  "period_daily": "매일",
+  "period_weekly": "매주",
+  "op_at_most": "최대",
+  "op_at_least": "최소",
+  "minutes": "분",
+  "scopeValuePlaceholder": "목표값",
+  "scopeValueLabel": "목표값",
+  "scopeTypeLabel": "대상 유형",
+  "scopeType_app": "앱",
+  "scopeType_category": "카테고리",
+  "searchAppPlaceholder": "앱을 검색하여 선택",
+  "periodLabel": "기간",
+  "operatorLabel": "연산자",
+  "minutesLabel": "목표 분"
+}

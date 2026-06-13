@@ -1,15 +1,33 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import InsightWorkspace from "@/pages/Dashboard/InsightWorkspace";
 import UnifiedTimeline from "@/pages/Dashboard/UnifiedTimeline";
 import * as api from "@/services/tauriApi";
-import type { AppUsageComparison } from "@/types";
+import type {
+  AppUsageComparison,
+  CategoryComparison,
+  ProjectComparison,
+  DistractionHotspot,
+} from "@/types";
 import { formatDuration, todayString, daysAgo } from "@/utils/format";
 import AsyncStateCard from "@/components/AsyncStateCard";
 
 type PeriodMode = "day" | "week" | "month";
+type ComparisonTab = "apps" | "categories" | "projects";
+
+const SAVED_VIEWS_KEY = "timelens.dashboardInsights.savedViews.v1";
+
+interface DashboardInsightsSavedView {
+  id: string;
+  name: string;
+  mode: PeriodMode;
+  selectedDate: string;
+  weekValue: string;
+  monthValue: string;
+  createdAt: string;
+}
 
 const toDate = (s: string) => new Date(`${s}T00:00:00`);
 const fmt = (d: Date) => d.toISOString().slice(0, 10);
@@ -58,6 +76,73 @@ function getMonthRange(monthValue: string): { start: string; end: string } {
   return { start: fmt(start), end: fmt(end) };
 }
 
+function loadSavedViews(): DashboardInsightsSavedView[] {
+  try {
+    const raw = localStorage.getItem(SAVED_VIEWS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as DashboardInsightsSavedView[];
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((v) => Boolean(v?.id && v?.name && v?.mode));
+  } catch {
+    return [];
+  }
+}
+
+interface ComparisonSummary {
+  current: number;
+  previous: number;
+  delta: number;
+  topIncreaseName: string | null;
+  topIncreaseDelta: number;
+  topDecreaseName: string | null;
+  topDecreaseDelta: number;
+  newCount: number;
+  stoppedCount: number;
+}
+
+function summarizeComparisons(
+  rows: Array<{ current_seconds: number; previous_seconds: number; delta_seconds: number }>,
+  nameOf: (row: unknown) => string | null
+): ComparisonSummary | null {
+  if (rows.length === 0) return null;
+
+  let current = 0;
+  let previous = 0;
+  let topIncreaseName: string | null = null;
+  let topIncreaseDelta = 0;
+  let topDecreaseName: string | null = null;
+  let topDecreaseDelta = 0;
+  let newCount = 0;
+  let stoppedCount = 0;
+
+  for (const row of rows) {
+    current += row.current_seconds;
+    previous += row.previous_seconds;
+    if (row.delta_seconds > 0 && row.delta_seconds > topIncreaseDelta) {
+      topIncreaseDelta = row.delta_seconds;
+      topIncreaseName = nameOf(row);
+    }
+    if (row.delta_seconds < 0 && row.delta_seconds < topDecreaseDelta) {
+      topDecreaseDelta = row.delta_seconds;
+      topDecreaseName = nameOf(row);
+    }
+    if (row.previous_seconds === 0 && row.current_seconds > 0) newCount += 1;
+    if (row.current_seconds === 0 && row.previous_seconds > 0) stoppedCount += 1;
+  }
+
+  return {
+    current,
+    previous,
+    delta: current - previous,
+    topIncreaseName,
+    topIncreaseDelta,
+    topDecreaseName,
+    topDecreaseDelta,
+    newCount,
+    stoppedCount,
+  };
+}
+
 export default function DashboardInsights() {
   const { t } = useTranslation(["common", "dashboard"]);
   const navigate = useNavigate();
@@ -72,8 +157,15 @@ export default function DashboardInsights() {
   const [selectedDate, setSelectedDate] = useState(initialDate);
   const [weekValue, setWeekValue] = useState(initialWeek);
   const [monthValue, setMonthValue] = useState(initialMonth);
-  const [loading, setLoading] = useState(false);
-  const [periodComparisonRows, setPeriodComparisonRows] = useState<AppUsageComparison[]>([]);
+  const [comparisonLoading, setComparisonLoading] = useState(false);
+  const [comparisonTab, setComparisonTab] = useState<ComparisonTab>("apps");
+  const [appComparisonRows, setAppComparisonRows] = useState<AppUsageComparison[]>([]);
+  const [categoryComparisonRows, setCategoryComparisonRows] = useState<CategoryComparison[]>([]);
+  const [projectComparisonRows, setProjectComparisonRows] = useState<ProjectComparison[]>([]);
+  const [hotspots, setHotspots] = useState<DistractionHotspot[]>([]);
+  const [hotspotsLoading, setHotspotsLoading] = useState(false);
+  const [viewName, setViewName] = useState("");
+  const [savedViews, setSavedViews] = useState<DashboardInsightsSavedView[]>(loadSavedViews);
 
   const weekStartDay: 0 | 1 = 1;
 
@@ -127,42 +219,23 @@ export default function DashboardInsights() {
     return { start: rangeDays.start, end: rangeDays.end };
   }, [periodMode, selectedDate, rangeDays]);
 
-  const whatChangedSummary = useMemo(() => {
-    if (periodComparisonRows.length === 0) return null;
+  const comparisonSummary = useMemo((): ComparisonSummary | null => {
+    if (comparisonTab === "categories") {
+      return summarizeComparisons(categoryComparisonRows, (r) => (r as CategoryComparison).category);
+    }
+    if (comparisonTab === "projects") {
+      return summarizeComparisons(projectComparisonRows, (r) => (r as ProjectComparison).project_name);
+    }
+    return summarizeComparisons(appComparisonRows, (r) => (r as AppUsageComparison).app_name);
+  }, [comparisonTab, appComparisonRows, categoryComparisonRows, projectComparisonRows]);
 
-    const totals = periodComparisonRows.reduce(
-      (acc, row) => {
-        acc.current += row.current_seconds;
-        acc.previous += row.previous_seconds;
-        if (row.delta_seconds > 0) {
-          if (!acc.topIncrease || row.delta_seconds > acc.topIncrease.delta_seconds) {
-            acc.topIncrease = row;
-          }
-        }
-        if (row.delta_seconds < 0) {
-          if (!acc.topDecrease || row.delta_seconds < acc.topDecrease.delta_seconds) {
-            acc.topDecrease = row;
-          }
-        }
-        if (row.previous_seconds === 0 && row.current_seconds > 0) acc.newApps += 1;
-        if (row.current_seconds === 0 && row.previous_seconds > 0) acc.stoppedApps += 1;
-        return acc;
-      },
-      {
-        current: 0,
-        previous: 0,
-        topIncrease: null as AppUsageComparison | null,
-        topDecrease: null as AppUsageComparison | null,
-        newApps: 0,
-        stoppedApps: 0,
-      }
+  const topAppIncreaseRow = useMemo(() => {
+    if (comparisonTab !== "apps") return null;
+    return appComparisonRows.reduce<AppUsageComparison | null>(
+      (best, row) => (row.delta_seconds > 0 && (!best || row.delta_seconds > best.delta_seconds) ? row : best),
+      null
     );
-
-    return {
-      ...totals,
-      delta: totals.current - totals.previous,
-    };
-  }, [periodComparisonRows]);
+  }, [comparisonTab, appComparisonRows]);
 
   useEffect(() => {
     setSearchParams({
@@ -174,14 +247,20 @@ export default function DashboardInsights() {
   }, [periodMode, selectedDate, weekValue, monthValue, setSearchParams]);
 
   useEffect(() => {
-    const loadPeriodComparison = async () => {
+    localStorage.setItem(SAVED_VIEWS_KEY, JSON.stringify(savedViews));
+  }, [savedViews]);
+
+  useEffect(() => {
+    const loadComparisons = async () => {
       let currentStart = selectedDate;
       let currentEnd = selectedDate;
       let days = 1;
 
       if (periodMode !== "day") {
         if (!rangeDays) {
-          setPeriodComparisonRows([]);
+          setAppComparisonRows([]);
+          setCategoryComparisonRows([]);
+          setProjectComparisonRows([]);
           return;
         }
         currentStart = rangeDays.start;
@@ -193,24 +272,61 @@ export default function DashboardInsights() {
       prevEndDate.setDate(prevEndDate.getDate() - 1);
       const prevStartDate = new Date(prevEndDate);
       prevStartDate.setDate(prevEndDate.getDate() - (days - 1));
+      const prevStart = fmt(prevStartDate);
+      const prevEnd = fmt(prevEndDate);
 
-      setLoading(true);
+      setComparisonLoading(true);
       try {
-        const rows = await api.getAppComparisonInRanges(
-          currentStart,
-          currentEnd,
-          fmt(prevStartDate),
-          fmt(prevEndDate)
-        );
-        setPeriodComparisonRows(rows);
+        const apps = await api.getAppComparisonInRanges(currentStart, currentEnd, prevStart, prevEnd);
+        setAppComparisonRows(apps);
       } catch {
-        setPeriodComparisonRows([]);
+        setAppComparisonRows([]);
+      }
+
+      if (comparisonTab === "categories") {
+        try {
+          const categories = await api.getCategoryComparisonInRanges(currentStart, currentEnd, prevStart, prevEnd);
+          setCategoryComparisonRows(categories);
+        } catch {
+          setCategoryComparisonRows([]);
+        }
+      }
+
+      if (comparisonTab === "projects") {
+        try {
+          const projects = await api.getProjectComparisonInRanges(currentStart, currentEnd, prevStart, prevEnd);
+          setProjectComparisonRows(projects);
+        } catch {
+          setProjectComparisonRows([]);
+        }
+      }
+
+      setComparisonLoading(false);
+    };
+
+    void loadComparisons();
+  }, [periodMode, selectedDate, rangeDays, comparisonTab]);
+
+  useEffect(() => {
+    const loadHotspots = async () => {
+      let start = selectedDate;
+      let end = selectedDate;
+      if (periodMode !== "day" && rangeDays) {
+        start = rangeDays.start;
+        end = rangeDays.end;
+      }
+      setHotspotsLoading(true);
+      try {
+        const rows = await api.getDistractionHotspots(start, end, 5);
+        setHotspots(rows);
+      } catch {
+        setHotspots([]);
       } finally {
-        setLoading(false);
+        setHotspotsLoading(false);
       }
     };
 
-    void loadPeriodComparison();
+    void loadHotspots();
   }, [periodMode, selectedDate, rangeDays]);
 
   const isToday = selectedDate === todayString();
@@ -250,6 +366,39 @@ export default function DashboardInsights() {
     setMonthValue(todayString().slice(0, 7));
   };
 
+  const handleSaveView = () => {
+    const name = viewName.trim();
+    if (!name) return;
+    const next: DashboardInsightsSavedView = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      name,
+      mode: periodMode,
+      selectedDate,
+      weekValue,
+      monthValue,
+      createdAt: new Date().toISOString(),
+    };
+    setSavedViews((prev) => [next, ...prev].slice(0, 12));
+    setViewName("");
+  };
+
+  const handleApplyView = (view: DashboardInsightsSavedView) => {
+    setPeriodMode(view.mode);
+    setSelectedDate(view.selectedDate);
+    setWeekValue(view.weekValue);
+    setMonthValue(view.monthValue);
+  };
+
+  const handleDeleteView = (id: string) => {
+    setSavedViews((prev) => prev.filter((v) => v.id !== id));
+  };
+
+  const isViewActive = (view: DashboardInsightsSavedView) =>
+    view.mode === periodMode &&
+    view.selectedDate === selectedDate &&
+    view.weekValue === weekValue &&
+    view.monthValue === monthValue;
+
   return (
     <div className="p-6 space-y-5 animate-fade-in">
       <div className="flex items-center justify-between min-h-[52px] gap-3">
@@ -257,7 +406,7 @@ export default function DashboardInsights() {
           <h1 className="text-xl font-bold text-text-primary">{t("dashboard:insightWorkspace.title")}</h1>
           <p className="text-text-muted text-xs mt-0.5">{t("dashboard:timeline.title")}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap justify-end">
           <button
             className="ui-btn-secondary !text-xs !px-3 !py-2"
             onClick={() => navigate("/dashboard")}
@@ -356,16 +505,89 @@ export default function DashboardInsights() {
         </div>
       </div>
 
-      {loading ? (
+      {/* Saved views */}
+      <div className="glass-card p-4 space-y-3">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <h3 className="text-sm font-semibold text-text-primary">{t("dashboard:savedViewsTitle")}</h3>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-[1.2fr_auto] gap-2">
+          <input
+            type="text"
+            value={viewName}
+            onChange={(e) => setViewName(e.target.value)}
+            placeholder={t("dashboard:savedViewNamePlaceholder")}
+            className="ui-field !text-xs"
+          />
+          <button
+            onClick={handleSaveView}
+            disabled={!viewName.trim()}
+            className="ui-btn-secondary !text-xs disabled:opacity-40"
+          >
+            {t("dashboard:saveCurrentView")}
+          </button>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          {savedViews.length === 0 && (
+            <p className="text-xs text-text-muted">{t("dashboard:noSavedViews")}</p>
+          )}
+          {savedViews.map((view) => (
+            <div
+              key={view.id}
+              className={[
+                "inline-flex items-center gap-1 rounded-xl border px-2.5 py-1.5 text-xs",
+                isViewActive(view)
+                  ? "border-accent-blue/50 text-accent-blue bg-accent-blue/10"
+                  : "border-surface-border text-text-secondary bg-surface-hover/40",
+              ].join(" ")}
+            >
+              <button
+                onClick={() => handleApplyView(view)}
+                className="hover:text-text-primary transition-colors"
+                title={t("dashboard:applyView")}
+              >
+                {view.name}
+              </button>
+              <button
+                onClick={() => handleDeleteView(view.id)}
+                className="text-text-muted hover:text-accent-red transition-colors"
+                title={t("dashboard:deleteView")}
+              >
+                <X size={12} />
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* What changed */}
+      {comparisonLoading ? (
         <AsyncStateCard variant="loading" title={t("common:loading")} compact />
-      ) : whatChangedSummary ? (
+      ) : comparisonSummary ? (
         <div className="glass-card p-5">
           <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
-            <h3 className="text-sm font-semibold text-text-primary">{t("dashboard:whatChangedTitle")}</h3>
-            <span className={whatChangedSummary.delta >= 0 ? "text-xs text-accent-red" : "text-xs text-accent-green"}>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="text-sm font-semibold text-text-primary">{t("dashboard:whatChangedTitle")}</h3>
+              <div className="flex gap-1 bg-surface-hover rounded-lg p-0.5">
+                {(["apps", "categories", "projects"] as ComparisonTab[]).map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setComparisonTab(tab)}
+                    className={[
+                      "px-2 py-1 rounded-md text-xs font-medium transition-colors",
+                      comparisonTab === tab
+                        ? "bg-accent-blue text-white"
+                        : "text-text-secondary hover:text-text-primary",
+                    ].join(" ")}
+                  >
+                    {t(`dashboard:comparisonTab${tab[0].toUpperCase()}${tab.slice(1)}`)}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <span className={comparisonSummary.delta >= 0 ? "text-xs text-accent-red" : "text-xs text-accent-green"}>
               {t("dashboard:whatChangedDelta", {
-                sign: whatChangedSummary.delta >= 0 ? "+" : "-",
-                value: formatDuration(Math.abs(whatChangedSummary.delta)),
+                sign: comparisonSummary.delta >= 0 ? "+" : "-",
+                value: formatDuration(Math.abs(comparisonSummary.delta)),
               })}
             </span>
           </div>
@@ -373,34 +595,34 @@ export default function DashboardInsights() {
             <div className="rounded-xl border border-surface-border bg-surface-hover/40 p-3">
               <p className="text-text-muted">{t("dashboard:whatChangedTopIncrease")}</p>
               <p className="text-text-primary mt-1 font-medium truncate">
-                {whatChangedSummary.topIncrease?.app_name ?? t("dashboard:noDataShort")}
+                {comparisonSummary.topIncreaseName ?? t("dashboard:noDataShort")}
               </p>
               <p className="text-accent-red mt-0.5">
-                {whatChangedSummary.topIncrease ? `+${formatDuration(whatChangedSummary.topIncrease.delta_seconds)}` : "-"}
+                {comparisonSummary.topIncreaseName ? `+${formatDuration(comparisonSummary.topIncreaseDelta)}` : "-"}
               </p>
             </div>
             <div className="rounded-xl border border-surface-border bg-surface-hover/40 p-3">
               <p className="text-text-muted">{t("dashboard:whatChangedTopDecrease")}</p>
               <p className="text-text-primary mt-1 font-medium truncate">
-                {whatChangedSummary.topDecrease?.app_name ?? t("dashboard:noDataShort")}
+                {comparisonSummary.topDecreaseName ?? t("dashboard:noDataShort")}
               </p>
               <p className="text-accent-green mt-0.5">
-                {whatChangedSummary.topDecrease ? `-${formatDuration(Math.abs(whatChangedSummary.topDecrease.delta_seconds))}` : "-"}
+                {comparisonSummary.topDecreaseName ? `-${formatDuration(Math.abs(comparisonSummary.topDecreaseDelta))}` : "-"}
               </p>
             </div>
             <div className="rounded-xl border border-surface-border bg-surface-hover/40 p-3">
               <p className="text-text-muted">{t("dashboard:whatChangedNewApps")}</p>
-              <p className="text-text-primary mt-1 font-medium">{whatChangedSummary.newApps}</p>
+              <p className="text-text-primary mt-1 font-medium">{comparisonSummary.newCount}</p>
             </div>
             <div className="rounded-xl border border-surface-border bg-surface-hover/40 p-3">
               <p className="text-text-muted">{t("dashboard:whatChangedStoppedApps")}</p>
-              <p className="text-text-primary mt-1 font-medium">{whatChangedSummary.stoppedApps}</p>
+              <p className="text-text-primary mt-1 font-medium">{comparisonSummary.stoppedCount}</p>
             </div>
           </div>
           <div className="mt-3 flex items-center gap-2 flex-wrap">
-            {whatChangedSummary.topIncrease && (
+            {topAppIncreaseRow && (
               <button
-                onClick={() => navigate(`/categories?appName=${encodeURIComponent(whatChangedSummary.topIncrease!.app_name)}&exePath=${encodeURIComponent(whatChangedSummary.topIncrease!.exe_path || "")}`)}
+                onClick={() => navigate(`/categories?appName=${encodeURIComponent(topAppIncreaseRow.app_name)}&exePath=${encodeURIComponent(topAppIncreaseRow.exe_path || "")}`)}
                 className="text-xs px-2.5 py-1.5 rounded-lg border border-surface-border text-text-muted hover:text-accent-blue"
               >
                 {t("dashboard:openTopIncreaseCategory")}
@@ -417,6 +639,47 @@ export default function DashboardInsights() {
       ) : (
         <AsyncStateCard variant="empty" title={t("dashboard:noDataShort")} compact />
       )}
+
+      {/* Distraction hotspots */}
+      <div className="glass-card p-5">
+        <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
+          <div>
+            <h3 className="text-sm font-semibold text-text-primary">{t("dashboard:distractionHotspotsTitle")}</h3>
+            <p className="text-xs text-text-muted mt-0.5">{t("dashboard:distractionHotspotsSubtitle")}</p>
+          </div>
+        </div>
+        {hotspotsLoading ? (
+          <AsyncStateCard variant="loading" title={t("common:loading")} compact />
+        ) : hotspots.length === 0 ? (
+          <AsyncStateCard variant="empty" title={t("dashboard:distractionHotspotsEmpty")} compact />
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {hotspots.map((spot, i) => (
+              <div
+                key={`${spot.app_name}-${spot.exe_path || i}`}
+                className="rounded-xl border border-surface-border bg-surface-hover/40 p-3 space-y-1.5"
+              >
+                <p className="text-sm font-medium text-text-primary truncate">{spot.app_name}</p>
+                <div className="grid grid-cols-3 gap-2 text-xs">
+                  <div>
+                    <p className="text-text-muted">{t("dashboard:hotspotSwitchCount")}</p>
+                    <p className="text-text-primary font-medium">{spot.switch_count}</p>
+                  </div>
+                  <div>
+                    <p className="text-text-muted">{t("dashboard:hotspotShortSessionRatio")}</p>
+                    <p className="text-text-primary font-medium">{Math.round(spot.short_session_ratio * 100)}%</p>
+                  </div>
+                  <div>
+                    <p className="text-text-muted">{t("dashboard:hotspotFragmentScore")}</p>
+                    <p className="text-text-primary font-medium">{spot.fragment_score.toFixed(2)}</p>
+                  </div>
+                </div>
+                <p className="text-xs text-text-secondary">{spot.reason}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       <InsightWorkspace selectedDate={selectedDate} periodMode={periodMode} />
       <UnifiedTimeline

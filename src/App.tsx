@@ -4,6 +4,7 @@ import { emit } from "@tauri-apps/api/event";
 import MainApp from "./MainApp";
 import WidgetWindow from "./widgets/WidgetWindow";
 import { useSettingsStore } from "./stores/settingsStore";
+import { AnnouncerProvider } from "@/components/Announcer";
 
 /**
  * Root component. Decides whether to render the main dashboard or a widget,
@@ -59,5 +60,9 @@ export default function App() {
     return <WidgetWindow widgetId={windowLabel} />;
   }
 
-  return <MainApp />;
+  return (
+    <AnnouncerProvider>
+      <MainApp />
+    </AnnouncerProvider>
+  );
 }

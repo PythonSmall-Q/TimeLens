@@ -59,6 +59,8 @@ export default function Sidebar({ onOpenSearch }: Props) {
           onClick={onOpenSearch}
           className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-text-muted
                      border border-surface-border hover:bg-surface-hover hover:text-text-secondary transition-colors"
+          title={t("common:openGlobalSearch")}
+          aria-label={t("common:openGlobalSearch")}
         >
           <Search size={13} />
           <span className="flex-1 text-left">{t("common:search")}</span>
@@ -67,7 +69,7 @@ export default function Sidebar({ onOpenSearch }: Props) {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-3 space-y-1 overflow-y-auto">
+      <nav aria-label={t("common:mainNavigation")} className="flex-1 px-3 py-3 space-y-1 overflow-y-auto">
         {NAV_ITEMS.map(({ to, icon: Icon, labelKey }) => (
           <NavLink
             key={to}

@@ -34,6 +34,61 @@ import zhTWGoals from "./locales/zh-TW/goals.json";
 import zhTWFocus from "./locales/zh-TW/focus.json";
 import zhTWBrowserUsage from "./locales/zh-TW/browserUsage.json";
 
+// JA
+import jaCommon from "./locales/ja/common.json";
+import jaDashboard from "./locales/ja/dashboard.json";
+import jaWidgets from "./locales/ja/widgets.json";
+import jaSettings from "./locales/ja/settings.json";
+import jaLimits from "./locales/ja/limits.json";
+import jaCategories from "./locales/ja/categories.json";
+import jaGoals from "./locales/ja/goals.json";
+import jaFocus from "./locales/ja/focus.json";
+import jaBrowserUsage from "./locales/ja/browserUsage.json";
+
+// KO
+import koCommon from "./locales/ko/common.json";
+import koDashboard from "./locales/ko/dashboard.json";
+import koWidgets from "./locales/ko/widgets.json";
+import koSettings from "./locales/ko/settings.json";
+import koLimits from "./locales/ko/limits.json";
+import koCategories from "./locales/ko/categories.json";
+import koGoals from "./locales/ko/goals.json";
+import koFocus from "./locales/ko/focus.json";
+import koBrowserUsage from "./locales/ko/browserUsage.json";
+
+// FR
+import frCommon from "./locales/fr/common.json";
+import frDashboard from "./locales/fr/dashboard.json";
+import frWidgets from "./locales/fr/widgets.json";
+import frSettings from "./locales/fr/settings.json";
+import frLimits from "./locales/fr/limits.json";
+import frCategories from "./locales/fr/categories.json";
+import frGoals from "./locales/fr/goals.json";
+import frFocus from "./locales/fr/focus.json";
+import frBrowserUsage from "./locales/fr/browserUsage.json";
+
+// DE
+import deCommon from "./locales/de/common.json";
+import deDashboard from "./locales/de/dashboard.json";
+import deWidgets from "./locales/de/widgets.json";
+import deSettings from "./locales/de/settings.json";
+import deLimits from "./locales/de/limits.json";
+import deCategories from "./locales/de/categories.json";
+import deGoals from "./locales/de/goals.json";
+import deFocus from "./locales/de/focus.json";
+import deBrowserUsage from "./locales/de/browserUsage.json";
+
+// ES
+import esCommon from "./locales/es/common.json";
+import esDashboard from "./locales/es/dashboard.json";
+import esWidgets from "./locales/es/widgets.json";
+import esSettings from "./locales/es/settings.json";
+import esLimits from "./locales/es/limits.json";
+import esCategories from "./locales/es/categories.json";
+import esGoals from "./locales/es/goals.json";
+import esFocus from "./locales/es/focus.json";
+import esBrowserUsage from "./locales/es/browserUsage.json";
+
 /**
  * To add a new language:
  * 1. Create src/i18n/locales/<lang-code>/ directory
@@ -117,59 +172,59 @@ i18n
         browserUsage: zhTWBrowserUsage,
       },
       ja: {
-        common: enCommon,
-        dashboard: enDashboard,
-        widgets: enWidgets,
-        settings: enSettings,
-        limits: enLimits,
-        categories: enCategories,
-        goals: enGoals,
-        focus: enFocus,
-        browserUsage: enBrowserUsage,
+        common: jaCommon,
+        dashboard: jaDashboard,
+        widgets: jaWidgets,
+        settings: jaSettings,
+        limits: jaLimits,
+        categories: jaCategories,
+        goals: jaGoals,
+        focus: jaFocus,
+        browserUsage: jaBrowserUsage,
       },
       ko: {
-        common: enCommon,
-        dashboard: enDashboard,
-        widgets: enWidgets,
-        settings: enSettings,
-        limits: enLimits,
-        categories: enCategories,
-        goals: enGoals,
-        focus: enFocus,
-        browserUsage: enBrowserUsage,
+        common: koCommon,
+        dashboard: koDashboard,
+        widgets: koWidgets,
+        settings: koSettings,
+        limits: koLimits,
+        categories: koCategories,
+        goals: koGoals,
+        focus: koFocus,
+        browserUsage: koBrowserUsage,
       },
       fr: {
-        common: enCommon,
-        dashboard: enDashboard,
-        widgets: enWidgets,
-        settings: enSettings,
-        limits: enLimits,
-        categories: enCategories,
-        goals: enGoals,
-        focus: enFocus,
-        browserUsage: enBrowserUsage,
+        common: frCommon,
+        dashboard: frDashboard,
+        widgets: frWidgets,
+        settings: frSettings,
+        limits: frLimits,
+        categories: frCategories,
+        goals: frGoals,
+        focus: frFocus,
+        browserUsage: frBrowserUsage,
       },
       de: {
-        common: enCommon,
-        dashboard: enDashboard,
-        widgets: enWidgets,
-        settings: enSettings,
-        limits: enLimits,
-        categories: enCategories,
-        goals: enGoals,
-        focus: enFocus,
-        browserUsage: enBrowserUsage,
+        common: deCommon,
+        dashboard: deDashboard,
+        widgets: deWidgets,
+        settings: deSettings,
+        limits: deLimits,
+        categories: deCategories,
+        goals: deGoals,
+        focus: deFocus,
+        browserUsage: deBrowserUsage,
       },
       es: {
-        common: enCommon,
-        dashboard: enDashboard,
-        widgets: enWidgets,
-        settings: enSettings,
-        limits: enLimits,
-        categories: enCategories,
-        goals: enGoals,
-        focus: enFocus,
-        browserUsage: enBrowserUsage,
+        common: esCommon,
+        dashboard: esDashboard,
+        widgets: esWidgets,
+        settings: esSettings,
+        limits: esLimits,
+        categories: esCategories,
+        goals: esGoals,
+        focus: esFocus,
+        browserUsage: esBrowserUsage,
       },
     },
     lng: resolveInitialLanguage(),

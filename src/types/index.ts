@@ -129,7 +129,7 @@ export interface WidgetRegistryItem {
   default_width: number;
   default_height: number;
   permissions: string[];
-  manifest_version: number;
+  manifest_version: string;
   capabilities: string[];
   sdk_version?: string | null;
   csp?: string | null;
@@ -264,6 +264,17 @@ export interface BackupBundleCounts {
   widget_configs: number;
   ignored_apps: number;
   app_settings: number;
+  app_categories?: number;
+  usage_goals?: number;
+  focus_sessions?: number;
+  focus_rules?: number;
+  browser_ignored_domains?: number;
+  browser_domain_limits?: number;
+  widget_permissions?: number;
+  widget_permission_audit_log?: number;
+  vscode_sessions?: number;
+  api_tokens?: number;
+  api_client_allowlist?: number;
 }
 
 export interface BackupManifest {
@@ -274,6 +285,7 @@ export interface BackupManifest {
   created_at: string;
   checksum: string;
   counts: BackupBundleCounts;
+  encrypted?: boolean;
 }
 
 export interface DataHealthIssue {
@@ -308,11 +320,25 @@ export interface RepairAssistantResult {
   rebuilt_daily_rows: number;
 }
 
+export interface TableDiffCounts {
+  backup_rows: number;
+  current_rows: number;
+  to_add: number;
+  to_update: number;
+  conflicts: number;
+}
+
+export interface BackupDiffSummary {
+  table_counts: Record<string, TableDiffCounts>;
+  settings_conflicts: string[];
+}
+
 export interface BackupPreview {
   manifest: BackupManifest;
   compatible: boolean;
   supported_strategies: Array<"overwrite" | "merge" | "new_profile">;
   warnings: string[];
+  diff?: BackupDiffSummary;
 }
 
 export interface BackupApplyResult {
@@ -320,6 +346,7 @@ export interface BackupApplyResult {
   strategy: "overwrite" | "merge" | "new_profile";
   imported_rows: number;
   warnings: string[];
+  new_profile_id?: string | null;
 }
 
 export interface RetentionPolicyInfo {
@@ -335,6 +362,8 @@ export interface RetentionRunResult {
   cutoff_date: string | null;
   archived_app_usage_rows: number;
   archived_daily_rows: number;
+  warm_rows?: number;
+  archive_rows?: number;
 }
 
 export interface TrackingFieldInfo {
@@ -502,4 +531,128 @@ export interface LocalApiSecuritySettings {
   token_required: boolean;
   allowlist_enforced: boolean;
   rate_limit_per_min: number;
+}
+
+// ── v2.0.0 data reliability extensions ─────────────────────────
+
+export interface DataIntegrityResult {
+  integrity_ok: boolean;
+  foreign_key_ok: boolean;
+  index_ok: boolean;
+  integrity_message: string;
+  foreign_key_message: string;
+}
+
+export interface DataGapResult {
+  missing_days: string[];
+  zero_usage_days: string[];
+  earliest_date: string | null;
+  latest_date: string | null;
+}
+
+export interface OrphanRowResult {
+  table: string;
+  description: string;
+  count: number;
+}
+
+export interface MigrationLogEntry {
+  version: number;
+  name: string;
+  applied_at: string;
+}
+
+export interface MigrationRehearsalReport {
+  source_path: string;
+  temp_path: string;
+  start_version: number;
+  end_version: number;
+  success: boolean;
+  error: string | null;
+  migration_log: MigrationLogEntry[];
+  integrity_check: string;
+}
+
+export interface MigrationStatus {
+  current_version: number;
+  latest_version: number;
+  pending: number;
+  is_bootstrapped: boolean;
+}
+
+export interface ArchiveSchedulerSettings {
+  enabled: boolean;
+  daily_run_hour: number;
+  run_on_battery: boolean;
+}
+
+export interface CompressionResult {
+  compressed_groups: number;
+  original_rows: number;
+  saved_bytes: number;
+}
+
+export interface ProfileInfo {
+  id: string;
+  name: string;
+  is_current: boolean;
+  is_default: boolean;
+  created_at: string;
+}
+
+export interface EncryptionStatus {
+  enabled: boolean;
+}
+
+// ── Phase 4: intelligence + focus rules ───────────────────────
+
+export interface DistractionHotspot {
+  app_name: string;
+  exe_path: string;
+  switch_count: number;
+  short_session_ratio: number;
+  fragment_score: number;
+  reason: string;
+}
+
+export interface CategoryComparison {
+  category: string;
+  current_seconds: number;
+  previous_seconds: number;
+  delta_seconds: number;
+  delta_ratio: number;
+}
+
+export interface ProjectComparison {
+  project_name: string;
+  project_path: string;
+  current_seconds: number;
+  previous_seconds: number;
+  delta_seconds: number;
+  delta_ratio: number;
+}
+
+export interface GoalRiskAlert {
+  goal_id: number;
+  scope_value: string;
+  message: string;
+  severity: "info" | "warning" | "critical" | string;
+}
+
+export interface FocusRule {
+  id?: number;
+  name: string;
+  enabled: boolean;
+  rule_type: "keyword" | "time_window" | "app";
+  condition_json: string;
+  action: "enter_focus" | "leave_focus";
+  auto_start: boolean;
+  quiet_hours_respect: boolean;
+}
+
+export interface FocusRuleMatch {
+  rule_id: number;
+  matched: boolean;
+  reason: string;
+  action?: "enter_focus" | "leave_focus" | string;
 }

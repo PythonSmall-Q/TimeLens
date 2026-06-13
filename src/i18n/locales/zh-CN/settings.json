@@ -118,7 +118,28 @@
     "actionCount": "修复步骤",
     "repairing": "修复中...",
     "repairFailed": "修复失败",
-    "repairTimeout": "修复超时，请重试"
+    "repairTimeout": "修复超时，请重试",
+    "advancedChecks": "高级检查",
+    "checkIntegrity": "检查完整性",
+    "scanGaps": "扫描缺失",
+    "checkOrphanRows": "检查孤立行",
+    "foreignKeys": "外键",
+    "earliestDate": "最早日期：{{date}}",
+    "latestDate": "最新日期：{{date}}",
+    "missingDays": "缺失天数：{{count}}",
+    "zeroUsageDays": "零使用天数：{{count}}",
+    "noOrphans": "未发现孤立行",
+    "migrationStatus": "迁移状态",
+    "currentVersion": "当前版本",
+    "latestVersion": "最新版本",
+    "pendingMigrations": "待处理",
+    "rehearsing": "预演中...",
+    "runRehearsal": "运行迁移预演",
+    "rehearsalSuccess": "预演成功（{{from}} → {{to}}）",
+    "rehearsalFailed": "预演失败",
+    "rehearsalIntegrity": "完整性检查：{{result}}",
+    "rehearsalLog": "已应用的迁移",
+    "actionFailed": "数据健康操作失败"
   },
   "backup": {
     "title": "备份与恢复 v2",
@@ -144,7 +165,20 @@
     "previewSchema": "Schema：{{schema}}",
     "previewCounts": "记录 {{appUsage}}，待办 {{todos}}，小组件 {{widgets}}",
     "previewChecksum": "校验和 {{checksum}}...",
-    "none": "无"
+    "none": "无",
+    "passphrase": "密码短语",
+    "encryptExport": "加密导出",
+    "passphraseRequired": "此备份需要密码短语",
+    "passphraseRequiredForExport": "请输入密码短语以加密导出",
+    "encrypted": "已加密备份",
+    "diffTitle": "差异摘要",
+    "diffBackupRows": "备份：{{count}}",
+    "diffCurrentRows": "当前：{{count}}",
+    "diffToAdd": "+{{count}} 待添加",
+    "diffToUpdate": "{{count}} 待更新",
+    "diffConflicts": "{{count}} 冲突",
+    "diffSettingsConflicts": "设置冲突",
+    "applySuccessProfile": "已恢复到新配置 '{{profile}}'"
   },
   "retention": {
     "title": "数据保留策略",
@@ -160,7 +194,19 @@
     "running": "归档中...",
     "lastRunPolicy": "最近执行策略：{{policy}}",
     "lastRunAppRows": "归档使用记录：{{count}}",
-    "lastRunDailyRows": "归档日汇总：{{count}}"
+    "lastRunDailyRows": "归档日汇总：{{count}}",
+    "warmRows": "温热行：{{count}}",
+    "archiveRows": "归档行：{{count}}",
+    "schedulerTitle": "归档调度器",
+    "schedulerEnabled": "已启用",
+    "schedulerHour": "每日运行小时",
+    "schedulerRunOnBattery": "电池时运行",
+    "schedulerSaveFailed": "保存调度设置失败",
+    "compressTitle": "压缩旧归档",
+    "compressAction": "压缩早于",
+    "compressing": "压缩中...",
+    "compressResult": "已压缩 {{groups}} 组（{{rows}} 行），节省 {{saved}}",
+    "compressFailed": "压缩失败"
   },
   "transparency": {
     "title": "追踪透明面板",
@@ -249,7 +295,9 @@
     "openApiSecurity": "打开 API 安全",
     "openBackup": "打开备份恢复",
     "openDataHealth": "打开数据健康",
-    "refresh": "刷新全部面板"
+    "refresh": "刷新全部面板",
+    "openProfiles": "打开配置",
+    "openEncryption": "打开加密"
   },
   "about": {
     "title": "关于",
@@ -265,5 +313,39 @@
     "viewRelease": "查看发布说明"
   },
   "saved": "设置已保存",
-  "addLanguageHint": "如需添加新语言，请参阅 docs/ADD_LANGUAGE.md"
+  "addLanguageHint": "如需添加新语言，请参阅 docs/ADD_LANGUAGE.md",
+  "profiles": {
+    "title": "配置文件",
+    "current": "当前配置：{{profile}}",
+    "listTitle": "配置文件列表",
+    "default": "默认",
+    "switch": "切换",
+    "noProfiles": "未找到配置文件",
+    "create": "创建配置",
+    "createTitle": "创建新配置",
+    "createPlaceholder": "配置名称",
+    "cancel": "取消",
+    "creating": "创建中...",
+    "createConfirm": "创建",
+    "switchConfirm": "切换到配置 '{{profile}}' 将重启 TimeLens。是否继续？",
+    "switchFailed": "切换配置失败",
+    "createFailed": "创建配置失败"
+  },
+  "encryption": {
+    "title": "数据库加密",
+    "status": "加密状态",
+    "enabled": "已启用",
+    "disabled": "已禁用",
+    "restartWarning": "操作影响",
+    "restartRequired": "应用将重启",
+    "passphrase": "密码短语",
+    "passphraseRequired": "需要密码短语",
+    "enable": "启用加密",
+    "disable": "禁用加密",
+    "working": "应用中...",
+    "enableConfirm": "启用加密将重启 TimeLens。请确保记住密码短语。是否继续？",
+    "disableConfirm": "禁用加密将重启 TimeLens。是否继续？",
+    "enableFailed": "启用加密失败",
+    "disableFailed": "禁用加密失败"
+  }
 }

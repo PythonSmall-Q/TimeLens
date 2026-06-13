@@ -16,6 +16,7 @@ const PERMISSION_KEYS: Record<string, string> = {
   "todo:read": "permissionTodoRead",
   "todo:write": "permissionTodoWrite",
   "settings:write": "permissionSettingsWrite",
+  "local-api:call": "permissionLocalApi",
 };
 
 export default function WidgetPermissionDialog({

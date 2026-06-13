@@ -1,0 +1,24 @@
+{
+  "title": "アプリカテゴリ",
+  "subtitle": "アプリにカテゴリタグを付けて、アクティビティタイプ別に分析",
+  "addRule": "アプリカテゴリを追加",
+  "exePlaceholder": "最近のアプリを選択…",
+  "categoryLabel": "カテゴリ",
+  "drilldownHint": "{{app}} のドリルダウンコンテキストが検出されました。そのカテゴリルールを直接追加または調整できます。",
+  "noRules": "カテゴリルールはまだありません。上からアプリを追加してください。",
+  "suggestedCategory": "提案: {{cat}} — クリックして適用",
+  "applySuggestion": "提案されたカテゴリを適用",
+  "presets": {
+    "Work": "仕事",
+    "Social": "ソーシャル",
+    "Entertainment": "エンタメ",
+    "Development": "開発",
+    "Productivity": "生産性",
+    "Education": "学習",
+    "Gaming": "ゲーム",
+    "Browsing": "ブラウジング",
+    "Communication": "コミュニケーション",
+    "System": "システム",
+    "uncategorized": "未分類"
+  }
+}

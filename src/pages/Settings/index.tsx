@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSettingsStore } from "@/stores/settingsStore";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
-import { Moon, Sun, Activity, Database, Info, Rocket, Keyboard, PanelsTopLeft, ArrowLeft, Search, Lock, Copy, RotateCw } from "lucide-react";
+import { Moon, Sun, Activity, Database, Info, Rocket, Keyboard, PanelsTopLeft, ArrowLeft, Search, Lock, Copy, RotateCw, User, Shield } from "lucide-react";
 import clsx from "clsx";
 import * as api from "@/services/tauriApi";
 import { APP_VERSION } from "../../version";
@@ -11,6 +11,15 @@ import type {
   ApiTokenMetadata,
   BackupPreview,
   DataHealthSummary,
+  DataIntegrityResult,
+  DataGapResult,
+  OrphanRowResult,
+  MigrationRehearsalReport,
+  MigrationStatus,
+  ArchiveSchedulerSettings,
+  CompressionResult,
+  ProfileInfo,
+  EncryptionStatus,
   ExecutableOption,
   InstallChannelInfo,
   LocalApiSecuritySettings,
@@ -21,6 +30,7 @@ import type {
   TrackingTransparencyReport,
 } from "@/types";
 import ExePickerInput from "@/components/ExePickerInput";
+import { useAnnouncer } from "@/hooks/useAnnouncer";
 
 function Section({
   icon: Icon,
@@ -55,6 +65,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 
 export default function Settings() {
   const { t } = useTranslation(["settings", "common"]);
+  const announce = useAnnouncer();
   const importJsonInputRef = useRef<HTMLInputElement | null>(null);
   const [launchAtStartup, setLaunchAtStartup] = useState(false);
   const [silentStartup, setSilentStartup] = useState(true);
@@ -65,7 +76,7 @@ export default function Settings() {
   const [repairPreview, setRepairPreview] = useState<RepairAssistantResult | null>(null);
   const [backupPreview, setBackupPreview] = useState<BackupPreview | null>(null);
   const [backupPackagePath, setBackupPackagePath] = useState<string | null>(null);
-  const [backupStrategy, setBackupStrategy] = useState<"overwrite" | "merge">("overwrite");
+  const [backupStrategy, setBackupStrategy] = useState<"overwrite" | "merge" | "new_profile">("overwrite");
   const [retentionInfo, setRetentionInfo] = useState<RetentionPolicyInfo | null>(null);
   const [trackingTransparency, setTrackingTransparency] = useState<TrackingTransparencyReport | null>(null);
   const [repairing, setRepairing] = useState(false);
@@ -85,6 +96,8 @@ export default function Settings() {
     | "dataHealth"
     | "backup"
     | "retention"
+    | "profiles"
+    | "encryption"
     | "transparency"
     | "extensionBridge"
     | "about"
@@ -114,6 +127,12 @@ export default function Settings() {
   const [trayIconStyle, setTrayIconStyleState] = useState<"auto" | "color" | "black" | "white">("auto");
   const [backupBusy, setBackupBusy] = useState<"export" | "validate" | "apply" | "import" | null>(null);
   const [backupMessage, setBackupMessage] = useState<{ type: "success" | "error" | "info"; text: string } | null>(null);
+
+  useEffect(() => {
+    if (backupMessage?.text) {
+      announce(backupMessage.text);
+    }
+  }, [backupMessage, announce]);
   const [retentionRunning, setRetentionRunning] = useState(false);
   const [retentionRunResult, setRetentionRunResult] = useState<RetentionRunResult | null>(null);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
@@ -124,6 +143,43 @@ export default function Settings() {
     start_recording: "Alt+R",
     pause_recording: "Alt+P",
   });
+
+  // v2.0.0 data health state
+  const [integrityResult, setIntegrityResult] = useState<DataIntegrityResult | null>(null);
+  const [gapResult, setGapResult] = useState<DataGapResult | null>(null);
+  const [orphanRows, setOrphanRows] = useState<OrphanRowResult[] | null>(null);
+  const [migrationRehearsal, setMigrationRehearsal] = useState<MigrationRehearsalReport | null>(null);
+  const [migrationStatus, setMigrationStatus] = useState<MigrationStatus | null>(null);
+  const [migrationBusy, setMigrationBusy] = useState(false);
+  const [dataHealthActionError, setDataHealthActionError] = useState<string | null>(null);
+
+  // v2.0.0 backup state
+  const [backupPassphrase, setBackupPassphrase] = useState("");
+  const [encryptExport, setEncryptExport] = useState(false);
+  const [backupNeedsPassphrase, setBackupNeedsPassphrase] = useState(false);
+
+  // v2.0.0 retention/archive state
+  const [archiveSchedulerSettings, setArchiveSchedulerSettingsState] = useState<ArchiveSchedulerSettings>({
+    enabled: false,
+    daily_run_hour: 2,
+    run_on_battery: true,
+  });
+  const [archiveSettingsLoading, setArchiveSettingsLoading] = useState(false);
+  const [compressionResult, setCompressionResult] = useState<CompressionResult | null>(null);
+  const [compressDays, setCompressDays] = useState(30);
+  const [compressBusy, setCompressBusy] = useState(false);
+
+  // v2.0.0 profiles state
+  const [profiles, setProfiles] = useState<ProfileInfo[]>([]);
+  const [currentProfile, setCurrentProfile] = useState<string>("default");
+  const [profileDialogOpen, setProfileDialogOpen] = useState(false);
+  const [newProfileName, setNewProfileName] = useState("");
+  const [profilesBusy, setProfilesBusy] = useState(false);
+
+  // v2.0.0 encryption state
+  const [encryptionStatus, setEncryptionStatus] = useState<EncryptionStatus | null>(null);
+  const [encryptionPassphrase, setEncryptionPassphrase] = useState("");
+  const [encryptionBusy, setEncryptionBusy] = useState(false);
 
   const {
     theme,
@@ -208,6 +264,27 @@ export default function Settings() {
 
     api.getTrackingTransparency()
       .then(setTrackingTransparency)
+      .catch(() => {});
+
+    // v2.0.0 initial loads
+    api.getMigrationStatus()
+      .then(setMigrationStatus)
+      .catch(() => {});
+
+    api.getArchiveSchedulerSettings()
+      .then(setArchiveSchedulerSettingsState)
+      .catch(() => {});
+
+    api.listProfiles()
+      .then(setProfiles)
+      .catch(() => {});
+
+    api.getCurrentProfile()
+      .then(setCurrentProfile)
+      .catch(() => {});
+
+    api.getDatabaseEncryptionStatus()
+      .then(setEncryptionStatus)
       .catch(() => {});
 
     const mergeOptions = (incoming: ExecutableOption[]) => {
@@ -299,14 +376,18 @@ export default function Settings() {
 
   const refreshReliabilityPanels = async () => {
     try {
-      const [health, retention, transparency] = await Promise.all([
+      const [health, retention, transparency, migration, archiveSettings] = await Promise.all([
         api.getDataHealthSummary(),
         api.getRetentionPolicyInfo(),
         api.getTrackingTransparency(),
+        api.getMigrationStatus(),
+        api.getArchiveSchedulerSettings(),
       ]);
       setDataHealth(health);
       setRetentionInfo(retention);
       setTrackingTransparency(transparency);
+      setMigrationStatus(migration);
+      setArchiveSchedulerSettingsState(archiveSettings);
     } catch {
       // keep silent to preserve current settings behavior
     }
@@ -455,21 +536,35 @@ export default function Settings() {
     }
   };
 
+  const importPassphrase = (): string | undefined => {
+    const pass = backupPassphrase.trim();
+    return pass.length > 0 ? pass : undefined;
+  };
+
+  const handleBackupError = (error: unknown) => {
+    const text = error instanceof Error ? error.message : t("backup.failed");
+    if (text.toLowerCase().includes("passphrase")) {
+      setBackupNeedsPassphrase(true);
+    }
+    setBackupMessage({ type: "error", text });
+  };
+
   const validateBackupPackage = async () => {
     const path = await openBackupPackage();
     if (!path) return;
     setBackupBusy("validate");
     setBackupMessage(null);
+    setBackupNeedsPassphrase(false);
     try {
       setBackupPackagePath(path);
-      const preview = await api.importBackupV2Validate(path);
+      const preview = await api.importBackupV2Validate(path, importPassphrase());
       setBackupPreview(preview);
+      if (preview.manifest.encrypted) {
+        setBackupNeedsPassphrase(true);
+      }
       setBackupMessage({ type: "info", text: t("backup.validated") });
     } catch (error) {
-      setBackupMessage({
-        type: "error",
-        text: error instanceof Error ? error.message : t("backup.failed"),
-      });
+      handleBackupError(error);
     } finally {
       setBackupBusy(null);
     }
@@ -482,23 +577,25 @@ export default function Settings() {
     setBackupMessage(null);
     try {
       setBackupPackagePath(path);
-      const result = await api.importBackupV2Apply(path, backupStrategy);
+      const isEncrypted = backupPreview?.manifest.encrypted ?? false;
+      if (isEncrypted && !backupPassphrase) {
+        throw new Error(t("backup.passphraseRequired"));
+      }
+      const result = await api.importBackupV2Apply(path, backupStrategy, importPassphrase());
       setBackupPreview({
         manifest: result.manifest,
         compatible: true,
-        supported_strategies: ["overwrite", "merge"],
+        supported_strategies: ["overwrite", "merge", "new_profile"],
         warnings: result.warnings,
       });
-      setBackupMessage({
-        type: "success",
-        text: t("backup.applySuccess", { count: result.imported_rows }),
-      });
+      const successText = result.new_profile_id
+        ? t("backup.applySuccessProfile", { profile: result.new_profile_id })
+        : t("backup.applySuccess", { count: result.imported_rows });
+      setBackupMessage({ type: "success", text: successText });
+      setBackupNeedsPassphrase(false);
       await refreshReliabilityPanels();
     } catch (error) {
-      setBackupMessage({
-        type: "error",
-        text: error instanceof Error ? error.message : t("backup.failed"),
-      });
+      handleBackupError(error);
     } finally {
       setBackupBusy(null);
     }
@@ -510,26 +607,27 @@ export default function Settings() {
     setBackupPackagePath(path);
     setBackupBusy("import");
     setBackupMessage(null);
+    setBackupNeedsPassphrase(false);
     try {
-      const preview = await api.importBackupV2Validate(path);
+      const preview = await api.importBackupV2Validate(path, importPassphrase());
       setBackupPreview(preview);
-      const result = await api.importBackupV2Apply(path, backupStrategy);
+      if (preview.manifest.encrypted && !backupPassphrase) {
+        throw new Error(t("backup.passphraseRequired"));
+      }
+      const result = await api.importBackupV2Apply(path, backupStrategy, importPassphrase());
       setBackupPreview({
         manifest: result.manifest,
         compatible: true,
-        supported_strategies: ["overwrite", "merge"],
+        supported_strategies: ["overwrite", "merge", "new_profile"],
         warnings: result.warnings,
       });
-      setBackupMessage({
-        type: "success",
-        text: t("backup.applySuccess", { count: result.imported_rows }),
-      });
+      const successText = result.new_profile_id
+        ? t("backup.applySuccessProfile", { profile: result.new_profile_id })
+        : t("backup.applySuccess", { count: result.imported_rows });
+      setBackupMessage({ type: "success", text: successText });
       await refreshReliabilityPanels();
     } catch (error) {
-      setBackupMessage({
-        type: "error",
-        text: error instanceof Error ? error.message : t("backup.failed"),
-      });
+      handleBackupError(error);
     } finally {
       setBackupBusy(null);
     }
@@ -538,24 +636,26 @@ export default function Settings() {
   const exportBackupPackage = async () => {
     const path = await saveBackupPackage();
     if (!path) return;
+    if (encryptExport && !backupPassphrase) {
+      setBackupMessage({ type: "error", text: t("backup.passphraseRequiredForExport") });
+      return;
+    }
     setBackupBusy("export");
     setBackupMessage(null);
     try {
-      const manifest = await api.exportBackupV2(path);
+      const passphrase = encryptExport ? backupPassphrase : undefined;
+      const manifest = await api.exportBackupV2(path, passphrase);
       setBackupPackagePath(path);
       setBackupPreview({
         manifest,
         compatible: true,
-        supported_strategies: ["overwrite", "merge"],
+        supported_strategies: ["overwrite", "merge", "new_profile"],
         warnings: [],
       });
       setBackupMessage({ type: "success", text: t("backup.exportSuccess") });
       await refreshReliabilityPanels();
     } catch (error) {
-      setBackupMessage({
-        type: "error",
-        text: error instanceof Error ? error.message : t("backup.failed"),
-      });
+      handleBackupError(error);
     } finally {
       setBackupBusy(null);
     }
@@ -597,6 +697,168 @@ export default function Settings() {
     }
   };
 
+  // v2.0.0 data health actions
+  const runCheckDataIntegrity = async () => {
+    setDataHealthActionError(null);
+    try {
+      const result = await api.checkDataIntegrity();
+      setIntegrityResult(result);
+    } catch (error) {
+      setDataHealthActionError(error instanceof Error ? error.message : t("dataHealth.actionFailed"));
+    }
+  };
+
+  const runScanDataGaps = async () => {
+    setDataHealthActionError(null);
+    try {
+      const result = await api.scanDataGaps();
+      setGapResult(result);
+    } catch (error) {
+      setDataHealthActionError(error instanceof Error ? error.message : t("dataHealth.actionFailed"));
+    }
+  };
+
+  const runCheckOrphanRows = async () => {
+    setDataHealthActionError(null);
+    try {
+      const result = await api.checkOrphanRows();
+      setOrphanRows(result);
+    } catch (error) {
+      setDataHealthActionError(error instanceof Error ? error.message : t("dataHealth.actionFailed"));
+    }
+  };
+
+  const runMigrationRehearsalNow = async () => {
+    setMigrationBusy(true);
+    setDataHealthActionError(null);
+    try {
+      const report = await api.runMigrationRehearsal();
+      setMigrationRehearsal(report);
+    } catch (error) {
+      setDataHealthActionError(error instanceof Error ? error.message : t("dataHealth.rehearsalFailed"));
+    } finally {
+      setMigrationBusy(false);
+    }
+  };
+
+  const refreshMigrationStatusNow = async () => {
+    try {
+      const status = await api.getMigrationStatus();
+      setMigrationStatus(status);
+    } catch {
+      // keep silent
+    }
+  };
+
+  // v2.0.0 archive scheduler
+  const saveArchiveSchedulerSettings = async (patch: Partial<ArchiveSchedulerSettings>) => {
+    const next = { ...archiveSchedulerSettings, ...patch };
+    setArchiveSchedulerSettingsState(next);
+    setArchiveSettingsLoading(true);
+    try {
+      await api.setArchiveSchedulerSettings(next);
+    } catch (error) {
+      setDataHealthActionError(error instanceof Error ? error.message : t("retention.schedulerSaveFailed"));
+    } finally {
+      setArchiveSettingsLoading(false);
+    }
+  };
+
+  const runCompressArchives = async () => {
+    setCompressBusy(true);
+    setDataHealthActionError(null);
+    try {
+      const result = await api.compressArchiveOlderThanDays(compressDays);
+      setCompressionResult(result);
+    } catch (error) {
+      setDataHealthActionError(error instanceof Error ? error.message : t("retention.compressFailed"));
+    } finally {
+      setCompressBusy(false);
+    }
+  };
+
+  // v2.0.0 profiles
+  const refreshProfiles = async () => {
+    try {
+      const [list, current] = await Promise.all([api.listProfiles(), api.getCurrentProfile()]);
+      setProfiles(list);
+      setCurrentProfile(current);
+    } catch {
+      // keep silent
+    }
+  };
+
+  const handleSwitchProfile = async (profileId: string) => {
+    if (!window.confirm(t("profiles.switchConfirm", { profile: profileId }))) return;
+    setProfilesBusy(true);
+    try {
+      await api.switchProfile(profileId);
+    } catch (error) {
+      setDataHealthActionError(error instanceof Error ? error.message : t("profiles.switchFailed"));
+      setProfilesBusy(false);
+    }
+  };
+
+  const handleCreateProfile = async () => {
+    const name = newProfileName.trim();
+    if (!name) return;
+    setProfilesBusy(true);
+    try {
+      await api.createProfile(name);
+      setNewProfileName("");
+      setProfileDialogOpen(false);
+      await refreshProfiles();
+    } catch (error) {
+      setDataHealthActionError(error instanceof Error ? error.message : t("profiles.createFailed"));
+    } finally {
+      setProfilesBusy(false);
+    }
+  };
+
+  // v2.0.0 encryption
+  const refreshEncryptionStatus = async () => {
+    try {
+      const status = await api.getDatabaseEncryptionStatus();
+      setEncryptionStatus(status);
+    } catch {
+      // keep silent
+    }
+  };
+
+  const handleEnableEncryption = async () => {
+    const pass = encryptionPassphrase.trim();
+    if (!pass) {
+      setDataHealthActionError(t("encryption.passphraseRequired"));
+      return;
+    }
+    if (!window.confirm(t("encryption.enableConfirm"))) return;
+    setEncryptionBusy(true);
+    setDataHealthActionError(null);
+    try {
+      await api.enableDatabaseEncryption(pass);
+    } catch (error) {
+      setDataHealthActionError(error instanceof Error ? error.message : t("encryption.enableFailed"));
+      setEncryptionBusy(false);
+    }
+  };
+
+  const handleDisableEncryption = async () => {
+    const pass = encryptionPassphrase.trim();
+    if (!pass) {
+      setDataHealthActionError(t("encryption.passphraseRequired"));
+      return;
+    }
+    if (!window.confirm(t("encryption.disableConfirm"))) return;
+    setEncryptionBusy(true);
+    setDataHealthActionError(null);
+    try {
+      await api.disableDatabaseEncryption(pass);
+    } catch (error) {
+      setDataHealthActionError(error instanceof Error ? error.message : t("encryption.disableFailed"));
+      setEncryptionBusy(false);
+    }
+  };
+
   const showWindowsStartupSettings = installChannelInfo?.platform === "windows";
   const showStartupSettings =
     installChannelInfo?.platform === "windows" || installChannelInfo?.platform === "macos";
@@ -619,6 +881,8 @@ export default function Settings() {
     { key: "dataHealth", title: t("dataHealth.title"), icon: Database, keywords: [t("dataHealth.integrity"), t("dataHealth.applyRepair")] },
     { key: "backup", title: t("backup.title"), icon: Database, keywords: [t("backup.exportAction"), t("backup.applyAction")] },
     { key: "retention", title: t("retention.title"), icon: Rocket, keywords: [t("retention.current"), t("retention.runNow")] },
+    { key: "profiles", title: t("profiles.title"), icon: User, keywords: [t("profiles.current"), t("profiles.switch")] },
+    { key: "encryption", title: t("encryption.title"), icon: Shield, keywords: [t("encryption.status"), t("encryption.enable")] },
     { key: "transparency", title: t("transparency.title"), icon: Info, keywords: [t("transparency.active"), t("transparency.fields")] },
     { key: "extensionBridge", title: t("extensionBridge.title"), icon: Lock, keywords: [t("extensionBridge.key"), "bridge", "extension"] },
     { key: "about", title: t("about.title"), icon: Info, keywords: [t("about.version"), "github"] },
@@ -822,9 +1086,23 @@ export default function Settings() {
               {t("privacyCenter.openDataHealth")}
             </button>
             <button
+              onClick={() => setActiveSection("profiles")}
+              className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
+            >
+              {t("privacyCenter.openProfiles")}
+            </button>
+            <button
+              onClick={() => setActiveSection("encryption")}
+              className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
+            >
+              {t("privacyCenter.openEncryption")}
+            </button>
+            <button
               onClick={() => {
                 void refreshReliabilityPanels();
                 void refreshApiGovernancePanels();
+                void refreshProfiles();
+                void refreshEncryptionStatus();
               }}
               className="text-xs px-3 py-1.5 rounded-lg border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
             >
@@ -1370,6 +1648,143 @@ export default function Settings() {
             ))}
           </div>
         )}
+
+        <div className="space-y-2">
+          <p className="text-xs text-text-secondary">{t("dataHealth.advancedChecks")}</p>
+          <div className="flex flex-wrap justify-end gap-2">
+            <button
+              onClick={runCheckDataIntegrity}
+              disabled={repairing}
+              className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
+            >
+              {t("dataHealth.checkIntegrity")}
+            </button>
+            <button
+              onClick={runScanDataGaps}
+              disabled={repairing}
+              className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
+            >
+              {t("dataHealth.scanGaps")}
+            </button>
+            <button
+              onClick={runCheckOrphanRows}
+              disabled={repairing}
+              className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
+            >
+              {t("dataHealth.checkOrphanRows")}
+            </button>
+          </div>
+          {integrityResult && (
+            <div className="grid gap-2 sm:grid-cols-3 text-xs text-text-muted">
+              <div className="rounded-md border border-surface-border px-2 py-1.5">
+                <p className="text-[11px] text-text-muted">{t("dataHealth.integrity")}</p>
+                <p className={clsx("font-medium", integrityResult.integrity_ok ? "text-accent-green" : "text-red-300")}>
+                  {integrityResult.integrity_ok ? t("dataHealth.ok") : t("dataHealth.fail")}
+                </p>
+                <p className="text-[11px]">{integrityResult.integrity_message}</p>
+              </div>
+              <div className="rounded-md border border-surface-border px-2 py-1.5">
+                <p className="text-[11px] text-text-muted">{t("dataHealth.foreignKeys")}</p>
+                <p className={clsx("font-medium", integrityResult.foreign_key_ok ? "text-accent-green" : "text-yellow-300")}>
+                  {integrityResult.foreign_key_ok ? t("dataHealth.ok") : t("dataHealth.warn")}
+                </p>
+                <p className="text-[11px]">{integrityResult.foreign_key_message}</p>
+              </div>
+              <div className="rounded-md border border-surface-border px-2 py-1.5">
+                <p className="text-[11px] text-text-muted">{t("dataHealth.indexes")}</p>
+                <p className={clsx("font-medium", integrityResult.index_ok ? "text-accent-green" : "text-yellow-300")}>
+                  {integrityResult.index_ok ? t("dataHealth.ok") : t("dataHealth.warn")}
+                </p>
+              </div>
+            </div>
+          )}
+          {gapResult && (
+            <div className="rounded-lg border border-surface-border bg-surface-hover/40 p-3 text-xs text-text-muted space-y-1">
+              <p>{t("dataHealth.earliestDate", { date: gapResult.earliest_date ?? t("backup.none") })}</p>
+              <p>{t("dataHealth.latestDate", { date: gapResult.latest_date ?? t("backup.none") })}</p>
+              <p>{t("dataHealth.missingDays", { count: gapResult.missing_days.length })}</p>
+              {gapResult.missing_days.length > 0 && (
+                <p className="text-text-secondary">{gapResult.missing_days.join(", ")}</p>
+              )}
+              <p>{t("dataHealth.zeroUsageDays", { count: gapResult.zero_usage_days.length })}</p>
+            </div>
+          )}
+          {orphanRows && (
+            <div className="rounded-lg border border-surface-border bg-surface-hover/40 p-3 text-xs text-text-muted space-y-1">
+              {orphanRows.length === 0 ? (
+                <p>{t("dataHealth.noOrphans")}</p>
+              ) : (
+                orphanRows.map((row) => (
+                  <div key={row.table} className="flex items-center justify-between gap-2">
+                    <span className="text-text-secondary">{row.table}</span>
+                    <span className="text-text-primary">{row.description} ({row.count})</span>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <p className="text-xs text-text-secondary">{t("dataHealth.migrationStatus")}</p>
+          <div className="grid gap-2 sm:grid-cols-3 text-xs text-text-muted">
+            <div className="rounded-lg border border-surface-border bg-surface-hover/40 p-3">
+              <p className="text-[11px] text-text-muted">{t("dataHealth.currentVersion")}</p>
+              <p className="text-text-primary font-medium">{migrationStatus?.current_version ?? t("backup.none")}</p>
+            </div>
+            <div className="rounded-lg border border-surface-border bg-surface-hover/40 p-3">
+              <p className="text-[11px] text-text-muted">{t("dataHealth.latestVersion")}</p>
+              <p className="text-text-primary font-medium">{migrationStatus?.latest_version ?? t("backup.none")}</p>
+            </div>
+            <div className="rounded-lg border border-surface-border bg-surface-hover/40 p-3">
+              <p className="text-[11px] text-text-muted">{t("dataHealth.pendingMigrations")}</p>
+              <p className={clsx("text-text-primary font-medium", (migrationStatus?.pending ?? 0) > 0 ? "text-yellow-300" : "text-accent-green")}>{migrationStatus?.pending ?? 0}</p>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={refreshMigrationStatusNow}
+              disabled={migrationBusy}
+              className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
+            >
+              {t("dataHealth.refresh")}
+            </button>
+            <button
+              onClick={runMigrationRehearsalNow}
+              disabled={migrationBusy}
+              className="text-xs px-3 py-1.5 rounded-lg border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
+            >
+              {migrationBusy ? t("dataHealth.rehearsing") : t("dataHealth.runRehearsal")}
+            </button>
+          </div>
+          {migrationRehearsal && (
+            <div className={clsx("rounded-lg border p-3 text-xs space-y-1", migrationRehearsal.success ? "border-accent-green/40 bg-accent-green/10 text-text-secondary" : "border-red-400/40 bg-red-500/10 text-red-200")}>
+              <p>
+                {migrationRehearsal.success
+                  ? t("dataHealth.rehearsalSuccess", { from: migrationRehearsal.start_version, to: migrationRehearsal.end_version })
+                  : t("dataHealth.rehearsalFailed")}
+              </p>
+              {migrationRehearsal.error && <p>{migrationRehearsal.error}</p>}
+              {migrationRehearsal.success && (
+                <>
+                  <p>{t("dataHealth.rehearsalIntegrity", { result: migrationRehearsal.integrity_check })}</p>
+                  <p className="text-text-secondary">{t("dataHealth.rehearsalLog")}</p>
+                  <div className="max-h-32 overflow-y-auto space-y-0.5">
+                    {migrationRehearsal.migration_log.map((entry) => (
+                      <p key={entry.version}>{entry.version} - {entry.name} ({new Date(entry.applied_at).toLocaleString()})</p>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+
+        {dataHealthActionError && (
+          <div className="rounded-lg border border-red-400/40 bg-red-500/10 p-3 text-xs text-red-200">
+            {dataHealthActionError}
+          </div>
+        )}
         <div className="flex justify-end">
           <button
             onClick={refreshReliabilityPanels}
@@ -1434,7 +1849,31 @@ export default function Settings() {
           </div>
         </Row>
 
-        <Row label={t("backup.export")}> 
+        <Row label={t("backup.passphrase")}>
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            <label className="flex items-center gap-1.5 text-xs text-text-secondary">
+              <input
+                type="checkbox"
+                className="ui-checkbox"
+                checked={encryptExport}
+                onChange={(e) => setEncryptExport(e.target.checked)}
+              />
+              {t("backup.encryptExport")}
+            </label>
+            <input
+              type="password"
+              value={backupPassphrase}
+              onChange={(e) => setBackupPassphrase(e.target.value)}
+              placeholder={t("backup.passphrase")}
+              className="ui-field max-w-44"
+            />
+          </div>
+        </Row>
+        {backupNeedsPassphrase && (
+          <p className="text-xs text-yellow-300 text-right">{t("backup.passphraseRequired")}</p>
+        )}
+
+        <Row label={t("backup.export")}>
           <div className="flex items-center gap-2 flex-wrap justify-end">
             <button
               onClick={exportBackupPackage}
@@ -1461,7 +1900,7 @@ export default function Settings() {
         </Row>
         <Row label={t("backup.restoreMode")}>
           <div className="flex gap-2 flex-wrap justify-end">
-            {(["overwrite", "merge"] as const).map((mode) => (
+            {(["overwrite", "merge", "new_profile"] as const).map((mode) => (
               <button
                 key={mode}
                 onClick={() => setBackupStrategy(mode)}
@@ -1495,11 +1934,36 @@ export default function Settings() {
               <p>{t("backup.previewSchema", { schema: backupPreview.manifest.schema_version })}</p>
               <p>{t("backup.previewCounts", { appUsage: backupPreview.manifest.counts.app_usage, todos: backupPreview.manifest.counts.todos, widgets: backupPreview.manifest.counts.widget_configs })}</p>
               <p>{t("backup.previewChecksum", { checksum: backupPreview.manifest.checksum.slice(0, 12) })}</p>
+              {backupPreview.manifest.encrypted && (
+                <p className="text-yellow-300">{t("backup.encrypted")}</p>
+              )}
               {backupPreview.warnings.length > 0 && (
                 <div className="space-y-1">
                   {backupPreview.warnings.map((warning) => (
                     <p key={warning} className="text-yellow-300">{warning}</p>
                   ))}
+                </div>
+              )}
+              {backupPreview.diff && (
+                <div className="space-y-2 border-t border-surface-border pt-2">
+                  <p className="text-text-secondary">{t("backup.diffTitle")}</p>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {Object.entries(backupPreview.diff.table_counts).map(([table, counts]) => (
+                      <div key={table} className="rounded-md border border-surface-border px-2 py-1.5">
+                        <p className="text-text-primary font-medium">{table}</p>
+                        <p className="text-[11px]">{t("backup.diffBackupRows", { count: counts.backup_rows })} / {t("backup.diffCurrentRows", { count: counts.current_rows })}</p>
+                        <p className="text-[11px]">{t("backup.diffToAdd", { count: counts.to_add })} · {t("backup.diffToUpdate", { count: counts.to_update })} · {t("backup.diffConflicts", { count: counts.conflicts })}</p>
+                      </div>
+                    ))}
+                  </div>
+                  {backupPreview.diff.settings_conflicts.length > 0 && (
+                    <div className="space-y-1">
+                      <p className="text-text-secondary">{t("backup.diffSettingsConflicts")}</p>
+                      {backupPreview.diff.settings_conflicts.map((conflict, idx) => (
+                        <p key={idx} className="text-yellow-300">{conflict}</p>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -1522,7 +1986,7 @@ export default function Settings() {
 
       {activeSection === "retention" && (
       <Section icon={Rocket} title={t("retention.title")}>
-        <Row label={t("retention.current")}> 
+        <Row label={t("retention.current")}>
           <div className="flex gap-2 flex-wrap justify-end">
             {(["keep_all", "3m", "6m", "12m"] as const).map((policy) => (
               <button
@@ -1562,6 +2026,205 @@ export default function Settings() {
             <p>{t("retention.lastRunPolicy", { policy: retentionRunResult.policy })}</p>
             <p>{t("retention.lastRunAppRows", { count: retentionRunResult.archived_app_usage_rows })}</p>
             <p>{t("retention.lastRunDailyRows", { count: retentionRunResult.archived_daily_rows })}</p>
+            {(retentionRunResult.warm_rows !== undefined || retentionRunResult.archive_rows !== undefined) && (
+              <>
+                <p>{t("retention.warmRows", { count: retentionRunResult.warm_rows ?? 0 })}</p>
+                <p>{t("retention.archiveRows", { count: retentionRunResult.archive_rows ?? 0 })}</p>
+              </>
+            )}
+          </div>
+        )}
+
+        <div className="space-y-2">
+          <p className="text-xs text-text-secondary">{t("retention.schedulerTitle")}</p>
+          <div className="grid gap-2 sm:grid-cols-3 text-xs text-text-muted">
+            <label className="rounded-lg border border-surface-border px-3 py-2 flex items-center justify-between">
+              <span>{t("retention.schedulerEnabled")}</span>
+              <input
+                type="checkbox"
+                className="ui-checkbox"
+                checked={archiveSchedulerSettings.enabled}
+                disabled={archiveSettingsLoading}
+                onChange={(e) => saveArchiveSchedulerSettings({ enabled: e.target.checked })}
+              />
+            </label>
+            <label className="rounded-lg border border-surface-border px-3 py-2 flex items-center justify-between gap-2">
+              <span>{t("retention.schedulerHour")}</span>
+              <input
+                type="number"
+                min={0}
+                max={23}
+                value={archiveSchedulerSettings.daily_run_hour}
+                disabled={archiveSettingsLoading}
+                onChange={(e) => {
+                  const hour = Math.max(0, Math.min(23, Number(e.target.value || "0")));
+                  saveArchiveSchedulerSettings({ daily_run_hour: hour });
+                }}
+                className="ui-field w-16"
+              />
+            </label>
+            <label className="rounded-lg border border-surface-border px-3 py-2 flex items-center justify-between">
+              <span>{t("retention.schedulerRunOnBattery")}</span>
+              <input
+                type="checkbox"
+                className="ui-checkbox"
+                checked={archiveSchedulerSettings.run_on_battery}
+                disabled={archiveSettingsLoading}
+                onChange={(e) => saveArchiveSchedulerSettings({ run_on_battery: e.target.checked })}
+              />
+            </label>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <p className="text-xs text-text-secondary">{t("retention.compressTitle")}</p>
+          <div className="flex items-center justify-end gap-2">
+            <input
+              type="number"
+              min={1}
+              value={compressDays}
+              onChange={(e) => setCompressDays(Math.max(1, Number(e.target.value || "1")))}
+              className="ui-field w-20"
+            />
+            <button
+              onClick={runCompressArchives}
+              disabled={compressBusy}
+              className="text-xs px-3 py-1.5 rounded-lg border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
+            >
+              {compressBusy ? t("retention.compressing") : t("retention.compressAction")}
+            </button>
+          </div>
+          {compressionResult && (
+            <div className="rounded-lg border border-surface-border bg-surface-hover/40 p-3 text-xs text-text-muted space-y-1">
+              <p>{t("retention.compressResult", { groups: compressionResult.compressed_groups, rows: compressionResult.original_rows, saved: formatBytes(compressionResult.saved_bytes) })}</p>
+            </div>
+          )}
+        </div>
+      </Section>
+      )}
+
+      {activeSection === "profiles" && (
+      <Section icon={User} title={t("profiles.title")}>
+        <div className="rounded-lg border border-surface-border bg-surface-hover/40 p-3 text-xs text-text-muted">
+          <p>{t("profiles.current", { profile: currentProfile })}</p>
+        </div>
+        <div className="space-y-2">
+          <p className="text-xs text-text-secondary">{t("profiles.listTitle")}</p>
+          <div className="space-y-1 max-h-56 overflow-y-auto">
+            {profiles.map((profile) => (
+              <div
+                key={profile.id}
+                className={clsx(
+                  "flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-xs",
+                  profile.is_current
+                    ? "border-accent-blue/40 bg-accent-blue/10"
+                    : "border-surface-border bg-surface-hover/40"
+                )}
+              >
+                <div className="min-w-0">
+                  <p className="text-text-primary font-medium truncate">{profile.name}</p>
+                  <p className="text-text-muted truncate">{profile.id}{profile.is_default ? ` · ${t("profiles.default")}` : ""}</p>
+                </div>
+                {!profile.is_current && (
+                  <button
+                    onClick={() => handleSwitchProfile(profile.id)}
+                    disabled={profilesBusy}
+                    className="text-xs px-2 py-1 rounded-lg border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
+                  >
+                    {t("profiles.switch")}
+                  </button>
+                )}
+              </div>
+            ))}
+            {profiles.length === 0 && <p className="text-xs text-text-muted">{t("profiles.noProfiles")}</p>}
+          </div>
+        </div>
+        <div className="flex justify-end">
+          <button
+            onClick={() => setProfileDialogOpen(true)}
+            disabled={profilesBusy}
+            className="text-xs px-3 py-1.5 rounded-lg border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
+          >
+            {t("profiles.create")}
+          </button>
+        </div>
+        {profileDialogOpen && (
+          <div className="rounded-lg border border-surface-border bg-surface-hover/40 p-3 space-y-2">
+            <p className="text-xs text-text-secondary">{t("profiles.createTitle")}</p>
+            <input
+              type="text"
+              value={newProfileName}
+              onChange={(e) => setNewProfileName(e.target.value)}
+              placeholder={t("profiles.createPlaceholder")}
+              className="ui-field w-full"
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => { setProfileDialogOpen(false); setNewProfileName(""); }}
+                className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
+              >
+                {t("profiles.cancel")}
+              </button>
+              <button
+                onClick={handleCreateProfile}
+                disabled={profilesBusy || !newProfileName.trim()}
+                className="text-xs px-3 py-1.5 rounded-lg border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
+              >
+                {profilesBusy ? t("profiles.creating") : t("profiles.createConfirm")}
+              </button>
+            </div>
+          </div>
+        )}
+        {dataHealthActionError && (
+          <div className="rounded-lg border border-red-400/40 bg-red-500/10 p-3 text-xs text-red-200">
+            {dataHealthActionError}
+          </div>
+        )}
+      </Section>
+      )}
+
+      {activeSection === "encryption" && (
+      <Section icon={Shield} title={t("encryption.title")}>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <div className="rounded-lg border border-surface-border bg-surface-hover/40 p-3">
+            <p className="text-[11px] text-text-muted">{t("encryption.status")}</p>
+            <p className={clsx("text-sm font-semibold", encryptionStatus?.enabled ? "text-accent-green" : "text-text-primary")}>
+              {encryptionStatus?.enabled ? t("encryption.enabled") : t("encryption.disabled")}
+            </p>
+          </div>
+          <div className="rounded-lg border border-surface-border bg-surface-hover/40 p-3">
+            <p className="text-[11px] text-text-muted">{t("encryption.restartWarning")}</p>
+            <p className="text-sm font-semibold text-yellow-300">{t("encryption.restartRequired")}</p>
+          </div>
+        </div>
+        <Row label={t("encryption.passphrase")}>
+          <input
+            type="password"
+            value={encryptionPassphrase}
+            onChange={(e) => setEncryptionPassphrase(e.target.value)}
+            placeholder={t("encryption.passphrase")}
+            className="ui-field max-w-44"
+          />
+        </Row>
+        <div className="flex justify-end gap-2">
+          <button
+            onClick={handleDisableEncryption}
+            disabled={encryptionBusy || !encryptionStatus?.enabled}
+            className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
+          >
+            {encryptionBusy ? t("encryption.working") : t("encryption.disable")}
+          </button>
+          <button
+            onClick={handleEnableEncryption}
+            disabled={encryptionBusy || encryptionStatus?.enabled}
+            className="text-xs px-3 py-1.5 rounded-lg border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
+          >
+            {encryptionBusy ? t("encryption.working") : t("encryption.enable")}
+          </button>
+        </div>
+        {dataHealthActionError && (
+          <div className="rounded-lg border border-red-400/40 bg-red-500/10 p-3 text-xs text-red-200">
+            {dataHealthActionError}
           </div>
         )}
       </Section>

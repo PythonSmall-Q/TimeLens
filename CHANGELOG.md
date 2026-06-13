@@ -5,7 +5,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [2.0.0] - 2026-06-06
+## [2.0.0] - 2026-06-12
 
 ### Added
 
@@ -30,6 +30,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Category and project comparison** — added `get_category_comparison_in_ranges` and `get_project_comparison_in_ranges` for period-over-period drill-down beyond apps.
 - **Goal risk notifications** — added `evaluate_goal_risks` and a background notifier that emits `goal-risk-alert` events and native notifications when goals are off track.
 - **Backend Focus rule automation** — moved Focus rules from frontend-only `localStorage` to the `focus_rules` table with CRUD commands and a background evaluator that auto starts/stops focus sessions.
+- **Widget SDK v2** — `manifest.json` now supports `manifest_version`, `sdk_version`, structured `capabilities`, and `csp`. Legacy v1 manifests are auto-normalized to v2.
+- **Widget `local_api_call` enforcement** — widgets can request `local-api:call`; the host issues scoped API tokens and the local API server enforces token scopes across all routes.
+- **Widget dev harness** — updated the local widget preview page to handle SDK v2 capabilities and permission simulation.
+- **Widget template & migration guide** — upgraded `examples/third-party-widget-template/` to SDK v2 with TypeScript types and `localApiCall` example; added `docs/WIDGET_SDK_v2_MIGRATION.md`.
+- **Settings UI for v2.0.0 platform features** — added sections/cards for migration rehearsal/integrity checks, passphrase-protected backups, archive scheduler and compression, profile management, and database encryption.
+- **CI quality gates** — added `npm test`, Rust `cargo test`, Tauri build smoke test, offline critical-journey tests, and migration-rehearsal job to `.github/workflows/ci.yml`.
+- **Dashboard Insights enhancements** — added saved views, distraction hotspot card, and Apps/Categories/Projects comparison tabs.
+- **Focus rule backend integration** — Focus Mode rules now persist in the backend `focus_rules` table with CRUD commands and backend-driven auto start/stop.
+- **Profile state isolation** — moved profile metadata and `current_profile_id` into a separate unencrypted `app_state.db` so profile switching remains reliable even when individual profile databases are encrypted.
+- **Full Japanese, Korean, French, German, and Spanish localization** — completed frontend translations across all desktop namespaces (`common`, `dashboard`, `widgets`, `settings`, `limits`, `categories`, `goals`, `focus`, `browserUsage`) for `ja`, `ko`, `fr`, `de`, and `es`.
+- **Frontend accessibility pass** — added "Skip to main content" link, global `:focus-visible` styles, ARIA live announcer for notifications, navigation landmark labels, `aria-current="page"`, icon-only button labels, dialog roles/modal attributes, and dynamic HTML `lang` updates.
+- **Local API server governance** — hardened all API server routes to enforce widget-scoped API token scopes and reject unscoped or revoked tokens.
+- **Offline test harness scripts** — added `scripts/offline-journey-tests.sh` and `scripts/migration-rehearsal.sh` for local critical-journey and migration validation.
 
 ### Changed
 
@@ -53,6 +66,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Added secondary confirmation and success/failure feedback for widget permission revoke actions to reduce accidental operations.
 - Added per-widget permission change timeline (grant/revoke actor + timestamp) for third-party widget governance audits.
 - Completed i18n coverage for newly added Widget permission matrix and Browser Usage/Dashboard incremental features across `en` / `zh-CN` / `zh-TW`.
+
+### Fixed
+
+- **Profile switching reliability** — fixed a bug where switching profiles could result in a "connection refused" error or missing profiles because `current_profile_id` was stored inside the encrypted profile database.
+- **Widget permission dialog state** — fixed install-time permission dialog state reset and instance targeting so permission grants are correctly associated with the widget being installed.
+- **Database encryption shutdown corruption** — fixed a critical bug where shutdown re-encryption generated a fresh nonce/salt but did not update the stored metadata, causing the next startup to fail with "Failed to decrypt database". Re-encryption now writes updated metadata and uses atomic temp-file writes.
+- **Database encryption file-lock resilience** — encryption/decryption and plaintext wipe now retry on Windows file locks and fall back to a usable runtime plaintext database if the encrypted backup cannot be decrypted on startup.
+- **Database encryption disable flow** — fixed a bug where disabling encryption and restarting could corrupt or overwrite the latest plaintext with a stale encrypted backup. Disabling now preserves the current runtime plaintext and removes encrypted artifacts after verifying the plaintext is valid.
+- **Database open retry on restart** — added a short retry loop when opening the profile database during startup to avoid "localhost refused connection" / startup failures caused by Windows file-lock races after `app.restart()`.
 
 ## [1.4.4] - 2026-06-06
 

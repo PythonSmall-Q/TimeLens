@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use sha2::{Digest, Sha256};
 use tauri::{AppHandle, Manager};
 
@@ -16,14 +16,18 @@ pub struct WidgetRegistryItem {
     pub default_width: f64,
     pub default_height: f64,
     pub permissions: Vec<String>,
-    #[serde(default)]
-    pub manifest_version: u32,
+    #[serde(default = "default_manifest_version")]
+    pub manifest_version: String,
     #[serde(default)]
     pub capabilities: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sdk_version: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub csp: Option<String>,
+}
+
+fn default_manifest_version() -> String {
+    "v1".to_string()
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -53,12 +57,58 @@ pub struct WidgetManifestV2 {
     pub entry: String,
     pub icon: Option<String>,
     pub default_size: Option<WidgetManifestSize>,
-    pub manifest_version: u32,
+    pub manifest_version: String,
     pub capabilities: Vec<String>,
     pub permissions: Vec<String>,
     pub sdk_version: Option<String>,
     pub csp: Option<String>,
     pub signature: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[serde(untagged)]
+pub enum RawCapability {
+    Name(String),
+    Object {
+        capability: String,
+        permission: Option<String>,
+    },
+}
+
+impl RawCapability {
+    pub fn capability(&self) -> &str {
+        match self {
+            RawCapability::Name(s) | RawCapability::Object { capability: s, .. } => s,
+        }
+    }
+
+    pub fn explicit_permission(&self) -> Option<&str> {
+        match self {
+            RawCapability::Object {
+                permission: Some(p),
+                ..
+            } => Some(p),
+            _ => None,
+        }
+    }
+}
+
+fn deserialize_manifest_version<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    use serde::de::Error;
+    let value = serde_json::Value::deserialize(deserializer)?;
+    match value {
+        serde_json::Value::String(s) => Ok(s),
+        serde_json::Value::Number(n) => Ok(format!(
+            "v{}",
+            n.as_i64().ok_or_else(|| D::Error::custom("invalid manifest version number"))?
+        )),
+        _ => Err(D::Error::custom(
+            "manifest_version must be a string or integer",
+        )),
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -69,10 +119,13 @@ pub struct RawWidgetManifest {
     entry: String,
     icon: Option<String>,
     default_size: Option<ThirdPartyWidgetSize>,
-    #[serde(default)]
-    manifest_version: u32,
+    #[serde(
+        default = "default_manifest_version",
+        deserialize_with = "deserialize_manifest_version"
+    )]
+    manifest_version: String,
     permissions: Option<Vec<String>>,
-    capabilities: Option<Vec<String>>,
+    capabilities: Option<Vec<RawCapability>>,
     sdk_version: Option<String>,
     csp: Option<String>,
     /// Optional SHA-256 hex digest of the entry JS file for integrity verification.
@@ -113,25 +166,44 @@ fn dedup_sort(items: Vec<String>) -> Vec<String> {
     unique
 }
 
+fn parse_manifest_version_number(version: &str) -> u32 {
+    version
+        .strip_prefix('v')
+        .or_else(|| version.strip_prefix('V'))
+        .and_then(|n| n.parse::<u32>().ok())
+        .unwrap_or(0)
+}
+
 /// Convert a legacy v1 manifest (or an already-v2 manifest) into a normalized
-/// `WidgetManifestV2`. Returns an error if `manifest_version > 2`.
+/// `WidgetManifestV2`. Returns an error if `manifest_version > v2`.
 pub fn normalize_manifest_v1_to_v2(manifest: RawWidgetManifest) -> Result<WidgetManifestV2, String> {
-    if manifest.manifest_version > 2 {
+    let version_num = parse_manifest_version_number(&manifest.manifest_version);
+    if version_num > 2 {
         return Err("unsupported manifest version".to_string());
     }
 
     let (capabilities, permissions) = if let Some(caps) = manifest.capabilities {
         // v2 manifest: capabilities are authoritative; derive runtime permissions.
-        let capabilities = dedup_sort(caps);
-        let mut perms: Vec<String> = capabilities
-            .iter()
-            .flat_map(|c| expand_capability_to_permissions(c).into_iter().map(String::from))
-            .collect();
+        let mut cap_names: Vec<String> = Vec::new();
+        let mut perms: Vec<String> = Vec::new();
+        for cap in caps {
+            let name = cap.capability().to_string();
+            cap_names.push(name.clone());
+            if let Some(p) = cap.explicit_permission() {
+                perms.push(p.to_string());
+            } else {
+                perms.extend(
+                    expand_capability_to_permissions(&name)
+                        .into_iter()
+                        .map(String::from),
+                );
+            }
+        }
         // Also preserve any explicit permissions if present (for forward compat).
         if let Some(explicit) = manifest.permissions {
             perms.extend(explicit);
         }
-        (capabilities, dedup_sort(perms))
+        (dedup_sort(cap_names), dedup_sort(perms))
     } else {
         // v1 manifest: permissions are authoritative; derive capabilities.
         let perms = manifest.permissions.unwrap_or_default();
@@ -152,7 +224,7 @@ pub fn normalize_manifest_v1_to_v2(manifest: RawWidgetManifest) -> Result<Widget
             width: s.width,
             height: s.height,
         }),
-        manifest_version: 2,
+        manifest_version: "v2".to_string(),
         capabilities,
         permissions,
         sdk_version: manifest.sdk_version,
@@ -173,7 +245,7 @@ fn official_widgets() -> Vec<WidgetRegistryItem> {
             default_width: 300.0,
             default_height: 180.0,
             permissions: Vec::new(),
-            manifest_version: 2,
+            manifest_version: "v2".to_string(),
             capabilities: Vec::new(),
             sdk_version: None,
             csp: None,
@@ -188,7 +260,7 @@ fn official_widgets() -> Vec<WidgetRegistryItem> {
             default_width: 320.0,
             default_height: 420.0,
             permissions: Vec::new(),
-            manifest_version: 2,
+            manifest_version: "v2".to_string(),
             capabilities: Vec::new(),
             sdk_version: None,
             csp: None,
@@ -203,7 +275,7 @@ fn official_widgets() -> Vec<WidgetRegistryItem> {
             default_width: 360.0,
             default_height: 320.0,
             permissions: Vec::new(),
-            manifest_version: 2,
+            manifest_version: "v2".to_string(),
             capabilities: Vec::new(),
             sdk_version: None,
             csp: None,
@@ -218,7 +290,7 @@ fn official_widgets() -> Vec<WidgetRegistryItem> {
             default_width: 560.0,
             default_height: 340.0,
             permissions: Vec::new(),
-            manifest_version: 2,
+            manifest_version: "v2".to_string(),
             capabilities: Vec::new(),
             sdk_version: None,
             csp: None,
@@ -233,7 +305,7 @@ fn official_widgets() -> Vec<WidgetRegistryItem> {
             default_width: 520.0,
             default_height: 330.0,
             permissions: Vec::new(),
-            manifest_version: 2,
+            manifest_version: "v2".to_string(),
             capabilities: Vec::new(),
             sdk_version: None,
             csp: None,
@@ -248,7 +320,7 @@ fn official_widgets() -> Vec<WidgetRegistryItem> {
             default_width: 420.0,
             default_height: 300.0,
             permissions: Vec::new(),
-            manifest_version: 2,
+            manifest_version: "v2".to_string(),
             capabilities: Vec::new(),
             sdk_version: None,
             csp: None,
@@ -447,7 +519,7 @@ mod tests {
             entry: "index.js".to_string(),
             icon: None,
             default_size: None,
-            manifest_version: 1,
+            manifest_version: "v1".to_string(),
             permissions: Some(vec![
                 "screen-time:read".to_string(),
                 "todo:write".to_string(),
@@ -459,13 +531,34 @@ mod tests {
             signature: None,
         };
         let v2 = normalize_manifest_v1_to_v2(raw).unwrap();
-        assert_eq!(v2.manifest_version, 2);
+        assert_eq!(v2.manifest_version, "v2");
         assert!(v2.capabilities.contains(&"read_metrics".to_string()));
         assert!(v2.capabilities.contains(&"write_data".to_string()));
         assert!(v2.capabilities.contains(&"local_api_call".to_string()));
         assert!(v2.permissions.contains(&"screen-time:read".to_string()));
         assert!(v2.permissions.contains(&"todo:write".to_string()));
         assert!(v2.permissions.contains(&"local-api:call".to_string()));
+    }
+
+    #[test]
+    fn test_normalize_v1_integer_manifest_version() {
+        let raw = RawWidgetManifest {
+            widget_type: "test".to_string(),
+            name: "Test".to_string(),
+            description: None,
+            entry: "index.js".to_string(),
+            icon: None,
+            default_size: None,
+            manifest_version: "1".to_string(),
+            permissions: Some(vec!["screen-time:read".to_string()]),
+            capabilities: None,
+            sdk_version: None,
+            csp: None,
+            signature: None,
+        };
+        let v2 = normalize_manifest_v1_to_v2(raw).unwrap();
+        assert_eq!(v2.manifest_version, "v2");
+        assert!(v2.capabilities.contains(&"read_metrics".to_string()));
     }
 
     #[test]
@@ -477,11 +570,11 @@ mod tests {
             entry: "index.js".to_string(),
             icon: None,
             default_size: None,
-            manifest_version: 2,
+            manifest_version: "v2".to_string(),
             permissions: None,
             capabilities: Some(vec![
-                "read_metrics".to_string(),
-                "write_data".to_string(),
+                RawCapability::Name("read_metrics".to_string()),
+                RawCapability::Name("write_data".to_string()),
             ]),
             sdk_version: None,
             csp: None,
@@ -495,6 +588,39 @@ mod tests {
     }
 
     #[test]
+    fn test_normalize_v2_capability_objects() {
+        let raw = RawWidgetManifest {
+            widget_type: "test".to_string(),
+            name: "Test".to_string(),
+            description: None,
+            entry: "index.js".to_string(),
+            icon: None,
+            default_size: None,
+            manifest_version: "v2".to_string(),
+            permissions: None,
+            capabilities: Some(vec![
+                RawCapability::Object {
+                    capability: "read_metrics".to_string(),
+                    permission: Some("screen-time:read".to_string()),
+                },
+                RawCapability::Object {
+                    capability: "local_api_call".to_string(),
+                    permission: None,
+                },
+            ]),
+            sdk_version: None,
+            csp: None,
+            signature: None,
+        };
+        let v2 = normalize_manifest_v1_to_v2(raw).unwrap();
+        assert!(v2.capabilities.contains(&"read_metrics".to_string()));
+        assert!(v2.capabilities.contains(&"local_api_call".to_string()));
+        assert!(v2.permissions.contains(&"screen-time:read".to_string()));
+        assert!(!v2.permissions.contains(&"todo:read".to_string()));
+        assert!(v2.permissions.contains(&"local-api:call".to_string()));
+    }
+
+    #[test]
     fn test_reject_unsupported_manifest_version() {
         let raw = RawWidgetManifest {
             widget_type: "test".to_string(),
@@ -503,7 +629,7 @@ mod tests {
             entry: "index.js".to_string(),
             icon: None,
             default_size: None,
-            manifest_version: 3,
+            manifest_version: "v3".to_string(),
             permissions: None,
             capabilities: None,
             sdk_version: None,

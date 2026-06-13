@@ -1,5 +1,5 @@
 import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { getAllWebviewWindows, getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { register as registerGlobalShortcut, unregisterAll as unregisterAllGlobalShortcuts } from "@tauri-apps/plugin-global-shortcut";
@@ -22,10 +22,11 @@ import InterruptionDetail from "./pages/InterruptionDetail";
 import WidgetDevHarness from "./pages/WidgetDevHarness";
 import { useStatsStore } from "./stores/statsStore";
 import { useSettingsStore } from "./stores/settingsStore";
-import type { ActiveWindowInfo, AppLimit } from "./types";
+import type { ActiveWindowInfo, AppLimit, GoalRiskAlert } from "./types";
 import * as api from "@/services/tauriApi";
 import { formatDuration } from "@/utils/format";
 import { useTranslation } from "react-i18next";
+import i18n from "@/i18n/config";
 import { todayString } from "@/utils/format";
 import { APP_VERSION } from "./version";
 
@@ -92,6 +93,18 @@ export default function MainApp() {
   const { t } = useTranslation(["common", "limits", "browserUsage"]);
 
   const [updateInfo, setUpdateInfo] = useState<{ version: string; notes: string; url: string } | null>(null);
+  const updateCloseButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    const handleLanguageChanged = (lng: string) => {
+      document.documentElement.lang = lng;
+    };
+    document.documentElement.lang = i18n.language || "en";
+    i18n.on("languageChanged", handleLanguageChanged);
+    return () => {
+      i18n.off("languageChanged", handleLanguageChanged);
+    };
+  }, []);
 
   const focusMainAndNavigate = useCallback(async (hash: string) => {
     const win = getCurrentWebviewWindow();
@@ -268,12 +281,20 @@ export default function MainApp() {
       }
     );
 
+    // Listen to goal risk alerts from backend intelligence
+    const unlistenGoalRisk = listen<GoalRiskAlert>("goal-risk-alert", async (e) => {
+      const { scope_value, message, severity } = e.payload;
+      const title = t("dashboard:goalRiskAlertTitle", { scope: scope_value });
+      await notifyWithNavigate(title, message, "#/goals", severity === "critical");
+    });
+
     return () => {
       clearInterval(interval);
       clearInterval(limitInterval);
       unlistenPromise.then((u) => u());
       unlistenMonitor.then((u) => u());
       unlistenDomainLimit.then((u) => u());
+      unlistenGoalRisk.then((u) => u());
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [checkLimits, fetchMonitorStatus, fetchToday, fetchTodaySummary, periodMode, selectedDate]);
@@ -350,6 +371,12 @@ export default function MainApp() {
     }, 4000);
     return () => clearTimeout(timer);
   }, [autoCheckUpdates, notifyWithNavigate, t]);
+
+  useEffect(() => {
+    if (updateInfo) {
+      updateCloseButtonRef.current?.focus();
+    }
+  }, [updateInfo]);
 
   useEffect(() => {
     let mounted = true;
@@ -441,14 +468,27 @@ export default function MainApp() {
 
       {/* ── Update available modal ── */}
       {updateInfo && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="update-dialog-title"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+        >
           <div className="glass-card max-w-md w-full mx-4 p-6 space-y-4 shadow-2xl">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <h2 className="text-lg font-bold text-text-primary">{t("common:updateAvailableTitle")}</h2>
+                <h2 id="update-dialog-title" className="text-lg font-bold text-text-primary">{t("common:updateAvailableTitle")}</h2>
                 <p className="text-sm text-text-secondary mt-1">{t("common:updateAvailableBody", { version: updateInfo.version, current: CURRENT_VERSION })}</p>
               </div>
-              <button onClick={() => setUpdateInfo(null)} className="text-text-muted hover:text-text-primary flex-shrink-0">✕</button>
+              <button
+                ref={updateCloseButtonRef}
+                onClick={() => setUpdateInfo(null)}
+                aria-label={t("common:close")}
+                title={t("common:close")}
+                className="text-text-muted hover:text-text-primary flex-shrink-0"
+              >
+                ✕
+              </button>
             </div>
             {updateInfo.notes && (
               <div className="bg-surface-light rounded-xl p-3 max-h-52 overflow-y-auto">

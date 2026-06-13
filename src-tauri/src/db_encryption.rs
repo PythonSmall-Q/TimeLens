@@ -1,6 +1,8 @@
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
+use std::thread;
+use std::time::Duration;
 
 use aes_gcm::aead::{Aead, KeyInit};
 use aes_gcm::{Aes256Gcm, Nonce};
@@ -94,6 +96,27 @@ pub fn delete_pending_action(data_dir: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
+/// Retry a filesystem operation a few times with a short delay.
+/// Useful on Windows where files may stay locked briefly after a handle is closed.
+fn retry_io<F>(mut op: F, desc: &str) -> std::io::Result<()>
+where
+    F: FnMut() -> std::io::Result<()>,
+{
+    let mut last_err = None;
+    for attempt in 0..5 {
+        match op() {
+            Ok(()) => return Ok(()),
+            Err(e) => {
+                last_err = Some(e);
+                if attempt < 4 {
+                    thread::sleep(Duration::from_millis(50 * (attempt + 1)));
+                }
+            }
+        }
+    }
+    Err(last_err.unwrap_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, desc)))
+}
+
 pub fn encrypt_file(
     plaintext_path: &Path,
     ciphertext_path: &Path,
@@ -123,8 +146,16 @@ pub fn encrypt_file(
         key_check: hex::encode(key_check),
     };
 
-    let mut out = File::create(ciphertext_path).map_err(|e| e.to_string())?;
-    out.write_all(&ciphertext).map_err(|e| e.to_string())?;
+    // Write to a temporary file and rename atomically so a crash during write
+    // never leaves a partially-written encrypted database behind.
+    let temp_path = ciphertext_path.with_extension("encrypted.tmp");
+    {
+        let mut out = File::create(&temp_path).map_err(|e| e.to_string())?;
+        out.write_all(&ciphertext).map_err(|e| e.to_string())?;
+        out.flush().map_err(|e| e.to_string())?;
+    }
+    retry_io(|| std::fs::rename(&temp_path, ciphertext_path), "rename encrypted database")
+        .map_err(|e| e.to_string())?;
 
     Ok(meta)
 }
@@ -161,10 +192,30 @@ pub fn decrypt_file(
 
     let plaintext = cipher
         .decrypt(nonce, ciphertext.as_ref())
-        .map_err(|_| "Failed to decrypt database".to_string())?;
+        .map_err(|_| "Failed to decrypt database (invalid passphrase or corrupted backup)".to_string())?;
 
-    let mut out = File::create(plaintext_path).map_err(|e| e.to_string())?;
-    out.write_all(&plaintext).map_err(|e| e.to_string())?;
+    // Write to a temporary file and rename atomically. This avoids corrupting an
+    // existing plaintext file if the write is interrupted, and avoids lock races
+    // on Windows when replacing a still-locked file.
+    let temp_path = plaintext_path.with_extension("db.tmp");
+    {
+        let mut out = File::create(&temp_path).map_err(|e| {
+            format!("Failed to create temporary plaintext database: {}", e)
+        })?;
+        out.write_all(&plaintext).map_err(|e| {
+            format!("Failed to write temporary plaintext database: {}", e)
+        })?;
+        out.flush().map_err(|e| {
+            format!("Failed to flush temporary plaintext database: {}", e)
+        })?;
+    }
+    retry_io(|| {
+        if plaintext_path.exists() {
+            std::fs::remove_file(plaintext_path)?;
+        }
+        std::fs::rename(&temp_path, plaintext_path)
+    }, "replace plaintext database")
+    .map_err(|e| format!("Failed to replace plaintext database: {}", e))?;
 
     Ok(())
 }
@@ -181,15 +232,17 @@ pub fn write_metadata(path: &Path, meta: &EncryptionMetadata) -> Result<(), Stri
 
 pub fn wipe_plaintext_db(plaintext_path: &Path) -> std::io::Result<()> {
     if plaintext_path.exists() {
-        std::fs::remove_file(plaintext_path)?;
+        // Best-effort retry on Windows where the file may still be locked by an
+        // open SQLite connection while the process is shutting down.
+        let _ = retry_io(|| std::fs::remove_file(plaintext_path), "remove plaintext database");
     }
     let wal = PathBuf::from(format!("{}-wal", plaintext_path.display()));
     let shm = PathBuf::from(format!("{}-shm", plaintext_path.display()));
     if wal.exists() {
-        let _ = std::fs::remove_file(wal);
+        let _ = retry_io(|| std::fs::remove_file(&wal), "remove wal file");
     }
     if shm.exists() {
-        let _ = std::fs::remove_file(shm);
+        let _ = retry_io(|| std::fs::remove_file(&shm), "remove shm file");
     }
     Ok(())
 }
@@ -219,7 +272,12 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_millis();
-        let dir = std::env::temp_dir().join(format!("timelens_db_encryption_test_{}", ts));
+        let tid = std::thread::current().id();
+        let rand = rand::random::<u32>();
+        let dir = std::env::temp_dir().join(format!(
+            "timelens_db_encryption_test_{}_{:?}_{}",
+            ts, tid, rand
+        ));
         std::fs::create_dir_all(&dir).unwrap();
         dir
     }
@@ -244,6 +302,38 @@ mod tests {
         assert_eq!(contents, "hello encrypted database");
 
         assert!(decrypt_file(&encrypted, &decrypted, "wrong", &read_meta).is_err());
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn test_reencrypt_uses_fresh_metadata() {
+        // Simulates the shutdown re-encryption path: encrypt, modify plaintext,
+        // re-encrypt, update metadata, then decrypt with the latest metadata.
+        let dir = tmp_dir();
+        let plaintext = dir.join("plain.db");
+        let encrypted = dir.join("plain.db.encrypted");
+        let meta_path = dir.join("plain.db.encryption-meta");
+        let decrypted = dir.join("decrypted.db");
+
+        std::fs::write(&plaintext, b"first snapshot").unwrap();
+
+        let meta1 = encrypt_file(&plaintext, &encrypted, "secret").unwrap();
+        write_metadata(&meta_path, &meta1).unwrap();
+
+        // Simulate runtime changes followed by shutdown re-encryption.
+        std::fs::write(&plaintext, b"second snapshot").unwrap();
+        let meta2 = encrypt_file(&plaintext, &encrypted, "secret").unwrap();
+        assert_ne!(meta1.nonce, meta2.nonce, "re-encryption must use a fresh nonce");
+        write_metadata(&meta_path, &meta2).unwrap();
+
+        // Decrypt with the updated metadata must succeed.
+        decrypt_file(&encrypted, &decrypted, "secret", &meta2).unwrap();
+        let contents = std::fs::read_to_string(&decrypted).unwrap();
+        assert_eq!(contents, "second snapshot");
+
+        // Decrypt with stale metadata must fail.
+        assert!(decrypt_file(&encrypted, &decrypted, "secret", &meta1).is_err());
 
         std::fs::remove_dir_all(&dir).ok();
     }

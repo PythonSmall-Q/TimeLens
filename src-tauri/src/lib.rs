@@ -8,6 +8,7 @@ pub mod widget_registry;
 
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use chrono::Timelike;
 use tauri::{
@@ -99,6 +100,40 @@ fn copy_if_exists(src: &Path, dst: &Path) -> std::io::Result<()> {
         std::fs::copy(src, dst)?;
     }
     Ok(())
+}
+
+/// Open the SQLite database with a short retry loop. This helps on Windows
+/// where `app.restart()` may start the new process before the old one has fully
+/// released its file locks.
+fn open_db_with_retry(path: &Path, retries: usize, delay: Duration) -> Result<rusqlite::Connection, String> {
+    let mut last_err = None;
+    for attempt in 0..=retries {
+        match db::open(path) {
+            Ok(conn) => return Ok(conn),
+            Err(e) => {
+                let is_lock_error = matches!(
+                    e,
+                    rusqlite::Error::SqliteFailure(code, _)
+                        if code.extended_code == rusqlite::ffi::SQLITE_BUSY
+                            || code.extended_code == rusqlite::ffi::SQLITE_BUSY_RECOVERY
+                            || code.extended_code == rusqlite::ffi::SQLITE_LOCKED
+                            || code.extended_code == rusqlite::ffi::SQLITE_LOCKED_SHAREDCACHE
+                            || code.extended_code == rusqlite::ffi::SQLITE_CANTOPEN
+                );
+                last_err = Some(e);
+                if attempt < retries && is_lock_error {
+                    std::thread::sleep(delay * (attempt as u32 + 1));
+                } else {
+                    break;
+                }
+            }
+        }
+    }
+    Err(format!(
+        "Failed to open database after {} attempts: {}",
+        retries + 1,
+        last_err.unwrap_or_else(|| rusqlite::Error::InvalidPath("unknown".into()))
+    ))
 }
 
 fn copy_db_with_sidecars(src: &Path, dst: &Path) -> std::io::Result<()> {
@@ -305,13 +340,62 @@ fn prepare_encrypted_database(db_path: &Path, data_dir: &Path) -> Result<(), Str
             return Err("Database encryption passphrase is empty".to_string());
         }
         let meta = db_encryption::read_metadata(&meta_path)?;
-        db_encryption::decrypt_file(&encrypted_path, db_path, &action.passphrase, &meta)?;
 
         if action.action == "disable" {
+            // When disabling, the runtime plaintext already contains the latest
+            // data written during the session. The encrypted backup on disk may
+            // be stale if the previous shutdown did not re-encrypt. Decrypting
+            // the backup would overwrite the current plaintext and lose data.
+            // Only decrypt as a last resort if the plaintext is missing.
+            if !db_path.exists() {
+                db_encryption::decrypt_file(&encrypted_path, db_path, &action.passphrase, &meta)?;
+            }
+
+            // Make sure the plaintext we are about to use is a valid SQLite DB.
+            {
+                let conn = db::open(db_path)
+                    .map_err(|e| format!("Encryption disable failed: plaintext database is unusable: {}", e))?;
+                drop(conn);
+            }
+
             std::fs::remove_file(&encrypted_path).map_err(|e| e.to_string())?;
             std::fs::remove_file(&meta_path).map_err(|e| e.to_string())?;
             db_encryption::delete_pending_action(data_dir).ok();
+            log::info!("Database encryption disabled; using plaintext database");
+            return Ok(());
         }
+
+        // Decrypt the encrypted backup to the runtime plaintext path. If the
+        // plaintext file still exists because a previous shutdown could not wipe
+        // it, we try to overwrite it. If overwriting fails and the existing
+        // plaintext looks usable, fall back to it so the app can still start.
+        match db_encryption::decrypt_file(&encrypted_path, db_path, &action.passphrase, &meta) {
+            Ok(()) => {}
+            Err(e) => {
+                if db_path.exists() {
+                    log::warn!(
+                        "Failed to decrypt encrypted database ({}); attempting to use existing runtime plaintext as recovery",
+                        e
+                    );
+                    // Verify the existing plaintext is a valid SQLite database.
+                    match db::open(db_path) {
+                        Ok(conn) => {
+                            drop(conn);
+                            log::info!("Using existing runtime plaintext database as recovery");
+                        }
+                        Err(open_err) => {
+                            return Err(format!(
+                                "Failed to decrypt database and existing plaintext is unusable: {} (open error: {})",
+                                e, open_err
+                            ));
+                        }
+                    }
+                } else {
+                    return Err(e);
+                }
+            }
+        }
+
         return Ok(());
     }
 
@@ -355,7 +439,18 @@ fn cleanup_database_encryption(target_db_path: &Path, data_dir: &Path) {
 
     let encrypted_path = db_encryption::encrypted_db_path(target_db_path);
     match db_encryption::encrypt_file(target_db_path, &encrypted_path, &pending.passphrase) {
-        Ok(_) => {
+        Ok(meta) => {
+            // The encryption process generates a fresh nonce/salt every time, so
+            // we must persist the new metadata before wiping the plaintext.
+            // Otherwise the next startup will try to decrypt with stale metadata
+            // and fail with "Failed to decrypt database".
+            if let Err(e) = db_encryption::write_metadata(&meta_path, &meta) {
+                log::warn!(
+                    "Re-encrypted database on exit but failed to write metadata: {}. Leaving runtime plaintext in place.",
+                    e
+                );
+                return;
+            }
             log::info!(
                 "Re-encrypted database on exit: {}",
                 encrypted_path.display()
@@ -396,32 +491,37 @@ pub fn run() {
             let data_dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&data_dir)?;
 
-            // Open the default profile first to discover the active profile id, then
-            // open the target profile database as the main DbState.
+            // Compute the default profile path first so legacy migration can run
+            // before we read global profile state.
             let default_db_path = resolve_database_path(&data_dir, None);
 
-            // Prepare default database (handle at-rest encryption if enabled).
-            prepare_encrypted_database(&default_db_path, &data_dir)
-                .map_err(|e| format!("Failed to prepare default database: {}", e))?;
+            // Open the unencrypted app state database first (before any profile DB)
+            // so profile metadata is available even when profile DBs are encrypted.
+            let app_state_conn = db::migrations::open_app_state_db(&data_dir)
+                .map_err(|e| format!("Failed to open app state database: {}", e))?;
 
-            let default_conn = db::open(&default_db_path)
-                .expect("Failed to open default SQLite database");
-            let active_profile_id = db::migrations::current_profile_id_from_conn(&default_conn);
+            // One-time migration of profile metadata from the legacy default
+            // profile DB into the separate app state DB.
+            let _ = db::migrations::migrate_profile_state_from_default_db(
+                &app_state_conn,
+                &default_db_path,
+            );
+
+            let active_profile_id = db::migrations::current_profile_id_from_app_state(&app_state_conn);
+            drop(app_state_conn);
+
             let target_db_path: PathBuf = if active_profile_id == db::migrations::DEFAULT_PROFILE_ID {
                 default_db_path.clone()
             } else {
                 db::migrations::db_path_for_profile(&data_dir, &active_profile_id)
             };
 
-            let conn = if target_db_path == default_db_path {
-                default_conn
-            } else {
-                drop(default_conn);
-                prepare_encrypted_database(&target_db_path, &data_dir)
-                    .map_err(|e| format!("Failed to prepare target database: {}", e))?;
-                db::open(&target_db_path)
-                    .expect("Failed to open active profile SQLite database")
-            };
+            // Prepare target database (handle at-rest encryption if enabled).
+            prepare_encrypted_database(&target_db_path, &data_dir)
+                .map_err(|e| format!("Failed to prepare target database: {}", e))?;
+
+            let conn = open_db_with_retry(&target_db_path, 10, Duration::from_millis(100))
+                .map_err(|e| format!("Failed to open active profile SQLite database: {}", e))?;
 
             // Clear pending encryption settings now that the database is open.
             {
@@ -502,7 +602,7 @@ pub fn run() {
             app.manage(tray_language.clone());
 
             let db_for_monitor: DbState = {
-                let conn = db::open(&target_db_path)
+                let conn = open_db_with_retry(&target_db_path, 10, Duration::from_millis(100))
                     .expect("Second db connection for monitor");
                 Arc::new(Mutex::new(conn))
             };
@@ -518,7 +618,7 @@ pub fn run() {
             // ── Local HTTP API ────────────────────────────────
             {
                 let api_db: DbState = {
-                    let conn = db::open(&target_db_path)
+                    let conn = open_db_with_retry(&target_db_path, 10, Duration::from_millis(100))
                         .expect("Third db connection for API server");
                     Arc::new(Mutex::new(conn))
                 };
@@ -534,7 +634,7 @@ pub fn run() {
             // ── Browser domain limit monitor ──────────────────
             {
                 let notif_db: DbState = {
-                    let conn = db::open(&target_db_path)
+                    let conn = open_db_with_retry(&target_db_path, 10, Duration::from_millis(100))
                         .expect("Fourth db connection for domain limit notifier");
                     Arc::new(Mutex::new(conn))
                 };
@@ -623,7 +723,7 @@ pub fn run() {
             // ── Archive scheduler background task ─────────────
             {
                 let archive_db: DbState = {
-                    let conn = db::open(&target_db_path)
+                    let conn = open_db_with_retry(&target_db_path, 10, Duration::from_millis(100))
                         .expect("Fifth db connection for archive scheduler");
                     Arc::new(Mutex::new(conn))
                 };
@@ -710,7 +810,7 @@ pub fn run() {
             // ── Derived metrics scheduler ─────────────────────
             {
                 let derived_db: DbState = {
-                    let conn = db::open(&target_db_path)
+                    let conn = open_db_with_retry(&target_db_path, 10, Duration::from_millis(100))
                         .expect("Sixth db connection for derived metrics scheduler");
                     Arc::new(Mutex::new(conn))
                 };
@@ -728,7 +828,7 @@ pub fn run() {
             // ── Goal risk notifier ────────────────────────────
             {
                 let risk_db: DbState = {
-                    let conn = db::open(&target_db_path)
+                    let conn = open_db_with_retry(&target_db_path, 10, Duration::from_millis(100))
                         .expect("Seventh db connection for goal risk notifier");
                     Arc::new(Mutex::new(conn))
                 };
@@ -770,7 +870,7 @@ pub fn run() {
             // ── Focus rule evaluator ──────────────────────────
             {
                 let focus_db: DbState = {
-                    let conn = db::open(&target_db_path)
+                    let conn = open_db_with_retry(&target_db_path, 10, Duration::from_millis(100))
                         .expect("Eighth db connection for focus rule evaluator");
                     Arc::new(Mutex::new(conn))
                 };

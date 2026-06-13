@@ -1,41 +1,120 @@
 # Widget SDK v2 Migration Guide
 
-TimeLens 2.0.0 introduces Widget SDK v2. This guide explains the manifest version policy, capability model, and how to upgrade an existing v1 widget.
+This document describes the Widget SDK v2 manifest format introduced in TimeLens
+v2.0.0 (Phase 5). It covers the new `capabilities` array, `local_api_call`
+usage, the optional `signature` field, and how to migrate from v1 manifests.
 
-## Manifest version policy
+## Table of contents
 
-- `manifest_version` is now a required top-level integer field.
-- Supported values: `1` (legacy, auto-upgraded) and `2` (current).
-- If `manifest_version > 2`, TimeLens rejects the widget with the error **"unsupported manifest version"**.
-- v1 manifests continue to load, but they are normalized to v2 internally.
+- [Quick comparison](#quick-comparison)
+- [Required and optional fields](#required-and-optional-fields)
+- [Capabilities vs. permissions](#capabilities-vs-permissions)
+  - [Object form](#object-form)
+  - [String form](#string-form)
+  - [Permission to capability mapping](#permission-to-capability-mapping)
+- [`local_api_call` usage](#local_api_call-usage)
+- [Signature field](#signature-field)
+- [Migrating from v1](#migrating-from-v1)
+- [Testing with the Widget Dev Harness](#testing-with-the-widget-dev-harness)
 
-## Mapping legacy permissions to capabilities
+## Quick comparison
 
-In v1 you declared `permissions` as method-level strings. In v2 you declare `capabilities`, which are broader security buckets. TimeLens maps between them automatically.
-
-| Legacy permission | v2 capability |
+| v1 manifest | v2 manifest |
 |---|---|
-| `screen-time:read` | `read_metrics` |
-| `todo:read` | `read_metrics` |
-| `todo:write` | `write_data` |
-| `settings:write` | `write_data` |
-| `active-window:subscribe` | `automation_trigger` |
-| `local-api:call` | `local_api_call` |
+| `"manifest_version": 1` or omitted | `"manifest_version": "v2"` |
+| `permissions: ["screen-time:read"]` | `capabilities: [{ "capability": "read_metrics", "permission": "screen-time:read" }]` |
+| No local API support | `local_api_call` capability |
+| No integrity check | Optional `signature` SHA-256 of entry file |
 
-### Reverse mapping (capability → runtime permissions)
+## Required and optional fields
 
-When you declare a capability, TimeLens grants the underlying runtime permission strings so the widget channel works out of the box.
+A minimal v2 manifest looks like this:
 
-| v2 capability | Runtime permissions granted |
-|---|---|
-| `read_metrics` | `screen-time:read`, `todo:read` |
-| `write_data` | `todo:write`, `settings:write` |
-| `automation_trigger` | `active-window:subscribe` |
-| `local_api_call` | `local-api:call` |
+```json
+{
+  "manifest_version": "v2",
+  "widget_type": "my_widget",
+  "name": "My Widget",
+  "entry": "index.js"
+}
+```
 
-## New `local-api:call` capability
+Required fields:
 
-Widgets can now call the TimeLens local HTTP API directly through the widget channel:
+- `manifest_version`: must be `"v2"` (or the legacy integer `2`).
+- `widget_type`: unique identifier, `[a-zA-Z0-9_-]` only.
+- `name`: human-readable widget name.
+- `entry`: path to the ESM entry file, relative to the manifest.
+
+Optional fields:
+
+- `description`: short description shown in Widget Center.
+- `icon`: icon identifier or path.
+- `default_size`: `{ "width": number, "height": number }`.
+- `capabilities`: array of capability objects or strings (see below).
+- `permissions`: legacy array of runtime permission strings. Still supported for
+  forward compatibility.
+- `sdk_version`: SDK version the widget targets, e.g. `"2.0.0"`.
+- `csp`: optional Content-Security-Policy applied to the widget iframe.
+- `signature`: SHA-256 hex digest of the entry file. When present, TimeLens
+  verifies the entry file hash before loading the widget.
+
+## Capabilities vs. permissions
+
+In SDK v2 you declare **capabilities**. Each capability maps to one or more
+runtime **permissions** that the user grants to the widget instance.
+
+### Object form
+
+The recommended v2 form lets you request a specific permission within a
+capability group:
+
+```json
+{
+  "capabilities": [
+    { "capability": "read_metrics", "permission": "screen-time:read" },
+    { "capability": "automation_trigger", "permission": "active-window:subscribe" },
+    { "capability": "local_api_call", "permission": "local-api:call" }
+  ]
+}
+```
+
+The `permission` property is optional. When omitted, TimeLens expands the
+capability to its default permissions.
+
+### String form
+
+For convenience you can still pass an array of capability names:
+
+```json
+{
+  "capabilities": ["read_metrics", "write_data", "local_api_call"]
+}
+```
+
+String capabilities expand to their default permissions.
+
+### Permission to capability mapping
+
+| Runtime permission | Capability | Notes |
+|---|---|---|
+| `screen-time:read` | `read_metrics` | Read aggregated screen time metrics. |
+| `todo:read` | `read_metrics` | Read todos. |
+| `todo:write` | `write_data` | Create / modify todos. |
+| `settings:write` | `write_data` | Change app settings such as focus mode. |
+| `active-window:subscribe` | `automation_trigger` | Receive active-window change events. |
+| `local-api:call` | `local_api_call` | Call the local TimeLens HTTP API. |
+
+If a manifest contains the legacy `permissions` array but no `capabilities`
+array, TimeLens treats it as a v1 manifest and derives capabilities from the
+permissions automatically.
+
+## `local_api_call` usage
+
+Widgets with the `local_api_call` capability can call the TimeLens local HTTP
+API through the widget bridge instead of making raw `fetch` calls themselves.
+The bridge automatically issues a scoped token and attaches the required
+headers.
 
 ```js
 const result = await context.channel.localApiCall({
@@ -45,56 +124,93 @@ const result = await context.channel.localApiCall({
 });
 ```
 
-Requirements:
+Available local API scopes include:
 
-1. The widget manifest includes the `local_api_call` capability.
-2. The user has granted the `local-api:call` permission to this widget instance.
-3. The requested `scopes` match the endpoint being called (e.g. `screen-time:read` for `GET /api/screen-time/today`).
+- `screen-time:read`
+- `browser:read`
+- `browser:write`
+- `vscode:read`
+- `vscode:write`
+- `active-window:subscribe` (for WebSocket subscriptions)
 
-The host automatically issues a scoped local API token and attaches it as the `X-Api-Token` header. The client ID is set to `widget-<widget_id>`, which the local API allowlist treats as a widget identity.
+The token is issued once per call, cached only for the request, and scoped to
+the requested `scopes`. The actual HTTP request is sent to
+`http://127.0.0.1:49152` with headers:
 
-## How to upgrade a v1 widget
+- `X-Client-Id: widget-<widget_id>`
+- `X-Api-Token: <scoped-token>`
 
-1. Add `"manifest_version": 2` to `manifest.json`.
-2. Replace or supplement `permissions` with `capabilities`.
+## Signature field
 
-Before:
+To protect against tampering, add the SHA-256 hex digest of your entry file:
 
 ```json
 {
-  "widget_type": "my_widget",
-  "name": "My Widget",
-  "entry": "index.js",
-  "permissions": ["screen-time:read", "active-window:subscribe"]
+  "signature": "a1b2c3d4..."
 }
 ```
 
-After:
+Generate it with:
+
+```bash
+# Linux / macOS
+shasum -a 256 index.js | awk '{print $1}'
+
+# Windows PowerShell
+(Get-FileHash index.js -Algorithm SHA256).Hash.ToLower()
+```
+
+If the entry file content does not match the signature, TimeLens refuses to
+load the widget and reports a signature mismatch in Widget Center.
+
+## Migrating from v1
+
+1. Change `manifest_version` to `"v2"`.
+2. Replace `permissions` with `capabilities`.
+3. Map each legacy permission to the appropriate capability (see table above).
+4. If you previously used raw `fetch` against `http://127.0.0.1:49152`, replace
+   those calls with `context.channel.localApiCall(...)` and add the
+   `local_api_call` capability.
+5. Optionally add `sdk_version` and `signature`.
+
+Example migration:
 
 ```json
+// v1
 {
-  "manifest_version": 2,
+  "manifest_version": 1,
   "widget_type": "my_widget",
   "name": "My Widget",
   "entry": "index.js",
-  "capabilities": ["read_metrics", "automation_trigger"],
+  "permissions": ["screen-time:read", "todo:write"]
+}
+
+// v2
+{
+  "manifest_version": "v2",
+  "widget_type": "my_widget",
+  "name": "My Widget",
+  "entry": "index.js",
+  "capabilities": [
+    { "capability": "read_metrics", "permission": "screen-time:read" },
+    { "capability": "write_data", "permission": "todo:write" }
+  ],
   "sdk_version": "2.0.0"
 }
 ```
 
-3. If you want to call the local API, add `"local_api_call"` to `capabilities` and use `context.channel.localApiCall(...)`.
-4. Optional: add `csp` for a custom Content Security Policy string, or `signature` for an SHA-256 integrity check of the entry file.
+TimeLens remains backward compatible: old v1 manifests are automatically
+upgraded to v2 at load time.
 
-## Additional optional fields
+## Testing with the Widget Dev Harness
 
-| Field | Type | Description |
-|---|---|---|
-| `sdk_version` | `string` | Widget SDK version the widget targets |
-| `csp` | `string` | Content Security Policy hint |
-| `signature` | `string` | Hex SHA-256 digest of the entry file for integrity verification |
+During development, use the Widget Dev Harness to iterate without installing
+widgets:
 
-## Backward compatibility
+1. Build TimeLens in development mode.
+2. Open Widget Center → "Dev Harness".
+3. Select your widget folder.
+4. Toggle capabilities and reload instantly.
 
-- TimeLens 2.0.0 still loads v1 manifests and auto-upgrades them.
-- Existing installed widgets do not need to be re-imported.
-- The Widget Dev Harness (available in dev mode) can load both v1 and v2 manifests from a local folder without installation.
+The harness uses a mock channel, so `localApiCall` returns a mock response
+unless you point it at a running TimeLens local API server.

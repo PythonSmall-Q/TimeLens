@@ -47,5 +47,9 @@
   "searchTodos": "待办",
   "searchGoals": "目标",
   "searchNoResult": "未找到结果",
-  "searchHint": "⌘K"
+  "searchHint": "⌘K",
+  "skipToMainContent": "跳转到主内容",
+  "mainNavigation": "主导航",
+  "clearSearch": "清除搜索",
+  "openGlobalSearch": "打开全局搜索"
 }

@@ -1,0 +1,24 @@
+{
+  "title": "Categorías de apps",
+  "subtitle": "Etiqueta apps con categorías para obtener análisis por tipo de actividad",
+  "addRule": "Agregar categoría de app",
+  "exePlaceholder": "Seleccionar una app reciente…",
+  "categoryLabel": "Categoría",
+  "drilldownHint": "Se detectó contexto de detalle para {{app}}. Puedes agregar o ajustar directamente su regla de categoría.",
+  "noRules": "Aún no hay reglas de categoría. Agrega una app arriba para comenzar.",
+  "suggestedCategory": "Sugerida: {{cat}} — haz clic para aplicar",
+  "applySuggestion": "Aplicar categoría sugerida",
+  "presets": {
+    "Work": "Trabajo",
+    "Social": "Social",
+    "Entertainment": "Entretenimiento",
+    "Development": "Desarrollo",
+    "Productivity": "Productividad",
+    "Education": "Educación",
+    "Gaming": "Juegos",
+    "Browsing": "Navegación",
+    "Communication": "Comunicación",
+    "System": "Sistema",
+    "uncategorized": "Sin categoría"
+  }
+}

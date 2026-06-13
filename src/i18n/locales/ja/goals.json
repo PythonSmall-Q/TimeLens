@@ -1,0 +1,22 @@
+{
+  "title": "使用目標",
+  "subtitle": "健康的な習慣を身につけるために、アプリやカテゴリの時間目標を設定",
+  "addGoal": "目標を追加",
+  "newGoal": "新しい目標",
+  "noGoals": "目標はまだありません。「目標を追加」から作成してください。",
+  "allApps": "すべてのアプリ",
+  "period_daily": "毎日",
+  "period_weekly": "毎週",
+  "op_at_most": "最大",
+  "op_at_least": "最小",
+  "minutes": "分",
+  "scopeValuePlaceholder": "目標値",
+  "scopeValueLabel": "目標値",
+  "scopeTypeLabel": "対象タイプ",
+  "scopeType_app": "アプリ",
+  "scopeType_category": "カテゴリ",
+  "searchAppPlaceholder": "アプリを検索して選択",
+  "periodLabel": "期間",
+  "operatorLabel": "演算子",
+  "minutesLabel": "目標分数"
+}

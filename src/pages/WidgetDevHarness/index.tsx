@@ -16,15 +16,20 @@ interface ThirdPartyWidgetContext {
   channel: Record<string, (...args: unknown[]) => Promise<unknown>>;
 }
 
+interface DevCapability {
+  capability: string;
+  permission?: string;
+}
+
 interface DevManifest {
   widget_type: string;
   name?: string;
   description?: string;
   entry: string;
   default_size?: { width: number; height: number };
-  capabilities?: string[];
+  capabilities?: Array<string | DevCapability>;
   permissions?: string[];
-  manifest_version?: number;
+  manifest_version?: string;
 }
 
 const CAPABILITY_OPTIONS = [
@@ -214,6 +219,17 @@ export default function WidgetDevHarness() {
     [grantedPerms]
   );
 
+  // Pre-select capability toggles from the loaded manifest.
+  useEffect(() => {
+    if (!manifest?.capabilities) return;
+    const keys = new Set(
+      manifest.capabilities
+        .map((c) => (typeof c === "string" ? c : c.capability))
+        .filter((k) => CAPABILITY_OPTIONS.some((o) => o.key === k))
+    );
+    setSelectedCapabilities(keys);
+  }, [manifest]);
+
   const handleSelectFolder = async () => {
     try {
       const selected = await open({ directory: true, multiple: false, title: t("devHarness.selectFolder") });
@@ -232,7 +248,7 @@ export default function WidgetDevHarness() {
     if (!folder) return;
     setError(null);
     try {
-      const manifestUrl = convertFileSrc(`${folder}/manifest.json`);
+      const manifestUrl = convertFileSrc(joinFilePath(folder, "manifest.json"));
       const manifestText = await fetchText(manifestUrl);
       const parsed = JSON.parse(manifestText) as DevManifest;
       if (!parsed.widget_type || !parsed.entry) {
@@ -240,7 +256,7 @@ export default function WidgetDevHarness() {
       }
       setManifest(parsed);
 
-      const entryUrl = convertFileSrc(`${folder}/${parsed.entry}`);
+      const entryUrl = convertFileSrc(joinFilePath(folder, parsed.entry));
       const entryText = await fetchText(entryUrl);
       const newHash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(entryText))
         .then((buf) => Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join(""));
@@ -292,7 +308,7 @@ export default function WidgetDevHarness() {
     let disposed = false;
     const check = async () => {
       try {
-        const entryUrl = convertFileSrc(`${folder}/${manifest.entry}`);
+        const entryUrl = convertFileSrc(joinFilePath(folder, manifest.entry));
         const entryText = await fetchText(entryUrl);
         const newHash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(entryText))
           .then((buf) => Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join(""));
@@ -401,12 +417,18 @@ export default function WidgetDevHarness() {
               </p>
               <p>
                 <span className="text-text-secondary">{t("devHarness.manifestVersion")}:</span>{" "}
-                {manifest.manifest_version ?? 1}
+                {manifest.manifest_version ?? "v1"}
               </p>
               {manifest.capabilities && (
                 <p>
                   <span className="text-text-secondary">{t("devHarness.capabilities")}:</span>{" "}
-                  {manifest.capabilities.join(", ")}
+                  {manifest.capabilities
+                    .map((c) =>
+                      typeof c === "string"
+                        ? c
+                        : `${c.capability}${c.permission ? ` (${c.permission})` : ""}`
+                    )
+                    .join(", ")}
                 </p>
               )}
               {manifest.permissions && (

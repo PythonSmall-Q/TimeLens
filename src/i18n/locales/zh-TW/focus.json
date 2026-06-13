@@ -12,7 +12,7 @@
   "triggerAuto": "自動觸發",
   "automation": {
     "title": "規則自動化",
-    "hint": "建立本機規則，用於模擬專注會話自動觸發。",
+    "hint": "建立後端規則，自動開始或結束專注會話。",
     "ruleNamePlaceholder": "規則名稱（例如：晨間深度工作）",
     "minRecentFocus": "近 7 天最少專注分鐘",
     "addRule": "新增規則",
@@ -26,6 +26,24 @@
     "outOfWindow": "目前時間不在規則時段內（{{start}} - {{end}}）。",
     "notEnoughFocus": "近期專注 {{recent}} 分，低於要求 {{required}} 分。",
     "alreadyActive": "規則已匹配，且專注模式已啟用。",
-    "readyToStart": "規則已匹配，可立即開始專注會話。"
+    "readyToStart": "規則已匹配，可立即開始專注會話。",
+    "ruleTypeKeyword": "關鍵字",
+    "ruleTypeTimeWindow": "時間段",
+    "ruleTypeApp": "應用程式",
+    "matchTypeContains": "包含",
+    "matchTypeExact": "精確",
+    "matchTypeRegex": "正規",
+    "keywordPlaceholder": "關鍵字或片語",
+    "appNamePlaceholder": "應用程式名稱",
+    "actionLabel": "動作",
+    "actionEnterFocus": "進入專注",
+    "actionLeaveFocus": "離開專注",
+    "autoStart": "自動開始",
+    "respectQuietHours": "遵守靜音時段",
+    "ruleMetaKeyword": "關鍵字：{{matchType}} '{{keyword}}'",
+    "ruleMetaTimeWindow": "時段：{{start}} - {{end}}",
+    "ruleMetaApp": "應用程式：{{app}}",
+    "noMatch": "規則未匹配目前條件。",
+    "simulationError": "目前無法評估規則。"
   }
 }

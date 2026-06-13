@@ -118,12 +118,33 @@ pub fn issue_widget_api_token(
     }
 
     let label = format!("Widget: {}", widget_id);
-    crate::commands::extension_bridge_cmd::issue_api_token_impl(
+    let token = crate::commands::extension_bridge_cmd::issue_api_token_impl(
         &conn,
         label,
-        scopes,
+        scopes.clone(),
         None,
+    )?;
+
+    let now = chrono::Local::now().format("%Y-%m-%dT%H:%M:%S").to_string();
+    let scopes_detail = if scopes.is_empty() {
+        "none".to_string()
+    } else {
+        scopes.join(", ")
+    };
+    conn.execute(
+        "INSERT INTO widget_permission_audit_log
+         (widget_id, permission, action, actor, occurred_at, detail)
+         VALUES (?1, ?2, 'issue_token', 'widget-runtime', ?3, ?4)",
+        rusqlite::params![
+            widget_id,
+            "local-api:call",
+            now,
+            format!("issued local API token with scopes: {}", scopes_detail)
+        ],
     )
+    .map_err(|e| format!("failed to record token audit log: {e}"))?;
+
+    Ok(token)
 }
 
 fn copy_dir_all(src: &std::path::Path, dst: &std::path::Path) -> Result<(), String> {

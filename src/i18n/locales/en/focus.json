@@ -12,7 +12,7 @@
   "triggerAuto": "Auto-triggered",
   "automation": {
     "title": "Rule Automation",
-    "hint": "Create local rules to simulate auto-start behavior for focus sessions.",
+    "hint": "Create backend rules to auto-start or stop focus sessions.",
     "ruleNamePlaceholder": "Rule name (e.g. Morning deep work)",
     "minRecentFocus": "Min focus minutes in last 7 days",
     "addRule": "Add rule",
@@ -26,6 +26,24 @@
     "outOfWindow": "Current time is outside the configured window ({{start}} - {{end}}).",
     "notEnoughFocus": "Recent focus is {{recent}}m, below required {{required}}m.",
     "alreadyActive": "Rule matches, and focus mode is already active.",
-    "readyToStart": "Rule matches. You can start a focus session now."
+    "readyToStart": "Rule matches. You can start a focus session now.",
+    "ruleTypeKeyword": "Keyword",
+    "ruleTypeTimeWindow": "Time window",
+    "ruleTypeApp": "App",
+    "matchTypeContains": "contains",
+    "matchTypeExact": "exact",
+    "matchTypeRegex": "regex",
+    "keywordPlaceholder": "Keyword or phrase",
+    "appNamePlaceholder": "App name",
+    "actionLabel": "Action",
+    "actionEnterFocus": "Enter focus",
+    "actionLeaveFocus": "Leave focus",
+    "autoStart": "Auto-start",
+    "respectQuietHours": "Respect quiet hours",
+    "ruleMetaKeyword": "Keyword: {{matchType}} '{{keyword}}'",
+    "ruleMetaTimeWindow": "Window: {{start}} - {{end}}",
+    "ruleMetaApp": "App: {{app}}",
+    "noMatch": "Rule did not match current conditions.",
+    "simulationError": "Could not evaluate rule right now."
   }
 }

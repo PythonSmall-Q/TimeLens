@@ -1,6 +1,6 @@
 # TimeLens Roadmap to v2.0.0 (Local-First)
 
-Last updated: 2026-06-06
+Last updated: 2026-06-12
 
 ## Canonical Source
 
@@ -248,7 +248,7 @@ Target window: 2027 Q1
 - Full end-to-end offline scenario testing across dashboard, widgets, backup, restore, and extension integration.
 - Security checklist verification for local storage, permission boundaries, and API exposure.
 - Long-run stability tests (multi-day local logging workload).
-- Accessibility checks for keyboard navigation and screen reader critical flows.
+- Accessibility checks for keyboard navigation and screen reader critical flows. *(Basic pass completed: skip link, focus-visible styles, ARIA live announcer, dialog roles, dynamic `lang`, landmark labels.)*
 
 ### Release Gates (Must Pass)
 

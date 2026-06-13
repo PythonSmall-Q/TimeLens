@@ -2,57 +2,26 @@ import { useEffect, useState, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { Focus, Play, Square, Clock } from "lucide-react";
 import * as api from "@/services/tauriApi";
-import type { FocusSession } from "@/types";
+import type { FocusSession, FocusRule, FocusRuleMatch } from "@/types";
 import clsx from "clsx";
 import AsyncStateCard from "@/components/AsyncStateCard";
 
-const FOCUS_RULES_KEY = "timelens.focus.rules.v1";
+type RuleType = "keyword" | "time_window" | "app";
+type MatchType = "contains" | "exact" | "regex";
+type RuleAction = "enter_focus" | "leave_focus";
 
-interface FocusAutomationRule {
-  id: string;
-  name: string;
+interface KeywordCondition {
+  match_type: MatchType;
+  keyword: string;
+}
+
+interface TimeWindowCondition {
   start: string;
   end: string;
-  minRecentFocusMinutes: number;
-  enabled: boolean;
 }
 
-interface SimulationResult {
-  matched: boolean;
-  reason: string;
-  suggestedAction: "start" | "keep" | "none";
-}
-
-function hmToMinutes(value: string): number | null {
-  const m = /^(\d{2}):(\d{2})$/.exec(value);
-  if (!m) return null;
-  const h = Number(m[1]);
-  const mm = Number(m[2]);
-  if (h < 0 || h > 23 || mm < 0 || mm > 59) return null;
-  return h * 60 + mm;
-}
-
-function inWindow(nowMinutes: number, start: string, end: string): boolean {
-  const s = hmToMinutes(start);
-  const e = hmToMinutes(end);
-  if (s === null || e === null) return false;
-  if (s === e) return true;
-  if (s < e) return nowMinutes >= s && nowMinutes < e;
-  return nowMinutes >= s || nowMinutes < e;
-}
-
-function recentFocusMinutes(sessions: FocusSession[], days: number): number {
-  const now = Date.now();
-  const threshold = now - days * 24 * 3600 * 1000;
-  let secs = 0;
-  for (const s of sessions) {
-    const started = new Date(s.started_at).getTime();
-    if (Number.isNaN(started) || started < threshold) continue;
-    const ended = s.ended_at ? new Date(s.ended_at).getTime() : now;
-    if (Number.isNaN(ended) || ended <= started) continue;
-    secs += Math.round((ended - started) / 1000);
-  }
-  return Math.floor(secs / 60);
+interface AppCondition {
+  app_name: string;
 }
 
 function durationLabel(started: string, ended: string | null): string {
@@ -65,6 +34,54 @@ function durationLabel(started: string, ended: string | null): string {
   return `${m}m`;
 }
 
+function parseKeywordCondition(conditionJson: string): KeywordCondition {
+  try {
+    const parsed = JSON.parse(conditionJson) as Partial<KeywordCondition>;
+    return {
+      match_type: ["contains", "exact", "regex"].includes(parsed.match_type ?? "")
+        ? (parsed.match_type as MatchType)
+        : "contains",
+      keyword: typeof parsed.keyword === "string" ? parsed.keyword : "",
+    };
+  } catch {
+    return { match_type: "contains", keyword: "" };
+  }
+}
+
+function parseTimeWindowCondition(conditionJson: string): TimeWindowCondition {
+  try {
+    const parsed = JSON.parse(conditionJson) as Partial<TimeWindowCondition>;
+    return {
+      start: typeof parsed.start === "string" ? parsed.start : "09:00",
+      end: typeof parsed.end === "string" ? parsed.end : "11:00",
+    };
+  } catch {
+    return { start: "09:00", end: "11:00" };
+  }
+}
+
+function parseAppCondition(conditionJson: string): AppCondition {
+  try {
+    const parsed = JSON.parse(conditionJson) as Partial<AppCondition>;
+    return { app_name: typeof parsed.app_name === "string" ? parsed.app_name : "" };
+  } catch {
+    return { app_name: "" };
+  }
+}
+
+function ruleMetaLabel(rule: FocusRule, t: (key: string, opts?: Record<string, unknown>) => string): string {
+  if (rule.rule_type === "keyword") {
+    const c = parseKeywordCondition(rule.condition_json);
+    return t("focus:automation.ruleMetaKeyword", { matchType: c.match_type, keyword: c.keyword || "?" });
+  }
+  if (rule.rule_type === "time_window") {
+    const c = parseTimeWindowCondition(rule.condition_json);
+    return t("focus:automation.ruleMetaTimeWindow", { start: c.start, end: c.end });
+  }
+  const c = parseAppCondition(rule.condition_json);
+  return t("focus:automation.ruleMetaApp", { app: c.app_name || "?" });
+}
+
 export default function FocusModePage() {
   const { t } = useTranslation(["focus", "common"]);
   const [active, setActive] = useState(false);
@@ -73,22 +90,21 @@ export default function FocusModePage() {
   const [loading, setLoading] = useState(true);
   const [toggling, setToggling] = useState(false);
   const [tick, setTick] = useState(0);
-  const [rules, setRules] = useState<FocusAutomationRule[]>(() => {
-    try {
-      const raw = localStorage.getItem(FOCUS_RULES_KEY);
-      if (!raw) return [];
-      const parsed = JSON.parse(raw) as FocusAutomationRule[];
-      if (!Array.isArray(parsed)) return [];
-      return parsed.filter((r) => Boolean(r?.id && r?.name && r?.start && r?.end));
-    } catch {
-      return [];
-    }
-  });
+  const [rules, setRules] = useState<FocusRule[]>([]);
+  const [rulesLoading, setRulesLoading] = useState(true);
+
   const [draftName, setDraftName] = useState("");
+  const [draftRuleType, setDraftRuleType] = useState<RuleType>("time_window");
+  const [draftAction, setDraftAction] = useState<RuleAction>("enter_focus");
+  const [draftAutoStart, setDraftAutoStart] = useState(true);
+  const [draftQuietHoursRespect, setDraftQuietHoursRespect] = useState(true);
+  const [draftMatchType, setDraftMatchType] = useState<MatchType>("contains");
+  const [draftKeyword, setDraftKeyword] = useState("");
   const [draftStart, setDraftStart] = useState("09:00");
   const [draftEnd, setDraftEnd] = useState("11:00");
-  const [draftMinFocus, setDraftMinFocus] = useState(30);
-  const [simulationByRule, setSimulationByRule] = useState<Record<string, SimulationResult>>({});
+  const [draftAppName, setDraftAppName] = useState("");
+
+  const [simulationByRule, setSimulationByRule] = useState<Record<number, FocusRuleMatch>>({});
 
   const loadState = useCallback(async () => {
     setLoading(true);
@@ -106,11 +122,20 @@ export default function FocusModePage() {
     }
   }, []);
 
-  useEffect(() => { loadState(); }, [loadState]);
+  const loadRules = useCallback(async () => {
+    setRulesLoading(true);
+    try {
+      const rows = await api.getFocusRules();
+      setRules(rows);
+    } catch {
+      setRules([]);
+    } finally {
+      setRulesLoading(false);
+    }
+  }, []);
 
-  useEffect(() => {
-    localStorage.setItem(FOCUS_RULES_KEY, JSON.stringify(rules));
-  }, [rules]);
+  useEffect(() => { loadState(); }, [loadState]);
+  useEffect(() => { loadRules(); }, [loadRules]);
 
   // Live timer tick every second while active
   useEffect(() => {
@@ -141,78 +166,123 @@ export default function FocusModePage() {
     }
   };
 
-  const simulateRule = useCallback((rule: FocusAutomationRule): SimulationResult => {
-    const now = new Date();
-    const nowMinutes = now.getHours() * 60 + now.getMinutes();
-    if (!rule.enabled) {
-      return {
-        matched: false,
-        reason: t("focus:automation.disabled"),
-        suggestedAction: "none",
-      };
+  const buildDraftConditionJson = useCallback((): string => {
+    if (draftRuleType === "keyword") {
+      return JSON.stringify({ match_type: draftMatchType, keyword: draftKeyword.trim() });
     }
-    if (!inWindow(nowMinutes, rule.start, rule.end)) {
-      return {
-        matched: false,
-        reason: t("focus:automation.outOfWindow", { start: rule.start, end: rule.end }),
-        suggestedAction: "none",
-      };
+    if (draftRuleType === "time_window") {
+      return JSON.stringify({ start: draftStart, end: draftEnd });
     }
+    return JSON.stringify({ app_name: draftAppName.trim() });
+  }, [draftRuleType, draftMatchType, draftKeyword, draftStart, draftEnd, draftAppName]);
 
-    const recent = recentFocusMinutes(sessions, 7);
-    if (recent < rule.minRecentFocusMinutes) {
-      return {
-        matched: false,
-        reason: t("focus:automation.notEnoughFocus", { recent, required: rule.minRecentFocusMinutes }),
-        suggestedAction: "none",
-      };
+  const resetDraft = useCallback((type: RuleType) => {
+    setDraftRuleType(type);
+    if (type === "keyword") {
+      setDraftMatchType("contains");
+      setDraftKeyword("");
+    } else if (type === "time_window") {
+      setDraftStart("09:00");
+      setDraftEnd("11:00");
+    } else {
+      setDraftAppName("");
     }
+  }, []);
 
-    if (active) {
-      return {
-        matched: true,
-        reason: t("focus:automation.alreadyActive"),
-        suggestedAction: "keep",
-      };
-    }
-
-    return {
-      matched: true,
-      reason: t("focus:automation.readyToStart"),
-      suggestedAction: "start",
-    };
-  }, [active, sessions, t]);
-
-  const runRuleSimulation = useCallback((rule: FocusAutomationRule) => {
-    setSimulationByRule((prev) => ({ ...prev, [rule.id]: simulateRule(rule) }));
-  }, [simulateRule]);
-
-  const applyRuleNow = useCallback(async (rule: FocusAutomationRule) => {
-    const result = simulateRule(rule);
-    setSimulationByRule((prev) => ({ ...prev, [rule.id]: result }));
-    if (result.suggestedAction !== "start") return;
-
-    const id = await api.startFocusSession(rule.name, "rule");
-    await api.setFocusModeActive(true);
-    setActive(true);
-    setActiveSessionId(id);
-    await loadState();
-  }, [loadState, simulateRule]);
-
-  const addRule = () => {
+  const addRule = async () => {
     const name = draftName.trim();
     if (!name) return;
-    const row: FocusAutomationRule = {
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+
+    const rule: FocusRule = {
       name,
-      start: draftStart,
-      end: draftEnd,
-      minRecentFocusMinutes: Math.max(0, draftMinFocus),
       enabled: true,
+      rule_type: draftRuleType,
+      condition_json: buildDraftConditionJson(),
+      action: draftAction,
+      auto_start: draftAutoStart,
+      quiet_hours_respect: draftQuietHoursRespect,
     };
-    setRules((prev) => [row, ...prev].slice(0, 20));
-    setDraftName("");
+
+    try {
+      await api.saveFocusRule(rule);
+      await loadRules();
+      setDraftName("");
+      resetDraft("time_window");
+    } catch {
+      // ignore save failures
+    }
   };
+
+  const toggleRule = async (rule: FocusRule) => {
+    if (rule.id === undefined) return;
+    try {
+      await api.saveFocusRule({ ...rule, enabled: !rule.enabled });
+      await loadRules();
+    } catch {
+      // ignore
+    }
+  };
+
+  const deleteRule = async (id: number | undefined) => {
+    if (id === undefined) return;
+    try {
+      await api.deleteFocusRule(id);
+      setRules((prev) => prev.filter((r) => r.id !== id));
+    } catch {
+      // ignore
+    }
+  };
+
+  const simulateRule = useCallback(async (rule: FocusRule): Promise<FocusRuleMatch | null> => {
+    const ruleId = rule.id;
+    if (ruleId === undefined) return null;
+    try {
+      const matches = await api.evaluateFocusRules();
+      const match = matches.find((m) => m.rule_id === ruleId) ?? null;
+      if (match) {
+        setSimulationByRule((prev) => ({ ...prev, [ruleId]: match }));
+      } else {
+        const fallback: FocusRuleMatch = {
+          rule_id: ruleId,
+          matched: false,
+          reason: t("focus:automation.noMatch"),
+        };
+        setSimulationByRule((prev) => ({ ...prev, [ruleId]: fallback }));
+        return fallback;
+      }
+      return match;
+    } catch {
+      const fallback: FocusRuleMatch = {
+        rule_id: ruleId,
+        matched: false,
+        reason: t("focus:automation.simulationError"),
+      };
+      setSimulationByRule((prev) => ({ ...prev, [ruleId]: fallback }));
+      return fallback;
+    }
+  }, [t]);
+
+  const applyRuleNow = useCallback(async (rule: FocusRule) => {
+    if (rule.id === undefined) return;
+    const match = await simulateRule(rule);
+
+    // Apply the rule action locally as a manual override when the backend reports a match.
+    const action = match?.action || rule.action;
+
+    if (action === "enter_focus" && !active) {
+      const id = await api.startFocusSession(rule.name, "rule");
+      await api.setFocusModeActive(true);
+      setActive(true);
+      setActiveSessionId(id);
+      await loadState();
+    } else if (action === "leave_focus" && active && activeSessionId != null) {
+      await api.stopFocusSession(activeSessionId);
+      await api.setFocusModeActive(false);
+      setActive(false);
+      setActiveSessionId(null);
+      await loadState();
+    }
+  }, [active, activeSessionId, loadState, simulateRule]);
 
   const activeSession = sessions.find((s) => s.ended_at == null);
   const pastSessions = sessions.filter((s) => s.ended_at != null);
@@ -310,7 +380,7 @@ export default function FocusModePage() {
 
         <div className="glass-card p-4 space-y-3">
           <p className="text-xs text-text-muted">{t("focus:automation.hint")}</p>
-          <div className="grid grid-cols-1 md:grid-cols-[1.2fr_auto_auto_auto_auto] gap-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
             <input
               type="text"
               value={draftName}
@@ -318,43 +388,111 @@ export default function FocusModePage() {
               placeholder={t("focus:automation.ruleNamePlaceholder")}
               className="ui-field"
             />
-            <input type="time" value={draftStart} onChange={(e) => setDraftStart(e.target.value)} className="ui-field !w-28" />
-            <input type="time" value={draftEnd} onChange={(e) => setDraftEnd(e.target.value)} className="ui-field !w-28" />
+            <select
+              value={draftRuleType}
+              onChange={(e) => resetDraft(e.target.value as RuleType)}
+              className="ui-select"
+            >
+              <option value="keyword">{t("focus:automation.ruleTypeKeyword")}</option>
+              <option value="time_window">{t("focus:automation.ruleTypeTimeWindow")}</option>
+              <option value="app">{t("focus:automation.ruleTypeApp")}</option>
+            </select>
+          </div>
+
+          {draftRuleType === "keyword" && (
+            <div className="grid grid-cols-1 md:grid-cols-[auto_1fr] gap-2">
+              <select
+                value={draftMatchType}
+                onChange={(e) => setDraftMatchType(e.target.value as MatchType)}
+                className="ui-select"
+              >
+                <option value="contains">{t("focus:automation.matchTypeContains")}</option>
+                <option value="exact">{t("focus:automation.matchTypeExact")}</option>
+                <option value="regex">{t("focus:automation.matchTypeRegex")}</option>
+              </select>
+              <input
+                type="text"
+                value={draftKeyword}
+                onChange={(e) => setDraftKeyword(e.target.value)}
+                placeholder={t("focus:automation.keywordPlaceholder")}
+                className="ui-field"
+              />
+            </div>
+          )}
+
+          {draftRuleType === "time_window" && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              <input type="time" value={draftStart} onChange={(e) => setDraftStart(e.target.value)} className="ui-field" />
+              <input type="time" value={draftEnd} onChange={(e) => setDraftEnd(e.target.value)} className="ui-field" />
+            </div>
+          )}
+
+          {draftRuleType === "app" && (
             <input
-              type="number"
-              min={0}
-              max={600}
-              value={draftMinFocus}
-              onChange={(e) => setDraftMinFocus(Number(e.target.value || "0"))}
-              className="ui-field !w-28"
-              title={t("focus:automation.minRecentFocus")}
+              type="text"
+              value={draftAppName}
+              onChange={(e) => setDraftAppName(e.target.value)}
+              placeholder={t("focus:automation.appNamePlaceholder")}
+              className="ui-field"
             />
-            <button onClick={addRule} className="btn-primary !px-3">{t("focus:automation.addRule")}</button>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-[auto_1fr_1fr] gap-2">
+            <select
+              value={draftAction}
+              onChange={(e) => setDraftAction(e.target.value as RuleAction)}
+              className="ui-select"
+            >
+              <option value="enter_focus">{t("focus:automation.actionEnterFocus")}</option>
+              <option value="leave_focus">{t("focus:automation.actionLeaveFocus")}</option>
+            </select>
+            <label className="flex items-center gap-2 text-xs text-text-secondary bg-surface-hover/40 rounded-xl px-3 py-2 border border-surface-border cursor-pointer">
+              <input
+                type="checkbox"
+                checked={draftAutoStart}
+                onChange={(e) => setDraftAutoStart(e.target.checked)}
+                className="accent-accent-blue"
+              />
+              {t("focus:automation.autoStart")}
+            </label>
+            <label className="flex items-center gap-2 text-xs text-text-secondary bg-surface-hover/40 rounded-xl px-3 py-2 border border-surface-border cursor-pointer">
+              <input
+                type="checkbox"
+                checked={draftQuietHoursRespect}
+                onChange={(e) => setDraftQuietHoursRespect(e.target.checked)}
+                className="accent-accent-blue"
+              />
+              {t("focus:automation.respectQuietHours")}
+            </label>
+          </div>
+
+          <div>
+            <button onClick={() => void addRule()} className="btn-primary !px-3">
+              {t("focus:automation.addRule")}
+            </button>
           </div>
         </div>
 
         <div className="glass-card divide-y divide-surface-border">
-          {rules.length === 0 ? (
+          {rulesLoading ? (
+            <AsyncStateCard variant="loading" title={t("common:loading")} compact />
+          ) : rules.length === 0 ? (
             <AsyncStateCard variant="empty" title={t("focus:automation.empty")} compact />
           ) : (
             rules.map((rule) => {
-              const simulation = simulationByRule[rule.id];
+              const simulation = rule.id !== undefined ? simulationByRule[rule.id] : undefined;
               return (
-                <div key={rule.id} className="p-4 space-y-2">
+                <div key={rule.id ?? rule.name} className="p-4 space-y-2">
                   <div className="flex items-center justify-between gap-2 flex-wrap">
                     <div>
                       <p className="text-sm text-text-primary font-medium">{rule.name}</p>
                       <p className="text-xs text-text-muted">
-                        {t("focus:automation.ruleMeta", {
-                          start: rule.start,
-                          end: rule.end,
-                          min: rule.minRecentFocusMinutes,
-                        })}
+                        {ruleMetaLabel(rule, t)} · {t("focus:automation.actionLabel")}: {t(`focus:automation.action${rule.action === "enter_focus" ? "EnterFocus" : "LeaveFocus"}`)}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => setRules((prev) => prev.map((r) => (r.id === rule.id ? { ...r, enabled: !r.enabled } : r)))}
+                        onClick={() => void toggleRule(rule)}
                         className={clsx(
                           "px-2.5 py-1 rounded-lg border text-xs",
                           rule.enabled ? "border-accent-blue/40 text-accent-blue" : "border-surface-border text-text-muted"
@@ -362,13 +500,13 @@ export default function FocusModePage() {
                       >
                         {rule.enabled ? t("focus:automation.enabled") : t("focus:automation.disabledShort")}
                       </button>
-                      <button onClick={() => runRuleSimulation(rule)} className="px-2.5 py-1 rounded-lg border border-surface-border text-xs text-text-secondary hover:bg-surface-hover">
+                      <button onClick={() => void simulateRule(rule)} className="px-2.5 py-1 rounded-lg border border-surface-border text-xs text-text-secondary hover:bg-surface-hover">
                         {t("focus:automation.simulate")}
                       </button>
                       <button onClick={() => void applyRuleNow(rule)} className="px-2.5 py-1 rounded-lg border border-accent-purple/50 text-xs text-accent-purple hover:bg-accent-purple/10">
                         {t("focus:automation.applyNow")}
                       </button>
-                      <button onClick={() => setRules((prev) => prev.filter((r) => r.id !== rule.id))} className="px-2.5 py-1 rounded-lg border border-surface-border text-xs text-text-muted hover:text-accent-red">
+                      <button onClick={() => void deleteRule(rule.id)} className="px-2.5 py-1 rounded-lg border border-surface-border text-xs text-text-muted hover:text-accent-red">
                         {t("common:delete")}
                       </button>
                     </div>
