@@ -2,6 +2,7 @@ import {
   appColor,
   clamp,
   formatDuration,
+  getProjectDisplayName,
   pad2,
 } from "./format";
 
@@ -41,6 +42,25 @@ describe("pad2", () => {
   it("does not pad two digit numbers", () => {
     expect(pad2(10)).toBe("10");
     expect(pad2(99)).toBe("99");
+  });
+});
+
+describe("getProjectDisplayName", () => {
+  const t = (key: string) => (key === "dashboard:unknownProject" ? "Unknown project" : key);
+
+  it("prefers the explicit project name", () => {
+    expect(getProjectDisplayName("MyProject", "/home/user/Other", t)).toBe("MyProject");
+  });
+
+  it("falls back to the basename of the project path", () => {
+    expect(getProjectDisplayName("", "/home/user/MyProject", t)).toBe("MyProject");
+    expect(getProjectDisplayName(undefined, "C:\\\\Users\\\\me\\\\MyProject", t)).toBe("MyProject");
+    expect(getProjectDisplayName("   ", "/home/user/MyProject/", t)).toBe("MyProject");
+  });
+
+  it("returns the localized unknown label when nothing is available", () => {
+    expect(getProjectDisplayName("", "", t)).toBe("Unknown project");
+    expect(getProjectDisplayName(undefined, undefined, t)).toBe("Unknown project");
   });
 });
 

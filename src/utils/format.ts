@@ -61,3 +61,25 @@ export function appColor(appName: string): string {
 export function pad2(n: number): string {
   return String(n).padStart(2, "0");
 }
+
+/**
+ * Return a display name for a VS Code project.
+ * Prefer an explicit project name, then derive one from the project path,
+ * and finally fall back to a localized "unknown project" label.
+ */
+export function getProjectDisplayName(
+  projectName: string | undefined | null,
+  projectPath: string | undefined | null,
+  t: (key: string) => string
+): string {
+  const name = projectName?.trim();
+  if (name) return name;
+
+  const path = projectPath?.trim();
+  if (path) {
+    const base = path.replace(/\\/g, "/").split("/").filter(Boolean).pop();
+    if (base) return base;
+  }
+
+  return t("dashboard:unknownProject");
+}

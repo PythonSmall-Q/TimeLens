@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { t } from "./i18n";
 
 /** Fetch JSON from the TimeLens local API, returns null on any error. */
 async function fetchJson<T>(url: string): Promise<T | null> {
@@ -264,7 +265,7 @@ function buildHtml(opts: BuildHtmlOptions): string {
             const pct = total > 0 ? Math.round((row.total_seconds / total) * 100) : 0;
             return `<div class="bar-row">
               <div class="bar-label">
-                <span title="${esc(row.project_path || row.project_name)}">${esc(row.project_name || "unknown")}</span>
+                <span title="${esc(row.project_path || row.project_name)}">${esc(row.project_name || t().unknownProject)}</span>
                 <span class="bar-dur">${fmtDuration(row.total_seconds)}</span>
               </div>
               <div class="bar-track"><div class="bar-fill bar-fill-green" style="width:${pct}%"></div></div>

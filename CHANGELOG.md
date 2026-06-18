@@ -66,6 +66,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Added secondary confirmation and success/failure feedback for widget permission revoke actions to reduce accidental operations.
 - Added per-widget permission change timeline (grant/revoke actor + timestamp) for third-party widget governance audits.
 - Completed i18n coverage for newly added Widget permission matrix and Browser Usage/Dashboard incremental features across `en` / `zh-CN` / `zh-TW`.
+- **`getProjectDisplayName` helper** in `src/utils/format.ts` with unit tests: prefers `project_name`, falls back to the basename of `project_path`, and finally returns the localized `dashboard:unknownProject` label.
+- **`dashboard:unknownProject`** i18n key across all desktop locales (`en`, `zh-CN`, `zh-TW`, `ja`, `ko`, `fr`, `de`, `es`).
+- **`unknownProject`** runtime string to the VS Code extension i18n module, used by the extension dashboard panel when a project name is missing.
 
 ### Fixed
 
@@ -75,6 +78,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Database encryption file-lock resilience** — encryption/decryption and plaintext wipe now retry on Windows file locks and fall back to a usable runtime plaintext database if the encrypted backup cannot be decrypted on startup.
 - **Database encryption disable flow** — fixed a bug where disabling encryption and restarting could corrupt or overwrite the latest plaintext with a stale encrypted backup. Disabling now preserves the current runtime plaintext and removes encrypted artifacts after verifying the plaintext is valid.
 - **Database open retry on restart** — added a short retry loop when opening the profile database during startup to avoid "localhost refused connection" / startup failures caused by Windows file-lock races after `app.restart()`.
+- **VS Code project name fallback** — when `project_name` is empty (for example, in detailed tracking where only the folder path was recorded), the Dashboard today overview and VS Code Insights project ranking now derive the display name from the opened folder path. If no folder information is available, they show a localized "Unknown project" label instead of "No data".
 
 ### Security
 
@@ -84,6 +88,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **CodeQL: hard-coded cryptographic value** — refactored salt/nonce generation in `src-tauri/src/db_encryption.rs` and `src-tauri/src/commands/data_reliability_cmd.rs` to use `OsRng.gen()` instead of zero-initialized arrays, eliminating false-positive hard-coded crypto alerts.
 - **CodeQL: workflow permissions** — added explicit `permissions: { contents: read, actions: write }` at workflow and job level in `.github/workflows/ci.yml`.
 - **CI `npm test` failure** — added frontend unit tests for `src/utils/format.ts` and a `vitest.config.ts` so `npm test` no longer exits with "No test files found".
+- **Patched npm vulnerabilities** — updated `vite` to `^8.0.16` in the root workspace to resolve the `server.fs.deny` Windows alternate-path bypass (GHSA-fx2h-pf6j-xcff) and the bundled `launch-editor` NTLMv2 hash disclosure via UNC paths (GHSA-v6wh-96g9-6wx3).
+- **Patched VS Code extension dependencies** — ran `npm audit fix` in `vscode-extension/` to update `markdown-it` to `14.2.0` (quadratic complexity DoS in smartquotes, GHSA-6v5v-wf23-fmfq), `form-data` to `4.0.6`, and `js-yaml` to `4.2.0`.
 
 ## [1.4.4] - 2026-06-06
 

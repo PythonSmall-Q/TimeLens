@@ -52,6 +52,7 @@ interface Messages {
   authFailedNoKey: string;
   configureKeyBtn: string;
   showLogBtn: string;
+  unknownProject: string;
 }
 
 const en: Messages = {
@@ -100,6 +101,7 @@ const en: Messages = {
   authFailedNoKey: "TimeLens: Extension bridge key not configured. Please set your API key.",
   configureKeyBtn: "Configure Key",
   showLogBtn: "Show Log",
+  unknownProject: "Unknown project",
 };
 
 const zh: Messages = {
@@ -148,6 +150,7 @@ const zh: Messages = {
   authFailedNoKey: "TimeLens: 未配置扩展桥接密钥，请先设置 API 密钥。",
   configureKeyBtn: "配置密钥",
   showLogBtn: "查看日志",
+  unknownProject: "未知项目",
 };
 
 const zhTw: Messages = {
@@ -196,6 +199,7 @@ const zhTw: Messages = {
   authFailedNoKey: "TimeLens: 尚未設定擴充橋接金鑰，請先設定 API 金鑰。",
   configureKeyBtn: "設定金鑰",
   showLogBtn: "檢視日誌",
+  unknownProject: "未知專案",
 };
 
 export function t(): Messages {

@@ -92,6 +92,7 @@
   "vscodeLang": "Lang:",
   "vscodeProject": "Project:",
   "unknownApp": "Unknown",
+  "unknownProject": "Unknown project",
   "vscodeInsights": "VS Code Usage Details",
   "vscodeTrackingToggle": "Record VS Code data",
   "vscodeExtensionTitle": "VS Code Extension",

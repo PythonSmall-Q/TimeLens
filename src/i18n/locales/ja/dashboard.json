@@ -92,6 +92,7 @@
   "vscodeLang": "言語:",
   "vscodeProject": "プロジェクト:",
   "unknownApp": "不明",
+  "unknownProject": "不明なプロジェクト",
   "vscodeInsights": "VS Code 使用の詳細",
   "vscodeTrackingToggle": "VS Code データを記録",
   "vscodeExtensionTitle": "VS Code 拡張機能",

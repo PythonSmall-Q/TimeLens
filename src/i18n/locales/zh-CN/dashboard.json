@@ -92,6 +92,7 @@
   "vscodeLang": "语言:",
   "vscodeProject": "项目:",
   "unknownApp": "未知应用",
+  "unknownProject": "未知项目",
   "vscodeInsights": "VS Code 使用详情",
   "vscodeTrackingToggle": "记录 VS Code 数据",
   "vscodeExtensionTitle": "VS Code 扩展",

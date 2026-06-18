@@ -4,8 +4,9 @@ Last updated: 2026-06-12
 
 ## Canonical Source
 
-This file is the single source of truth for the TimeLens local-first roadmap.
-Legacy planning notes from `docs/ROADMAP_FROM_1.4.3.md` are merged into the post-v2.0 outlook section in this document.
+This file is the single source of truth for the TimeLens local-first roadmap **up to and including v2.0.0**.
+Planning for releases after v2.0.0 is maintained in `docs/ROADMAP_POST_v2.0.0.md`.
+Legacy planning notes from `docs/ROADMAP_FROM_1.4.3.md` are merged into the post-v2.0 outlook in that document.
 
 ## Vision
 
@@ -258,31 +259,13 @@ Target window: 2027 Q1
 - Migration from supported 1.x versions passes integrity checks.
 - End-to-end privacy checklist is publicly documented.
 
-## Post-v2.0 Outlook (Merged)
+## Post-v2.0 Outlook
 
-### v2.2.0 (2026 Q3) - Widget Workflow Expansion
+Detailed planning for releases after v2.0.0 (including v2.2.0, v2.4.0, v2.6.0, v3.0.0, and beyond) is maintained in a separate roadmap file:
 
-- Upgrade Widget Center into a high-frequency workflow entry surface.
-- Add scenario presets and one-click layout switching.
-- Add widget performance observability with local fallback strategies.
+- **`docs/ROADMAP_POST_v2.0.0.md`**
 
-### v2.4.0 (2026 Q4) - Focus and Goal Execution
-
-- Convert insights into executable daily plans.
-- Add goal coaching, session review summaries, and anti-distraction policies.
-- Expand official workflow widgets for planning and review loops.
-
-### v2.6.0 (2027 Q1) - Developer Ecosystem and Governance
-
-- Improve third-party widget developer workflow with SDK and local debugging.
-- Strengthen permission governance and localhost API auditing.
-- Introduce widget quality scoring for startup, stability, and resource usage.
-
-### v3.0.0 (2027 Q2) - Local-First Productivity Platform
-
-- Complete the loop of insight, planning, execution, and reflection.
-- Expand local automation and long-term data lifecycle controls.
-- Finish accessibility and localization quality coverage.
+That document covers the widget runtime, multi-language extension model, extension ecosystem governance, and the unified local-first productivity extension platform.
 
 ## Governance and Decision Rules
 

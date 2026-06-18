@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 import { useStatsStore } from "@/stores/statsStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useDashboardLayoutStore } from "@/stores/dashboardLayoutStore";
-import { formatDuration } from "@/utils/format";
+import { formatDuration, getProjectDisplayName } from "@/utils/format";
 import { todayString } from "@/utils/format";
 import { Monitor, Zap, TrendingUp, PauseCircle, Play, Pause, Code2 } from "lucide-react";
 import clsx from "clsx";
@@ -35,7 +35,9 @@ export default function TodayOverview() {
   const topProject = vscodeProjectStats[0];
   const appNameLabel = topApp?.app_name?.trim() || t("dashboard:unknownApp");
   const langLabel = topLanguage?.language?.trim() || t("dashboard:noDataShort");
-  const projectLabel = topProject?.project_name?.trim() || t("dashboard:noDataShort");
+  const projectLabel = topProject
+    ? getProjectDisplayName(topProject.project_name, topProject.project_path, t)
+    : t("dashboard:noDataShort");
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">

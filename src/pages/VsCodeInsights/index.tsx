@@ -7,7 +7,7 @@ import {
   setFocusModeActive,
   setVsCodeTrackingEnabled,
 } from "@/services/tauriApi";
-import { formatDuration, todayString } from "@/utils/format";
+import { formatDuration, getProjectDisplayName, todayString } from "@/utils/format";
 
 const fmt = (d: Date) => d.toISOString().slice(0, 10);
 
@@ -261,14 +261,15 @@ export default function VsCodeInsights() {
               <div className="text-xs text-text-muted italic">{t("dashboard:trackingLevelHidden")}</div>
             ) : (
               <div className="space-y-2">
-                {vscodeProjectStats.slice(0, 10).map((row) => {
+                {vscodeProjectStats.slice(0, 10).map((row, index) => {
                   const total = vscodeProjectStats.reduce((s, r) => s + r.total_seconds, 0);
                   const pct = total > 0 ? Math.round((row.total_seconds / total) * 100) : 0;
+                  const displayName = getProjectDisplayName(row.project_name, row.project_path, t);
                   return (
-                    <div key={`${row.project_path}-${row.project_name}`} className="space-y-0.5">
+                    <div key={`${row.project_path || "-"}-${row.project_name || "-"}-${index}`} className="space-y-0.5">
                       <div className="flex items-center justify-between text-sm gap-3">
-                        <span className="text-text-primary truncate" title={row.project_path || row.project_name}>
-                          {row.project_name || t("dashboard:noDataShort")}
+                        <span className="text-text-primary truncate" title={row.project_path || row.project_name || undefined}>
+                          {displayName}
                         </span>
                         <span className="text-text-secondary shrink-0 text-xs">{formatDuration(row.total_seconds)}</span>
                       </div>
