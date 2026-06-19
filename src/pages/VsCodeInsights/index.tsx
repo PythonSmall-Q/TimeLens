@@ -44,6 +44,7 @@ export default function VsCodeInsights() {
   const [trackingLevel, setTrackingLevel] = useState<string>("standard");
   const [focusEnabled, setFocusEnabled] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const range = useMemo(() => {
     if (periodMode === "month") {
@@ -108,6 +109,15 @@ export default function VsCodeInsights() {
     }
   };
 
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await fetchVsCodeStatsForRange(range.start, range.end);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   // Conditional section visibility: show if data exists OR level covers it
   const showLanguage = vscodeLanguageStats.length > 0 || trackingLevel === "standard" || trackingLevel === "detailed";
   const showProject = vscodeProjectStats.length > 0 || trackingLevel === "detailed";
@@ -128,12 +138,21 @@ export default function VsCodeInsights() {
         <div className="flex items-center gap-2">
           {/* Tracking on/off toggle in header */}
           <button
-            disabled={saving}
+            disabled={saving || refreshing}
             onClick={onToggleTracking}
             title={t("dashboard:vscodeTrackingToggle")}
             className={`ui-btn-secondary !text-xs !px-3 !py-1.5 disabled:opacity-60 ${!trackingEnabled ? "opacity-50" : ""}`}
           >
             {trackingEnabled ? t("dashboard:statusEnabled") : t("dashboard:statusDisabled")}
+          </button>
+
+          <button
+            disabled={refreshing}
+            onClick={handleRefresh}
+            title={t("dashboard:refresh")}
+            className="ui-btn-secondary !text-xs !px-3 !py-1.5 disabled:opacity-60"
+          >
+            {refreshing ? t("common:loading") : t("dashboard:refresh")}
           </button>
 
           <select

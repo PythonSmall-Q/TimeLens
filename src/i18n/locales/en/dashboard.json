@@ -179,5 +179,6 @@
     "week": "Week preset",
     "month": "Month preset",
     "backToToday": "Back to today"
-  }
+  },
+  "refresh": "Refresh"
 }

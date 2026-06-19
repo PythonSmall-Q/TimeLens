@@ -37,6 +37,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Settings UI for v2.0.0 platform features** — added sections/cards for migration rehearsal/integrity checks, passphrase-protected backups, archive scheduler and compression, profile management, and database encryption.
 - **CI quality gates** — added `npm test`, Rust `cargo test`, Tauri build smoke test, offline critical-journey tests, and migration-rehearsal job to `.github/workflows/ci.yml`.
 - **Dashboard Insights enhancements** — added saved views, distraction hotspot card, and Apps/Categories/Projects comparison tabs.
+- **VS Code Insights manual refresh** — added a refresh button to the VS Code Insights page header, matching the browser extension refresh behavior.
 - **Focus rule backend integration** — Focus Mode rules now persist in the backend `focus_rules` table with CRUD commands and backend-driven auto start/stop.
 - **Profile state isolation** — moved profile metadata and `current_profile_id` into a separate unencrypted `app_state.db` so profile switching remains reliable even when individual profile databases are encrypted.
 - **Full Japanese, Korean, French, German, and Spanish localization** — completed frontend translations across all desktop namespaces (`common`, `dashboard`, `widgets`, `settings`, `limits`, `categories`, `goals`, `focus`, `browserUsage`) for `ja`, `ko`, `fr`, `de`, and `es`.

@@ -179,5 +179,6 @@
     "week": "Preajuste de semana",
     "month": "Preajuste de mes",
     "backToToday": "Volver a hoy"
-  }
+  },
+  "refresh": "Actualizar"
 }
