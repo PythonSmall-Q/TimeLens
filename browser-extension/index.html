@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TimeLens Browser Companion · 浏览器扩展</title>
+  <meta name="description" content="TimeLens 官方浏览器扩展，自动追踪标签页使用时长，与桌面端同步，支持 Chrome 与 Firefox。" />
+  <link rel="icon" type="image/png" href="../docs/assets/icon.png" />
+  <link rel="stylesheet" href="../docs/styles.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- Navbar -->
+  <nav class="navbar">
+    <div class="nav-container">
+      <a href="../docs/index.html" class="nav-brand">
+        <img src="../docs/assets/icon.svg" alt="TimeLens" class="nav-icon" />
+        <span class="nav-title">TimeLens</span>
+      </a>
+      <div class="nav-links">
+        <a href="../docs/index.html#features" class="nav-link">功能</a>
+        <a href="../docs/index.html#showcase" class="nav-link">展示</a>
+        <a href="../docs/index.html#ecosystem" class="nav-link">生态</a>
+        <a href="../docs/index.html#quickstart" class="nav-link">快速开始</a>
+        <a href="../docs/index.html#docs" class="nav-link">文档</a>
+        <a href="https://github.com/PythonSmall-Q/TimeLens" class="nav-link" target="_blank" rel="noopener">
+          <svg class="github-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+          GitHub
+        </a>
+      </div>
+      <button class="nav-toggle" id="navToggle" aria-label="切换导航">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </nav>
+
+  <div class="content-wrapper">
+    <aside class="sidebar">
+      <ul class="sidebar-nav">
+        <li><a href="../docs/index.html">← 返回首页</a></li>
+        <li><a href="../docs/DEVELOPMENT.html">开发指南</a></li>
+        <li><a href="../docs/ARCHITECTURE.html">架构文档</a></li>
+        <li><a href="../docs/API_REFERENCE.html">API 参考</a></li>
+        <li><a href="../vscode-extension/index.html">VS Code 扩展</a></li>
+        <li><a href="../docs/ADD_LANGUAGE.html">添加语言</a></li>
+      </ul>
+    </aside>
+
+    <main class="content-main">
+      <nav class="breadcrumb">
+        <a href="../docs/index.html">文档首页</a>
+        <span>/</span>
+        <span>浏览器扩展</span>
+      </nav>
+
+      <h1>TimeLens Browser Companion</h1>
+      <p>官方 <strong>TimeLens 浏览器扩展</strong>，用于跟踪浏览器标签页使用时长，并通过本地 API 与桌面端同步数据，让屏幕时间报告同时覆盖桌面应用与网页浏览。</p>
+
+      <div style="margin: 24px 0;">
+        <a href="https://microsoftedge.microsoft.com/addons/detail/ggpfddncgjgicapbhiifkcffbfjcdcpi" class="btn btn-primary" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          Microsoft Edge 加载项
+        </a>
+        <a href="https://github.com/PythonSmall-Q/TimeLens/tree/master/browser-extension" class="btn btn-secondary" target="_blank" rel="noopener" style="margin-left:12px">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
+          浏览源码
+        </a>
+      </div>
+
+      <hr />
+
+      <h2 id="overview">概述</h2>
+      <p>该扩展以 Manifest V3 Service Worker 形式运行。它会记录你在各个浏览器标签页上的停留时间（按域名聚合），并通过本地 HTTP API（<code>127.0.0.1:49152</code>）将使用会话转发给 TimeLens 桌面端。</p>
+
+      <h2 id="features">功能特性</h2>
+      <table>
+        <thead>
+          <tr><th>功能</th><th>说明</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>标签页会话跟踪</strong></td><td>自动记录当前活跃标签页的停留时间，切换标签页、最小化浏览器或进入空闲状态时自动暂停。</td></tr>
+          <tr><td><strong>空闲检测</strong></td><td>借助 <code>chrome.idle</code> API，当你超过 60 秒未操作键盘/鼠标时停止计时。</td></tr>
+          <tr><td><strong>离线缓冲</strong></td><td>桌面端离线时，会话数据先在本地排队缓存，待桌面端恢复后自动批量上报。</td></tr>
+          <tr><td><strong>弹出面板</strong></td><td>点击工具栏图标，即可查看今日热门域名、近期会话记录以及与 TimeLens 的连接状态。</td></tr>
+          <tr><td><strong>多语言界面</strong></td><td>内置英文与简体中文支持，与桌面端语言设置保持一致。</td></tr>
+          <tr><td><strong>Chrome & Firefox</strong></td><td>同时支持 Chromium 内核浏览器与 Firefox。</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="architecture">架构</h2>
+      <pre><code>browser-extension/
+├── manifest.json          # Manifest V3 配置
+├── background.js          # Service Worker —— 跟踪与同步逻辑
+├── popup.html / popup.js  # 工具栏弹出面板 UI
+├── popup.css              # 弹出面板样式
+├── i18n.js                # 轻量国际化辅助模块
+├── _locales/              # 本地化字符串（en、zh_CN）
+├── icons/                 # 扩展图标
+└── scripts/               # 构建脚本</code></pre>
+      <ul>
+        <li><code>background.js</code> 负责处理 tabs、windows、idle 和 alarms 事件，将当前会话保存在 <code>chrome.storage.local</code> 中，并通过 POST 请求将已完成的会话发送至桌面端 API。</li>
+        <li><code>popup.js</code> 读取缓存的会话数据，并调用 <code>/api/screen-time/today</code> 接口渲染弹出面板。</li>
+      </ul>
+
+      <h2 id="build">构建</h2>
+      <pre><code># 代码检查
+npm run lint
+
+# 构建 Firefox 版本（默认）
+npm run build
+
+# 构建 Chrome 版本
+npm run build:chrome</code></pre>
+
+      <h2 id="download">下载安装</h2>
+      <p>浏览器扩展已上架 Microsoft Edge 加载项商店，点击上方按钮或下方链接即可安装：</p>
+      <p>
+        <a href="https://microsoftedge.microsoft.com/addons/detail/ggpfddncgjgicapbhiifkcffbfjcdcpi" target="_blank" rel="noopener">前往 Microsoft Edge 加载项安装 →</a>
+      </p>
+
+      <h2 id="related">相关文档</h2>
+      <ul>
+        <li><a href="../README.md">TimeLens 桌面端 README</a></li>
+        <li><a href="../README_zh.md">TimeLens 桌面端 README（中文）</a></li>
+        <li><a href="../docs/API_REFERENCE.html">API 参考</a></li>
+      </ul>
+    </main>
+  </div>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="footer-container">
+      <div class="footer-brand">
+        <img src="../docs/assets/icon.svg" alt="TimeLens" class="footer-icon" />
+        <span>TimeLens</span>
+      </div>
+      <p class="footer-copy">MIT License · Built with Tauri & React · 由社区驱动</p>
+      <div class="footer-links">
+        <a href="https://github.com/PythonSmall-Q/TimeLens" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/PythonSmall-Q/TimeLens/releases" target="_blank" rel="noopener">Releases</a>
+        <a href="../README.md">README</a>
+        <a href="../CHANGELOG.md">Changelog</a>
+        <a href="../CONTRIBUTING.md">Contributing</a>
+        <a href="../PRIVACY_POLICY.md">Privacy</a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    const navToggle = document.getElementById('navToggle');
+    const navLinks = document.querySelector('.nav-links');
+    navToggle.addEventListener('click', () => {
+      navLinks.classList.toggle('open');
+    });
+  </script>
+</body>
+</html>

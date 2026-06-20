@@ -45,8 +45,8 @@ TimeLens is more than a desktop app — it's a screen-time platform with cross-t
 | Component | Path | Description |
 | --------- | ---- | ----------- |
 | **TimeLens Desktop** | `src/` + `src-tauri/` | Main Tauri + React application with tracking, insights, widgets, and settings. |
-| **Browser Extension** | `browser-extension/` | Collects domain-level web usage and merges it with desktop stats. |
-| **VS Code Extension** | `vscode-extension/` | Tracks coding sessions by language, project, and workspace. |
+| **Browser Extension** | [`browser-extension/`](browser-extension/index.html) | Collects domain-level web usage and merges it with desktop stats. |
+| **VS Code Extension** | [`vscode-extension/`](vscode-extension/index.html) | Tracks coding sessions by language, project, and workspace. |
 
 ---
 

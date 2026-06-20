@@ -46,7 +46,7 @@
         <img src="assets/icon.png" alt="TimeLens" class="hero-icon" />
         <span>TimeLens</span>
         <span class="hero-badge-sep">·</span>
-        <span class="hero-badge-version">v1.1.0</span>
+        <span class="hero-badge-version" id="heroVersion">v2.0.0</span>
       </div>
       <h1 class="hero-title reveal">
         洞悉每一分桌面时光
@@ -89,8 +89,9 @@
         <div class="clock-face">
           <div class="clock-hand hour"></div>
           <div class="clock-hand minute"></div>
+          <div class="clock-hand second"></div>
         </div>
-        <div class="clock-digital">14:32</div>
+        <div class="clock-digital" id="heroClock">14:32:00</div>
       </div>
     </div>
 
@@ -355,7 +356,8 @@
           </div>
           <h3>浏览器扩展</h3>
           <p>采集网页访问数据，域名级时长统计，支持与桌面端数据合并，统一呈现你的网络使用时间。</p>
-          <a href="../browser-extension/README.md" target="_blank">了解更多 →</a>
+          <a href="browser-extension/index.html">了解更多 →</a>
+          <a href="https://microsoftedge.microsoft.com/addons/detail/ggpfddncgjgicapbhiifkcffbfjcdcpi" target="_blank" rel="noopener" style="margin-left:12px">Edge 商店 →</a>
         </div>
         <div class="ecosystem-card reveal">
           <div class="ecosystem-icon vscode">
@@ -363,7 +365,8 @@
           </div>
           <h3>VS Code 扩展</h3>
           <p>记录代码编辑器内的项目与语言使用时长，开发者生产力洞察的绝佳搭档。</p>
-          <a href="../vscode-extension/README.md" target="_blank">了解更多 →</a>
+          <a href="vscode-extension/index.html">了解更多 →</a>
+          <a href="https://marketplace.visualstudio.com/items?itemName=ShanWenxiao.timelens-vscode-extension" target="_blank" rel="noopener" style="margin-left:12px">Marketplace →</a>
         </div>
       </div>
     </div>
@@ -439,7 +442,13 @@ npm run tauri:dev">
       </div>
       <div class="tech-grid">
         <div class="tech-card reveal">
-          <img src="https://tauri.app/img/index/header_dark.svg" alt="Tauri" class="tech-logo" />
+          <svg class="tech-logo" viewBox="0 0 24 24" fill="none" aria-label="Tauri">
+            <circle cx="12" cy="12" r="10" fill="#FFC131" />
+            <path fill="#0d1117" d="M12 6a6 6 0 0 0-6 6c0 3.31 2.69 6 6 6s6-2.69 6-6-2.69-6-6-6zm0 10.5a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9z"/>
+            <circle cx="12" cy="12" r="2.5" fill="#0d1117" />
+            <path fill="#24C8D8" d="M12 2a10 10 0 0 0-3.5.63l.45 1.35A8.5 8.5 0 0 1 12 3.5c.35 0 .69.02 1.03.06l.22-1.38A10.1 10.1 0 0 0 12 2z"/>
+            <path fill="#24C8D8" d="M20.37 8.5a10 10 0 0 0-1.85-2.52l-1.06.77a8.5 8.5 0 0 1 1.57 2.15l1.34-.4z"/>
+          </svg>
           <h4>Tauri 2.x</h4>
           <p>Rust 驱动的轻量级桌面壳</p>
         </div>
@@ -606,6 +615,53 @@ npm run tauri:dev">
       p.style.animationDuration = (3 + Math.random() * 4) + 's';
       particlesContainer.appendChild(p);
     }
+
+    // Real-time version from GitHub releases
+    const versionEl = document.getElementById('heroVersion');
+    fetch('https://api.github.com/repos/PythonSmall-Q/TimeLens/releases/latest')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data && data.tag_name) {
+          versionEl.textContent = data.tag_name;
+        }
+      })
+      .catch(() => { /* keep default */ });
+
+    // Real-time clock with seconds
+    const clockEl = document.getElementById('heroClock');
+    const hourHand = document.querySelector('.hero-widget.widget-clock .clock-hand.hour');
+    const minuteHand = document.querySelector('.hero-widget.widget-clock .clock-hand.minute');
+    const secondHand = document.querySelector('.hero-widget.widget-clock .clock-hand.second');
+
+    function pad(n) { return n.toString().padStart(2, '0'); }
+    function updateClock() {
+      const now = new Date();
+      const h = now.getHours();
+      const m = now.getMinutes();
+      const s = now.getSeconds();
+      clockEl.textContent = `${pad(h)}:${pad(m)}:${pad(s)}`;
+
+      const hDeg = (h % 12) * 30 + m * 0.5;
+      const mDeg = m * 6 + s * 0.1;
+      const sDeg = s * 6;
+      if (hourHand) hourHand.style.transform = `translateX(-50%) rotate(${hDeg}deg)`;
+      if (minuteHand) minuteHand.style.transform = `translateX(-50%) rotate(${mDeg}deg)`;
+      if (secondHand) secondHand.style.transform = `translateX(-50%) rotate(${sDeg}deg)`;
+    }
+    updateClock();
+    setInterval(updateClock, 1000);
+
+    // Floating widgets parallax on scroll
+    const heroWidgets = document.querySelectorAll('.hero-widget');
+    heroWidgets.forEach(w => w.classList.add('parallax'));
+    window.addEventListener('scroll', () => {
+      const y = window.scrollY;
+      heroWidgets.forEach((w, i) => {
+        const factor = 0.15 + i * 0.05;
+        const drift = Math.min(y * factor, 120);
+        w.style.transform = `translateY(${drift}px)`;
+      });
+    }, { passive: true });
   </script>
 </body>
 </html>

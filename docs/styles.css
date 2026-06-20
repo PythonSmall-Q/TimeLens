@@ -1147,6 +1147,13 @@ a:hover {
   transform: translateX(-50%) rotate(160deg);
 }
 
+.clock-hand.second {
+  width: 1px;
+  height: 17px;
+  background: var(--danger);
+  transform: translateX(-50%) rotate(250deg);
+}
+
 .clock-digital {
   font-family: var(--font-mono);
   font-size: 1.1rem;
@@ -1240,6 +1247,10 @@ a:hover {
   top: 30%;
   left: 8%;
   animation: floatWidget 5s ease-in-out infinite 1s;
+}
+
+.hero-widget.parallax {
+  transition: transform 0.1s linear;
 }
 
 @keyframes floatWidget {

@@ -43,8 +43,8 @@ TimeLens 不仅是一款桌面应用，更是围绕屏幕时间构建的跨端�
 | 组件 | 路径 | 说明 |
 | ---- | ---- | ---- |
 | **TimeLens 桌面端** | `src/` + `src-tauri/` | 基于 Tauri + React 的主应用，提供追踪、洞察、小组件与完整设置。 |
-| **浏览器扩展** | `browser-extension/` | 采集域名级网页使用数据，并与桌面端数据合并展示。 |
-| **VS Code 扩展** | `vscode-extension/` | 按语言、项目、工作区统计编码时长，开发者生产力洞察的好帮手。 |
+| **浏览器扩展** | [`browser-extension/`](browser-extension/index.html) | 采集域名级网页使用数据，并与桌面端数据合并展示。 |
+| **VS Code 扩展** | [`vscode-extension/`](vscode-extension/index.html) | 按语言、项目、工作区统计编码时长，开发者生产力洞察的好帮手。 |
 
 ---
 
