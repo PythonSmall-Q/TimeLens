@@ -44,6 +44,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Frontend accessibility pass** — added "Skip to main content" link, global `:focus-visible` styles, ARIA live announcer for notifications, navigation landmark labels, `aria-current="page"`, icon-only button labels, dialog roles/modal attributes, and dynamic HTML `lang` updates.
 - **Local API server governance** — hardened all API server routes to enforce widget-scoped API token scopes and reject unscoped or revoked tokens.
 - **Offline test harness scripts** — added `scripts/offline-journey-tests.sh` and `scripts/migration-rehearsal.sh` for local critical-journey and migration validation.
+- **VS Code extension sidebar home page redesign** — added connection status badge, focus-mode indicator, today's VS Code time card, language/project breakdown with progress bars, top desktop apps, and cleaner action buttons; sidebar API calls now include `X-Api-Token` and `X-Client-Id` headers for local API governance compatibility.
 
 ### Changed
 
@@ -73,6 +74,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **Settings excluded apps could not be unchecked after saving** — fixed a path-normalization mismatch: the backend stores ignored app paths lowercased, but the frontend compared original-case paths, causing excluded apps to vanish from the list. The list now renders ignored apps directly with case-insensitive matching so they remain visible and togglable.
+- **VS Code extension sidebar title showed raw `%timelens.homeView.name%`** — fixed invalid JSON in `vscode-extension/package.nls.json` and `vscode-extension/package.nls.zh-CN.json` (missing comma after `timelens.apiToken.description`), which prevented VS Code from resolving all `%...%` placeholder strings in `package.json`.
 - **Profile switching reliability** — fixed a bug where switching profiles could result in a "connection refused" error or missing profiles because `current_profile_id` was stored inside the encrypted profile database.
 - **Widget permission dialog state** — fixed install-time permission dialog state reset and instance targeting so permission grants are correctly associated with the widget being installed.
 - **Database encryption shutdown corruption** — fixed a critical bug where shutdown re-encryption generated a fresh nonce/salt but did not update the stored metadata, causing the next startup to fail with "Failed to decrypt database". Re-encryption now writes updated metadata and uses atomic temp-file writes.

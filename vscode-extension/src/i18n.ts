@@ -53,6 +53,15 @@ interface Messages {
   configureKeyBtn: string;
   showLogBtn: string;
   unknownProject: string;
+  statusConnected: string;
+  statusDisconnected: string;
+  focusActive: string;
+  focusInactive: string;
+  languagesTitle: string;
+  projectsTitle: string;
+  topAppsTitle: string;
+  noData: string;
+  viewMore: string;
 }
 
 const en: Messages = {
@@ -102,6 +111,15 @@ const en: Messages = {
   configureKeyBtn: "Configure Key",
   showLogBtn: "Show Log",
   unknownProject: "Unknown project",
+  statusConnected: "Connected",
+  statusDisconnected: "Disconnected",
+  focusActive: "Focus mode on",
+  focusInactive: "Focus mode off",
+  languagesTitle: "Languages today",
+  projectsTitle: "Projects today",
+  topAppsTitle: "Top desktop apps",
+  noData: "No data yet",
+  viewMore: "View more",
 };
 
 const zh: Messages = {
@@ -151,6 +169,15 @@ const zh: Messages = {
   configureKeyBtn: "配置密钥",
   showLogBtn: "查看日志",
   unknownProject: "未知项目",
+  statusConnected: "已连接",
+  statusDisconnected: "未连接",
+  focusActive: "专注模式开启",
+  focusInactive: "专注模式关闭",
+  languagesTitle: "今日语言",
+  projectsTitle: "今日项目",
+  topAppsTitle: "今日桌面应用",
+  noData: "暂无数据",
+  viewMore: "查看更多",
 };
 
 const zhTw: Messages = {
@@ -200,6 +227,15 @@ const zhTw: Messages = {
   configureKeyBtn: "設定金鑰",
   showLogBtn: "檢視日誌",
   unknownProject: "未知專案",
+  statusConnected: "已連線",
+  statusDisconnected: "未連線",
+  focusActive: "專注模式開啟",
+  focusInactive: "專注模式關閉",
+  languagesTitle: "今日語言",
+  projectsTitle: "今日專案",
+  topAppsTitle: "今日桌面應用",
+  noData: "暫無資料",
+  viewMore: "檢視更多",
 };
 
 export function t(): Messages {

@@ -304,11 +304,12 @@ export default function Settings() {
 
         // Auto-seed TimeLens exclusion on first run
         api.getIgnoredApps().then((ignored) => {
-          setIgnoredAppsState(ignored);
-          if (ignored.length === 0 && excludeTimelens) {
+          const normalized = ignored.map(normalizeExePath);
+          setIgnoredAppsState(normalized);
+          if (normalized.length === 0 && excludeTimelens) {
             const tlExes = recent
-              .filter((x) => x.exe_path.toLowerCase().includes("timelens"))
-              .map((x) => x.exe_path);
+              .filter((x) => normalizeExePath(x.exe_path).includes("timelens"))
+              .map((x) => normalizeExePath(x.exe_path));
             if (tlExes.length > 0) {
               setIgnoredAppsState(tlExes);
               api.setIgnoredApps(tlExes).catch(() => {});
@@ -343,21 +344,24 @@ export default function Settings() {
     return 0;
   };
 
+  const normalizeExePath = (p: string) => p.trim().replace(/\//g, "\\").toLowerCase();
+
   const toggleIgnoredApp = (exePath: string) => {
+    const normalized = normalizeExePath(exePath);
     setIgnoredAppsState((prev) =>
-      prev.includes(exePath)
-        ? prev.filter((p) => p !== exePath)
-        : [...prev, exePath]
+      prev.includes(normalized)
+        ? prev.filter((p) => p !== normalized)
+        : [...prev, normalized]
     );
   };
 
   const addPickedExcludedApp = (appName: string, exePath: string) => {
     if (!exePath) return;
-    const normalized = exePath.replace(/\//g, "\\");
+    const normalized = normalizeExePath(exePath);
     setIgnoredAppsState((prev) => (prev.includes(normalized) ? prev : [...prev, normalized]));
     setExecutableOptions((prev) => {
-      if (prev.some((x) => x.exe_path === normalized)) return prev;
-      return [{ app_name: appName, exe_path: normalized }, ...prev];
+      if (prev.some((x) => normalizeExePath(x.exe_path) === normalized)) return prev;
+      return [{ app_name: appName, exe_path: exePath }, ...prev];
     });
     setExcludePickerValue("");
   };
@@ -1197,15 +1201,15 @@ export default function Settings() {
               setExcludeTimelens(next);
               // Add/remove TimeLens exes from ignored list
               const tlExes = executableOptions
-                .filter((x) => x.exe_path.toLowerCase().includes("timelens"))
-                .map((x) => x.exe_path);
+                .filter((x) => normalizeExePath(x.exe_path).includes("timelens"))
+                .map((x) => normalizeExePath(x.exe_path));
               if (next) {
                 const merged = Array.from(new Set([...ignoredApps, ...tlExes]));
                 setIgnoredAppsState(merged);
                 api.setIgnoredApps(merged).catch(() => {});
               } else {
                 const filtered = ignoredApps.filter(
-                  (p) => !p.toLowerCase().includes("timelens")
+                  (p) => !normalizeExePath(p).includes("timelens")
                 );
                 setIgnoredAppsState(filtered);
                 api.setIgnoredApps(filtered).catch(() => {});
@@ -1523,36 +1527,47 @@ export default function Settings() {
             options={executableOptions}
             placeholder={t("data.searchExe")}
             value={excludePickerValue}
+            excludePaths={new Set(
+              executableOptions
+                .filter((x) => ignoredApps.includes(normalizeExePath(x.exe_path)))
+                .map((x) => x.exe_path)
+            )}
             onChange={(appName, exePath) => {
               if (exePath) { addPickedExcludedApp(appName, exePath); }
               else { setExcludePickerValue(appName); }
             }}
           />
           <div className="max-h-48 overflow-y-auto rounded-lg border border-surface-border divide-y divide-surface-border">
-            {executableOptions.filter((x) => ignoredApps.includes(x.exe_path)).map((row) => {
-              const checked = ignoredApps.includes(row.exe_path);
+            {ignoredApps.map((path) => {
+              const option = executableOptions.find(
+                (x) => normalizeExePath(x.exe_path) === path
+              );
+              const appName =
+                option?.app_name ??
+                path.split(/[\\/]/).pop()?.replace(/\.exe$/i, "") ??
+                path;
+              const exePath = option?.exe_path ?? path;
               return (
                 <label
-                  key={row.exe_path}
+                  key={path}
                   className="flex items-start gap-2 px-3 py-2 text-xs text-text-secondary hover:bg-surface-hover cursor-pointer"
                 >
                   <input
                     type="checkbox"
                     className="ui-checkbox mt-0.5"
-                    checked={checked}
-                    onChange={() => toggleIgnoredApp(row.exe_path)}
+                    checked={true}
+                    onChange={() => toggleIgnoredApp(path)}
                   />
                   <span className="min-w-0">
-                    <span className="block text-text-primary truncate">{row.app_name}</span>
-                    <span className="block text-text-muted truncate" title={row.exe_path}>
-                      {row.exe_path}
+                    <span className="block text-text-primary truncate">{appName}</span>
+                    <span className="block text-text-muted truncate" title={exePath}>
+                      {exePath}
                     </span>
                   </span>
                 </label>
               );
             })}
-            
-            {executableOptions.filter((x: ExecutableOption) => ignoredApps.includes(x.exe_path)).length === 0 && (
+            {ignoredApps.length === 0 && (
               <p className="px-3 py-3 text-xs text-text-muted">{t("data.noExcludedApps")}</p>
             )}
           </div>
