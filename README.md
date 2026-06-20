@@ -22,16 +22,35 @@
 
 ## ✨ Features
 
-- **Screen Time Tracking** — Automatically records foreground app usage with per-app daily totals, hourly distribution charts, and 7-day trends.
-- **Floating Widgets** — Transparent, frameless, always-on-top overlays: analog/digital clock, to-do list with drag-reorder, and a multi-mode timer (Pomodoro / countdown / stopwatch).
-- **Glassmorphic UI** — Dark-first design with backdrop blur and subtle transparency throughout.
+- **Screen Time Tracking** — Automatically records foreground app usage with per-app daily totals, hourly distribution charts, 7-day trends, and a 365-day usage heatmap.
+- **Insight Hub** — Discover "What Changed" between periods, identify distraction hotspots, and explore a unified timeline across desktop, browser, and interruptions.
+- **Floating Widgets** — Transparent, frameless, always-on-top overlays: analog/digital clock, drag-reorder to-do list, multi-mode timer, sticky notes, habit tracker, and desktop pet.
+- **Glassmorphic UI** — Dark-first design with backdrop blur, subtle transparency, and gradient accents throughout.
+- **App Limits & Goals** — Set daily limits and productivity goals for apps or categories, with progressive notifications before you exceed them.
+- **Focus Mode** — One-click focus sessions with automatic rules and deep-work time logging.
+- **Browser & VS Code Integration** — Browser extension captures domain-level web usage; VS Code extension tracks coding time by language and project.
+- **Third-party Widget SDK** — Open widget SDK v2 with permission matrix, audit logs, and a developer harness.
+- **Data Health & Encrypted Backup** — Integrity checks, gap scans, orphaned-row cleanup, AES-256-GCM encrypted backups, and multi-profile isolation.
+- **Local API Server** — Built-in API server with scoped tokens, allowlist, and rate limiting for widgets and external tools.
 - **System Tray** — Minimize to tray; create new widgets, pause tracking, or quit from the tray menu.
 - **Persistent Sessions** — Widget layouts and positions are restored on every launch via SQLite.
-- **Multi-language** — Ships with `en` and `zh-CN`; easily extensible (see [Adding a Language](#adding-a-language)).
+- **Multi-language** — Ships with 8 languages: `en`, `zh-CN`, `zh-TW`, `ja`, `ko`, `fr`, `de`, `es`; easily extensible (see [Adding a Language](#adding-a-language)).
 
 ---
 
-🛠 Tech Stack
+## 🗺 Product Ecosystem
+
+TimeLens is more than a desktop app — it's a screen-time platform with cross-tool integrations:
+
+| Component | Path | Description |
+| --------- | ---- | ----------- |
+| **TimeLens Desktop** | `src/` + `src-tauri/` | Main Tauri + React application with tracking, insights, widgets, and settings. |
+| **Browser Extension** | `browser-extension/` | Collects domain-level web usage and merges it with desktop stats. |
+| **VS Code Extension** | `vscode-extension/` | Tracks coding sessions by language, project, and workspace. |
+
+---
+
+## 🛠 Tech Stack
 
 | Layer            | Technology                                 |
 | ---------------- | ------------------------------------------ |

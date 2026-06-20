@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>TimeLens · 文档</title>
+  <title>TimeLens · 桌面屏幕时间追踪器 & 浮动小组件管理器</title>
+  <meta name="description" content="TimeLens 是一款轻量级桌面屏幕时间追踪器，支持自动记录前台应用、透明毛玻璃悬浮窗、应用限额与目标、浏览器/VS Code 统计、专注模式及第三方小组件 SDK。" />
   <link rel="icon" type="image/png" href="assets/icon.png" />
   <link rel="stylesheet" href="styles.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -20,6 +21,8 @@
       </a>
       <div class="nav-links">
         <a href="#features" class="nav-link">功能</a>
+        <a href="#showcase" class="nav-link">展示</a>
+        <a href="#ecosystem" class="nav-link">生态</a>
         <a href="#quickstart" class="nav-link">快速开始</a>
         <a href="#docs" class="nav-link">文档</a>
         <a href="https://github.com/PythonSmall-Q/TimeLens" class="nav-link" target="_blank" rel="noopener">
@@ -36,30 +39,31 @@
   <!-- Hero Section -->
   <header class="hero">
     <div class="hero-bg"></div>
+    <div class="hero-grid"></div>
     <div class="hero-particles" id="particles"></div>
     <div class="hero-content">
-      <div class="hero-badge">
+      <div class="hero-badge reveal">
         <img src="assets/icon.png" alt="TimeLens" class="hero-icon" />
         <span>TimeLens</span>
+        <span class="hero-badge-sep">·</span>
+        <span class="hero-badge-version">v1.1.0</span>
       </div>
-      <h1 class="hero-title">
-        <span class="gradient-text">轻量级</span>
-        桌面屏幕时间追踪器
+      <h1 class="hero-title reveal">
+        洞悉每一分桌面时光
         <br />
-        <span class="gradient-text">&</span>
-        浮动小组件管理器
+        <span class="gradient-text">轻盈追踪 · 灵动组件 · 本地优先</span>
       </h1>
-      <p class="hero-subtitle">
-        自动记录前台应用使用时长，透明毛玻璃悬浮窗，多语言支持
+      <p class="hero-subtitle reveal">
+        自动记录前台应用使用时长，透明毛玻璃悬浮窗常驻桌面，多语言、零运行时外部依赖，
         <br class="hide-mobile" />
-        基于 Tauri + React 构建，SQLite 持久化，Windows 原生体验
+        基于 Tauri + React + SQLite 构建，为你的 Windows 桌面打造原生级屏幕时间体验。
       </p>
-      <div class="hero-badges">
+      <div class="hero-badges reveal">
         <span class="badge"><span class="badge-dot green"></span>MIT 许可证</span>
-        <span class="badge"><span class="badge-dot blue"></span>Windows 支持</span>
-        <span class="badge"><span class="badge-dot purple"></span>v1.1.0</span>
+        <span class="badge"><span class="badge-dot blue"></span>Windows 原生支持</span>
+        <span class="badge"><span class="badge-dot purple"></span>本地 SQLite 存储</span>
       </div>
-      <div class="hero-actions">
+      <div class="hero-actions reveal">
         <a href="https://apps.microsoft.com/detail/9mvt208csf6p?referrer=appbadge&mode=full" class="btn btn-primary" target="_blank" rel="noopener">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
           Microsoft Store
@@ -74,26 +78,67 @@
         </a>
       </div>
     </div>
+
+    <!-- Floating widget mockups -->
+    <div class="hero-widget widget-clock reveal" aria-hidden="true">
+      <div class="widget-header">
+        <span class="widget-dot"></span>
+        <span class="widget-title">Clock</span>
+      </div>
+      <div class="widget-clock-body">
+        <div class="clock-face">
+          <div class="clock-hand hour"></div>
+          <div class="clock-hand minute"></div>
+        </div>
+        <div class="clock-digital">14:32</div>
+      </div>
+    </div>
+
+    <div class="hero-widget widget-todo reveal" aria-hidden="true">
+      <div class="widget-header">
+        <span class="widget-dot"></span>
+        <span class="widget-title">Todo</span>
+      </div>
+      <div class="widget-todo-body">
+        <div class="todo-item done"><span></span>设计首页</div>
+        <div class="todo-item done"><span></span>优化动效</div>
+        <div class="todo-item"><span></span>发布版本</div>
+      </div>
+    </div>
+
+    <div class="hero-widget widget-timer reveal" aria-hidden="true">
+      <div class="widget-header">
+        <span class="widget-dot"></span>
+        <span class="widget-title">Focus</span>
+      </div>
+      <div class="widget-timer-body">
+        <svg viewBox="0 0 36 36" class="timer-ring">
+          <path class="timer-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+          <path class="timer-progress" stroke-dasharray="75, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+        </svg>
+        <div class="timer-text">18:42</div>
+      </div>
+    </div>
   </header>
 
   <!-- Stats Bar -->
   <section class="stats-bar">
     <div class="stats-container">
-      <div class="stat-item">
-        <span class="stat-value">8+</span>
-        <span class="stat-label">核心页面</span>
+      <div class="stat-item reveal">
+        <span class="stat-value">11+</span>
+        <span class="stat-label">可配置首页卡片</span>
       </div>
-      <div class="stat-item">
-        <span class="stat-value">5</span>
-        <span class="stat-label">内置小组件</span>
+      <div class="stat-item reveal">
+        <span class="stat-value">6</span>
+        <span class="stat-label">官方浮动小组件</span>
       </div>
-      <div class="stat-item">
-        <span class="stat-value">2</span>
-        <span class="stat-label">语言支持</span>
+      <div class="stat-item reveal">
+        <span class="stat-value">8</span>
+        <span class="stat-label">界面语言支持</span>
       </div>
-      <div class="stat-item">
+      <div class="stat-item reveal">
         <span class="stat-value">0</span>
-        <span class="stat-label">外部依赖（运行时）</span>
+        <span class="stat-label">运行时外部依赖</span>
       </div>
     </div>
   </section>
@@ -101,53 +146,224 @@
   <!-- Features Section -->
   <section id="features" class="features">
     <div class="section-container">
-      <div class="section-header">
+      <div class="section-header reveal">
         <span class="section-tag">功能特性</span>
-        <h2 class="section-title"> everything you need</h2>
-        <p class="section-desc">TimeLens 提供完整的屏幕时间追踪和桌面小组件解决方案</p>
+        <h2 class="section-title">从追踪到行动，一应俱全</h2>
+        <p class="section-desc">TimeLens 提供完整的屏幕时间追踪、数据洞察与桌面小组件生态，让你真正掌控数字生活。</p>
       </div>
       <div class="feature-grid">
-        <div class="feature-card">
+        <div class="feature-card reveal">
           <div class="feature-icon-wrap">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
           </div>
           <h3>屏幕时间追踪</h3>
-          <p>自动记录前台应用使用时长，支持每日总览、小时分布图表及 7 日趋势对比。</p>
+          <p>自动记录前台应用使用时长，支持每日总览、24 小时分布、7 日趋势对比与 365 天使用热力图。</p>
         </div>
-        <div class="feature-card">
+        <div class="feature-card reveal">
           <div class="feature-icon-wrap">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
           </div>
           <h3>浮动小组件</h3>
-          <p>透明无边框、始终置顶的悬浮窗：模拟/数字时钟、可拖拽排序的待办列表、多模式计时器。</p>
+          <p>透明无边框、始终置顶的悬浮窗：模拟/数字时钟、可拖拽待办、多模式计时器、便签、习惯追踪与桌面宠物。</p>
         </div>
-        <div class="feature-card">
+        <div class="feature-card reveal">
           <div class="feature-icon-wrap">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>
           </div>
           <h3>毛玻璃 UI</h3>
-          <p>深色优先设计，全局使用背景模糊与微透明效果，打造原生级视觉体验。</p>
+          <p>深色优先设计，全局使用背景模糊、微透明与渐变光效，打造原生级视觉体验与一致的操作手感。</p>
         </div>
-        <div class="feature-card">
+        <div class="feature-card reveal">
           <div class="feature-icon-wrap">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           </div>
           <h3>应用限制 & 目标</h3>
-          <p>为特定应用或分类设置每日使用限额，配置生产力目标并追踪达成进度。</p>
+          <p>为特定应用或分类设置每日限额，配置生产力目标并追踪达成进度，超额前自动提醒。</p>
         </div>
-        <div class="feature-card">
+        <div class="feature-card reveal">
           <div class="feature-icon-wrap">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
           </div>
           <h3>浏览器使用统计</h3>
-          <p>通过浏览器扩展采集网页访问数据，分析各域名使用时长，与桌面应用数据合并展示。</p>
+          <p>通过浏览器扩展采集网页访问数据，分析域名级使用时长，与桌面应用数据合并展示。</p>
         </div>
-        <div class="feature-card">
+        <div class="feature-card reveal">
           <div class="feature-icon-wrap">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
           </div>
           <h3>专注模式</h3>
-          <p>一键开启专注时段，屏蔽干扰并记录深度工作时间，提升工作效率。</p>
+          <p>一键开启专注时段，屏蔽干扰并记录深度工作时间，支持自动规则与专注历史回顾。</p>
+        </div>
+        <div class="feature-card reveal">
+          <div class="feature-icon-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>
+          </div>
+          <h3>Insight Hub</h3>
+          <p>"What Changed" 周期对比、分心热点、跨桌面/浏览器/中断的统一时间线，支持保存自定义分析视图。</p>
+        </div>
+        <div class="feature-card reveal">
+          <div class="feature-icon-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+          </div>
+          <h3>VS Code 集成</h3>
+          <p>配套 VS Code 扩展记录编码时长，按语言、项目、工作区维度统计，与主应用数据打通。</p>
+        </div>
+        <div class="feature-card reveal">
+          <div class="feature-icon-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          </div>
+          <h3>多语言支持</h3>
+          <p>内置简体中文、繁体中文、英语、日语、韩语、法语、德语、西班牙语，欢迎通过社区持续扩展。</p>
+        </div>
+        <div class="feature-card reveal">
+          <div class="feature-icon-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>
+          </div>
+          <h3>第三方小组件 SDK</h3>
+          <p>开放式小组件 SDK v2，支持权限矩阵、审计日志与开发者 Harness，轻松扩展你的桌面工作流。</p>
+        </div>
+        <div class="feature-card reveal">
+          <div class="feature-icon-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          </div>
+          <h3>数据健康 & 加密备份</h3>
+          <p>数据完整性检查、缺口扫描、孤立行清理，支持 AES-256-GCM 加密备份与多 Profile 隔离。</p>
+        </div>
+        <div class="feature-card reveal">
+          <div class="feature-icon-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+          </div>
+          <h3>本地 API 服务</h3>
+          <p>内置本地 API 服务器，基于 scoped token、allowlist 与速率限制，让小组件与外部工具安全互通。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Showcase Section -->
+  <section id="showcase" class="showcase">
+    <div class="section-container">
+      <div class="section-header reveal">
+        <span class="section-tag">应用展示</span>
+        <h2 class="section-title">一个窗口，洞察全部</h2>
+        <p class="section-desc">高度可定制的仪表盘首页，拖拽排序、自由显隐，把最关心的数据放在最显眼的位置。</p>
+      </div>
+      <div class="showcase-frame reveal">
+        <div class="showcase-window">
+          <div class="showcase-sidebar">
+            <div class="showcase-brand">
+              <img src="assets/icon.svg" alt="" />
+              <span>TimeLens</span>
+            </div>
+            <div class="showcase-nav">
+              <div class="showcase-nav-item active"><span></span>仪表盘</div>
+              <div class="showcase-nav-item"><span></span>洞察</div>
+              <div class="showcase-nav-item"><span></span>小组件</div>
+              <div class="showcase-nav-item"><span></span>限制</div>
+              <div class="showcase-nav-item"><span></span>专注</div>
+            </div>
+            <div class="showcase-tracker">
+              <div class="tracker-label">今日总时长</div>
+              <div class="tracker-value">6h 42m</div>
+            </div>
+          </div>
+          <div class="showcase-main">
+            <div class="showcase-header">
+              <h3>Screen Time</h3>
+              <div class="showcase-tabs">
+                <span class="active">Day</span>
+                <span>Week</span>
+                <span>Month</span>
+              </div>
+            </div>
+            <div class="showcase-grid">
+              <div class="showcase-card wide">
+                <div class="card-title">今日总览</div>
+                <div class="overview-stats">
+                  <div><strong>6h 42m</strong><small>总时长</small></div>
+                  <div><strong>VS Code</strong><small>当前应用</small></div>
+                  <div><strong>128</strong><small>切换次数</small></div>
+                </div>
+              </div>
+              <div class="showcase-card wide">
+                <div class="card-title">应用排行</div>
+                <div class="bar-chart">
+                  <div class="bar" style="--value: 85%"><label>VS Code</label></div>
+                  <div class="bar" style="--value: 62%"><label>Chrome</label></div>
+                  <div class="bar" style="--value: 40%"><label>Slack</label></div>
+                  <div class="bar" style="--value: 28%"><label>Figma</label></div>
+                </div>
+              </div>
+              <div class="showcase-card">
+                <div class="card-title">24 小时分布</div>
+                <div class="area-chart">
+                  <svg viewBox="0 0 200 60" preserveAspectRatio="none">
+                    <defs>
+                      <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#58a6ff" stop-opacity="0.5" />
+                        <stop offset="100%" stop-color="#58a6ff" stop-opacity="0" />
+                      </linearGradient>
+                    </defs>
+                    <path d="M0,60 L0,35 Q20,40 40,25 T80,30 T120,15 T160,40 T200,20 L200,60 Z" fill="url(#areaGrad)" />
+                    <path d="M0,35 Q20,40 40,25 T80,30 T120,15 T160,40 T200,20" fill="none" stroke="#58a6ff" stroke-width="2" />
+                  </svg>
+                </div>
+              </div>
+              <div class="showcase-card">
+                <div class="card-title">生产力评分</div>
+                <div class="score-ring">
+                  <svg viewBox="0 0 36 36">
+                    <defs>
+                      <linearGradient id="ringGradient" x1="0" y1="0" x2="1" y2="1">
+                        <stop offset="0%" stop-color="#58a6ff" />
+                        <stop offset="100%" stop-color="#a371f7" />
+                      </linearGradient>
+                    </defs>
+                    <path class="ring-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                    <path class="ring-progress" stroke-dasharray="82, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                  </svg>
+                  <span class="score-value">82</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Ecosystem Section -->
+  <section id="ecosystem" class="ecosystem">
+    <div class="section-container">
+      <div class="section-header reveal">
+        <span class="section-tag">产品生态</span>
+        <h2 class="section-title">多端协同，完整覆盖</h2>
+        <p class="section-desc">TimeLens 不只是一款桌面应用，更是围绕屏幕时间构建的跨端工具集合。</p>
+      </div>
+      <div class="ecosystem-grid">
+        <div class="ecosystem-card reveal">
+          <div class="ecosystem-icon">
+            <img src="assets/icon.svg" alt="TimeLens" />
+          </div>
+          <h3>TimeLens 桌面端</h3>
+          <p>Tauri + React 构建的 Windows 原生应用，提供完整的追踪、洞察、小组件与设置能力。</p>
+          <a href="https://github.com/PythonSmall-Q/TimeLens" target="_blank" rel="noopener">查看源码 →</a>
+        </div>
+        <div class="ecosystem-card reveal">
+          <div class="ecosystem-icon browser">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          </div>
+          <h3>浏览器扩展</h3>
+          <p>采集网页访问数据，域名级时长统计，支持与桌面端数据合并，统一呈现你的网络使用时间。</p>
+          <a href="../browser-extension/README.md" target="_blank">了解更多 →</a>
+        </div>
+        <div class="ecosystem-card reveal">
+          <div class="ecosystem-icon vscode">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+          </div>
+          <h3>VS Code 扩展</h3>
+          <p>记录代码编辑器内的项目与语言使用时长，开发者生产力洞察的绝佳搭档。</p>
+          <a href="../vscode-extension/README.md" target="_blank">了解更多 →</a>
         </div>
       </div>
     </div>
@@ -156,11 +372,11 @@
   <!-- Quick Start Section -->
   <section id="quickstart" class="quickstart">
     <div class="section-container">
-      <div class="section-header">
+      <div class="section-header reveal">
         <span class="section-tag">快速开始</span>
         <h2 class="section-title">5 分钟上手 TimeLens</h2>
       </div>
-      <div class="code-block">
+      <div class="code-block reveal">
         <div class="code-header">
           <div class="code-dots">
             <span></span><span></span><span></span>
@@ -184,28 +400,28 @@ npm run tauri:dev">
 <span class="code-keyword">cd</span> TimeLens
 
 <span class="code-comment"># 2. 安装前端依赖</span>
-npm install
+<span class="code-keyword">npm</span> install
 
 <span class="code-comment"># 3. 启动开发服务器 + Tauri 窗口</span>
-npm run tauri:dev</code></pre>
+<span class="code-keyword">npm</span> run tauri:dev</code></pre>
       </div>
       <div class="quickstart-grid">
-        <div class="quickstart-item">
+        <div class="quickstart-item reveal">
           <div class="quickstart-num">1</div>
           <h4>环境准备</h4>
           <p>Node.js ≥ 18、Rust ≥ 1.77、Tauri CLI 2.x</p>
         </div>
-        <div class="quickstart-item">
+        <div class="quickstart-item reveal">
           <div class="quickstart-num">2</div>
           <h4>安装依赖</h4>
           <p>运行 <code>npm install</code> 安装前端依赖</p>
         </div>
-        <div class="quickstart-item">
+        <div class="quickstart-item reveal">
           <div class="quickstart-num">3</div>
           <h4>启动开发</h4>
           <p>运行 <code>npm run tauri:dev</code> 启动</p>
         </div>
-        <div class="quickstart-item">
+        <div class="quickstart-item reveal">
           <div class="quickstart-num">4</div>
           <h4>生产构建</h4>
           <p>运行 <code>npm run tauri:build</code> 打包</p>
@@ -217,37 +433,37 @@ npm run tauri:dev</code></pre>
   <!-- Tech Stack Section -->
   <section class="tech-stack">
     <div class="section-container">
-      <div class="section-header">
+      <div class="section-header reveal">
         <span class="section-tag">技术栈</span>
         <h2 class="section-title">现代化的桌面应用架构</h2>
       </div>
       <div class="tech-grid">
-        <div class="tech-card">
+        <div class="tech-card reveal">
           <img src="https://tauri.app/img/index/header_dark.svg" alt="Tauri" class="tech-logo" />
           <h4>Tauri 2.x</h4>
           <p>Rust 驱动的轻量级桌面壳</p>
         </div>
-        <div class="tech-card">
+        <div class="tech-card reveal">
           <svg class="tech-logo" viewBox="0 0 24 24" fill="none"><path fill="#61DAFB" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/></svg>
           <h4>React 18</h4>
           <p>TypeScript 5 + Vite 5 构建</p>
         </div>
-        <div class="tech-card">
+        <div class="tech-card reveal">
           <svg class="tech-logo" viewBox="0 0 24 24" fill="none"><path fill="#38BDF8" d="M12 6c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6z"/></svg>
           <h4>Tailwind CSS</h4>
           <p>毛玻璃效果 + 响应式设计</p>
         </div>
-        <div class="tech-card">
+        <div class="tech-card reveal">
           <svg class="tech-logo" viewBox="0 0 24 24" fill="none"><path fill="#F43F5E" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/></svg>
           <h4>SQLite</h4>
           <p>rusqlite 嵌入式数据库</p>
         </div>
-        <div class="tech-card">
+        <div class="tech-card reveal">
           <svg class="tech-logo" viewBox="0 0 24 24" fill="none"><path fill="#8B5CF6" d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
           <h4>Zustand</h4>
           <p>轻量级状态管理</p>
         </div>
-        <div class="tech-card">
+        <div class="tech-card reveal">
           <svg class="tech-logo" viewBox="0 0 24 24" fill="none"><path fill="#22C55E" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/></svg>
           <h4>Recharts</h4>
           <p>数据可视化图表库</p>
@@ -259,12 +475,12 @@ npm run tauri:dev</code></pre>
   <!-- Documentation Section -->
   <section id="docs" class="documentation">
     <div class="section-container">
-      <div class="section-header">
+      <div class="section-header reveal">
         <span class="section-tag">文档中心</span>
         <h2 class="section-title">深入了解 TimeLens</h2>
       </div>
       <div class="doc-grid">
-        <a href="DEVELOPMENT.html" class="doc-card">
+        <a href="DEVELOPMENT.html" class="doc-card reveal">
           <div class="doc-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
           </div>
@@ -272,7 +488,7 @@ npm run tauri:dev</code></pre>
           <p>完整的环境搭建、架构说明与调试技巧。涵盖前后端开发流程、数据库结构、脚本参考等。</p>
           <span class="doc-link">阅读更多 →</span>
         </a>
-        <a href="ARCHITECTURE.html" class="doc-card">
+        <a href="ARCHITECTURE.html" class="doc-card reveal">
           <div class="doc-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
           </div>
@@ -280,7 +496,7 @@ npm run tauri:dev</code></pre>
           <p>系统整体架构图、模块划分、数据流说明。了解 Monitor 模块、Command 层、前端状态管理等核心设计。</p>
           <span class="doc-link">阅读更多 →</span>
         </a>
-        <a href="API_REFERENCE.html" class="doc-card">
+        <a href="API_REFERENCE.html" class="doc-card reveal">
           <div class="doc-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
           </div>
@@ -288,7 +504,7 @@ npm run tauri:dev</code></pre>
           <p>Rust Command 接口完整列表、前端服务层封装、类型定义与使用示例。快速查找可用 API。</p>
           <span class="doc-link">阅读更多 →</span>
         </a>
-        <a href="WIDGETS_DEV_GUIDE.html" class="doc-card">
+        <a href="WIDGETS_DEV_GUIDE.html" class="doc-card reveal">
           <div class="doc-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
           </div>
@@ -296,7 +512,7 @@ npm run tauri:dev</code></pre>
           <p>第三方小组件开发完整指南。Manifest 格式、渲染接口、权限系统与示例代码。</p>
           <span class="doc-link">阅读更多 →</span>
         </a>
-        <a href="ADD_LANGUAGE.html" class="doc-card">
+        <a href="ADD_LANGUAGE.html" class="doc-card reveal">
           <div class="doc-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
           </div>
@@ -304,7 +520,7 @@ npm run tauri:dev</code></pre>
           <p>为 TimeLens 添加新 UI 语言的详细步骤。涵盖 JSON 翻译、配置注册与测试验证。</p>
           <span class="doc-link">阅读更多 →</span>
         </a>
-        <a href="WIDGETS_DEV_GUIDE.zh-CN.html" class="doc-card">
+        <a href="WIDGETS_DEV_GUIDE.zh-CN.html" class="doc-card reveal">
           <div class="doc-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
           </div>
@@ -323,12 +539,14 @@ npm run tauri:dev</code></pre>
         <img src="assets/icon.svg" alt="TimeLens" class="footer-icon" />
         <span>TimeLens</span>
       </div>
-      <p class="footer-copy">MIT License · Built with Tauri & React</p>
+      <p class="footer-copy">MIT License · Built with Tauri & React · 由社区驱动</p>
       <div class="footer-links">
         <a href="https://github.com/PythonSmall-Q/TimeLens" target="_blank" rel="noopener">GitHub</a>
         <a href="https://github.com/PythonSmall-Q/TimeLens/releases" target="_blank" rel="noopener">Releases</a>
         <a href="../README.md">README</a>
         <a href="../CHANGELOG.md">Changelog</a>
+        <a href="../CONTRIBUTING.md">Contributing</a>
+        <a href="../PRIVACY_POLICY.md">Privacy</a>
       </div>
     </div>
   </footer>
@@ -348,6 +566,7 @@ npm run tauri:dev</code></pre>
         const target = document.querySelector(this.getAttribute('href'));
         if (target) {
           target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          navLinks.classList.remove('open');
         }
       });
     });
@@ -364,9 +583,21 @@ npm run tauri:dev</code></pre>
       });
     });
 
+    // Scroll reveal
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
+
     // Particle effect (simple stars)
     const particlesContainer = document.getElementById('particles');
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < 40; i++) {
       const p = document.createElement('div');
       p.className = 'particle';
       p.style.left = Math.random() * 100 + '%';
