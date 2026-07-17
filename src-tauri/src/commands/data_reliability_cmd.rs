@@ -23,7 +23,8 @@ const BACKUP_VERSION: &str = "v2";
 const BACKUP_PACKAGE_FILE: &str = "backup.json";
 const BACKUP_MANIFEST_FILE: &str = "manifest.json";
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(default)]
 pub struct BackupBundleCounts {
     pub app_usage: usize,
     pub browser_sessions: usize,
@@ -52,6 +53,7 @@ pub struct BackupManifest {
     pub locale: String,
     pub created_at: String,
     pub checksum: String,
+    #[serde(default)]
     pub counts: BackupBundleCounts,
     #[serde(default)]
     pub encrypted: bool,
@@ -72,6 +74,7 @@ struct SettingEntry {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 struct BackupBundle {
     app_usage: Vec<AppUsageRecord>,
     browser_sessions: Vec<BrowserSession>,
@@ -90,6 +93,30 @@ struct BackupBundle {
     vscode_sessions: Vec<VsCodeSession>,
     api_tokens: Vec<ApiTokenMetadata>,
     api_client_allowlist: Vec<ApiClientAllowlistEntry>,
+}
+
+impl Default for BackupBundle {
+    fn default() -> Self {
+        Self {
+            app_usage: Vec::new(),
+            browser_sessions: Vec::new(),
+            todos: Vec::new(),
+            widget_configs: Vec::new(),
+            ignored_apps: Vec::new(),
+            app_settings: Vec::new(),
+            app_categories: Vec::new(),
+            usage_goals: Vec::new(),
+            focus_sessions: Vec::new(),
+            focus_rules: Vec::new(),
+            browser_ignored_domains: Vec::new(),
+            browser_domain_limits: Vec::new(),
+            widget_permissions: Vec::new(),
+            widget_permission_audit_log: Vec::new(),
+            vscode_sessions: Vec::new(),
+            api_tokens: Vec::new(),
+            api_client_allowlist: Vec::new(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

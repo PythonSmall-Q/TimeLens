@@ -68,11 +68,19 @@ export default function BackupSection() {
   };
 
   const handleBackupError = (error: unknown) => {
-    const text = error instanceof Error ? error.message : t("backup.failed");
+    const extractText = (err: unknown): string => {
+      if (err instanceof Error) return err.message;
+      if (typeof err === "string") return err;
+      if (err && typeof err === "object" && "message" in err && typeof (err as { message?: unknown }).message === "string") {
+        return (err as { message: string }).message;
+      }
+      return t("backup.failed");
+    };
+    const text = extractText(error);
     if (text.toLowerCase().includes("passphrase")) {
       setBackupNeedsPassphrase(true);
     }
-    setBackupMessage({ type: "error", text });
+    setBackupMessage({ type: "error", text: text || t("backup.failed") });
   };
 
   const clearBackupSelection = () => {

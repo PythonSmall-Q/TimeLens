@@ -93,6 +93,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Database encryption disable flow** — fixed a bug where disabling encryption and restarting could corrupt or overwrite the latest plaintext with a stale encrypted backup. Disabling now preserves the current runtime plaintext and removes encrypted artifacts after verifying the plaintext is valid.
 - **Database open retry on restart** — added a short retry loop when opening the profile database during startup to avoid "localhost refused connection" / startup failures caused by Windows file-lock races after `app.restart()`.
 - **VS Code project name fallback** — when `project_name` is empty (for example, in detailed tracking where only the folder path was recorded), the Dashboard today overview and VS Code Insights project ranking now derive the display name from the opened folder path. If no folder information is available, they show a localized "Unknown project" label instead of "No data".
+- **Tauri dialog permissions** — added `dialog:allow-confirm`, `dialog:allow-ask`, and `dialog:allow-message` to the default capability so that `@tauri-apps/plugin-dialog` confirmations and messages no longer fail with "dialog.confirm not allowed" or "dialog.message not allowed".
+- **Legacy v2 backup compatibility** — older v2 backup packages created before the v2.0.0 schema expansion (which added app categories, usage goals, focus rules, VS Code sessions, API tokens, etc.) now deserialize safely. Missing tables default to empty, so validate/restore no longer fails with a generic "backup action failed" message.
+- **Backup error messages** — improved error extraction in the Backup & Restore UI so that backend failure details are shown instead of falling back to the generic "backup action failed" translation whenever the thrown error is not a standard `Error` instance.
 
 ### Security
 
