@@ -1,5 +1,5 @@
 import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, lazy, Suspense } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { getAllWebviewWindows, getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { register as registerGlobalShortcut, unregisterAll as unregisterAllGlobalShortcuts } from "@tauri-apps/plugin-global-shortcut";
@@ -7,19 +7,21 @@ import { isPermissionGranted, requestPermission, sendNotification } from "@tauri
 import { open as openExternal } from "@tauri-apps/plugin-shell";
 import { check } from "@tauri-apps/plugin-updater";
 import MainLayout from "./components/layout/MainLayout";
-import Dashboard from "./pages/Dashboard";
-import WidgetCenter from "./pages/WidgetCenter";
-import Settings from "./pages/Settings";
-import Limits from "./pages/Limits";
-import Categories from "./pages/Categories";
-import Goals from "./pages/Goals";
-import FocusMode from "./pages/FocusMode";
-import BrowserUsage from "./pages/BrowserUsage";
-import HomeCustomize from "./pages/HomeCustomize";
-import VsCodeInsights from "./pages/VsCodeInsights";
-import DashboardInsights from "./pages/DashboardInsights";
-import InterruptionDetail from "./pages/InterruptionDetail";
-import WidgetDevHarness from "./pages/WidgetDevHarness";
+import Loading from "./components/Loading";
+
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const WidgetCenter = lazy(() => import("./pages/WidgetCenter"));
+const Settings = lazy(() => import("./pages/Settings"));
+const Limits = lazy(() => import("./pages/Limits"));
+const Categories = lazy(() => import("./pages/Categories"));
+const Goals = lazy(() => import("./pages/Goals"));
+const FocusMode = lazy(() => import("./pages/FocusMode"));
+const BrowserUsage = lazy(() => import("./pages/BrowserUsage"));
+const HomeCustomize = lazy(() => import("./pages/HomeCustomize"));
+const VsCodeInsights = lazy(() => import("./pages/VsCodeInsights"));
+const DashboardInsights = lazy(() => import("./pages/DashboardInsights"));
+const InterruptionDetail = lazy(() => import("./pages/InterruptionDetail"));
+const WidgetDevHarness = lazy(() => import("./pages/WidgetDevHarness"));
 import { useStatsStore } from "./stores/statsStore";
 import { useSettingsStore } from "./stores/settingsStore";
 import type { ActiveWindowInfo, AppLimit, GoalRiskAlert } from "./types";
@@ -448,22 +450,24 @@ export default function MainApp() {
   return (
     <HashRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <MainLayout>
-        <Routes>
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/dashboard-insights" element={<DashboardInsights />} />
-          <Route path="/vscode" element={<VsCodeInsights />} />
-          <Route path="/dashboard-customize" element={<HomeCustomize />} />
-          <Route path="/widgets" element={<WidgetCenter />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="/limits" element={<Limits />} />
-          <Route path="/categories" element={<Categories />} />
-          <Route path="/goals" element={<Goals />} />
-          <Route path="/focus" element={<FocusMode />} />
-          <Route path="/browser" element={<BrowserUsage />} />
-          <Route path="/interruptions/detail" element={<InterruptionDetail />} />
-          <Route path="/widget-dev-harness" element={<WidgetDevHarness />} />
-        </Routes>
+        <Suspense fallback={<Loading />}>
+          <Routes>
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/dashboard-insights" element={<DashboardInsights />} />
+            <Route path="/vscode" element={<VsCodeInsights />} />
+            <Route path="/dashboard-customize" element={<HomeCustomize />} />
+            <Route path="/widgets" element={<WidgetCenter />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/limits" element={<Limits />} />
+            <Route path="/categories" element={<Categories />} />
+            <Route path="/goals" element={<Goals />} />
+            <Route path="/focus" element={<FocusMode />} />
+            <Route path="/browser" element={<BrowserUsage />} />
+            <Route path="/interruptions/detail" element={<InterruptionDetail />} />
+            <Route path="/widget-dev-harness" element={<WidgetDevHarness />} />
+          </Routes>
+        </Suspense>
       </MainLayout>
 
       {/* ── Update available modal ── */}
