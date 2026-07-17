@@ -129,7 +129,7 @@
   "timerDesc": "Modes Pomodoro, compte à rebours et chronomètre dans une fenêtre flottante compacte.",
   "noteDesc": "Bloc-notes flottant pour noter des idées sans quitter votre flux de travail.",
   "statusDesc": "Widget de suivi d'habitudes pour suivre les objectifs quotidiens et les séries.",
-  "petDesc": "Animal de bureau basé sur un manifeste avec états de concentration, de repos et de compagnie. Prêt pour la personnalisation future des packs.",
+  "petDesc": "Le widget animal de bureau est en développement. Restez à l'écoute.",
   "petStudio": {
     "title": "Paramètres du pet",
     "desc": "Ajustez la taille du widget pet actuel et importez un pack pet JSON.",
@@ -148,7 +148,7 @@
   },
   "official": "Officiel",
   "pet": {
-    "title": "Animal de bureau",
+    "title": "Animal de bureau（En développement）",
     "pack": "Pack",
     "focusLabel": "Mode concentration",
     "restLabel": "Au repos",
@@ -158,7 +158,8 @@
     "defaultApp": "votre flux de travail",
     "fallbackMessage": "Je suis là pour maintenir votre rythme stable.",
     "manifestBadge": "Pack pet",
-    "clickAction": "Tap"
+    "clickAction": "Tap",
+    "comingSoon": "Desktop pet widget is under development. Stay tuned."
   },
   "thirdParty": {
     "title": "Widget tiers",
@@ -182,5 +183,6 @@
     "logs": "Journaux",
     "noLogs": "Aucun journal pour le moment.",
     "loadingManifest": "Chargement du manifeste…"
-  }
+  },
+  "comingSoon": "Coming Soon"
 }

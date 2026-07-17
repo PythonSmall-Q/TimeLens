@@ -3,7 +3,7 @@
   "widgetCenterDesc": "管理與建立浮動小元件",
   "myWidgets": "我的小元件",
   "addWidget": "新增小元件",
-  "selfAdd": "新增小元件",
+  "selfAdd": "自行新增",
   "myWidgetsTab": "我的小元件",
   "importLocalWidget": "匯入本機元件",
   "importSuccess": "小元件匯入成功",
@@ -118,8 +118,6 @@
     "breakComplete": "休息結束，繼續加油！"
   },
   "marketplace": "小元件市場",
-  "selfAdd": "自行新增",
-  "myWidgetsTab": "我的小元件",
   "installed": "已新增",
   "addOne": "新增",
   "addFromTemplate": "基於模板新增",
@@ -130,7 +128,7 @@
   "timerDesc": "集番茄鐘、倒計時、正計時於一體的緊湊懸浮視窗。",
   "noteDesc": "浮動便箋本，隨手記錄想法，不影響目前工作流。",
   "statusDesc": "習慣打卡小元件，追蹤每日目標與連續完成天數。",
-  "petDesc": "基於 manifest 的桌寵小元件，支持專注、休息、陪伴三種狀態，並為後續資源包自訂打底。",
+  "petDesc": "桌寵小組件正在開發中，敬請期待。",
   "petStudio": {
     "title": "桌寵設定",
     "desc": "在這里調整目前桌寵的視窗尺寸，並匯入 JSON 資源包。",
@@ -149,7 +147,7 @@
   },
   "official": "官方",
   "pet": {
-    "title": "桌寵",
+    "title": "桌寵（開發中）",
     "pack": "資源包",
     "focusLabel": "專注模式",
     "restLabel": "休息中",
@@ -159,7 +157,8 @@
     "defaultApp": "你的工作流",
     "fallbackMessage": "我會在這里陪你穩住節奏。",
     "manifestBadge": "桌寵包",
-    "clickAction": "點選"
+    "clickAction": "點選",
+    "comingSoon": "桌寵小組件正在開發中，敬請期待。"
   },
   "thirdParty": {
     "title": "第三方小元件",
@@ -183,5 +182,6 @@
     "logs": "日誌",
     "noLogs": "暫無日誌。",
     "loadingManifest": "正在載入清單..."
-  }
+  },
+  "comingSoon": "開發中"
 }

@@ -3,7 +3,7 @@
   "widgetCenterDesc": "管理与创建浮动小组件",
   "myWidgets": "我的小组件",
   "addWidget": "添加小组件",
-  "selfAdd": "添加小组件",
+  "selfAdd": "自行添加",
   "myWidgetsTab": "我的小组件",
   "importLocalWidget": "导入本地组件",
   "importSuccess": "小组件导入成功",
@@ -118,8 +118,6 @@
     "breakComplete": "休息结束，继续加油！"
   },
   "marketplace": "小组件市场",
-  "selfAdd": "自行添加",
-  "myWidgetsTab": "我的小组件",
   "installed": "已添加",
   "addOne": "添加",
   "addFromTemplate": "基于模板添加",
@@ -130,7 +128,7 @@
   "timerDesc": "集番茄钟、倒计时、正计时于一体的紧凑悬浮窗口。",
   "noteDesc": "浮动便签本，随手记录想法，不影响当前工作流。",
   "statusDesc": "习惯打卡小组件，追踪每日目标与连续完成天数。",
-  "petDesc": "基于 manifest 的桌宠小组件，支持专注、休息、陪伴三种状态，并为后续资源包自定义打底。",
+  "petDesc": "桌宠小组件正在开发中，敬请期待。",
   "petStudio": {
     "title": "桌宠设置",
     "desc": "在这里调整当前桌宠的窗口尺寸，并导入 JSON 资源包。",
@@ -149,7 +147,7 @@
   },
   "official": "官方",
   "pet": {
-    "title": "桌宠",
+    "title": "桌宠（开发中）",
     "pack": "资源包",
     "focusLabel": "专注模式",
     "restLabel": "休息中",
@@ -159,7 +157,8 @@
     "defaultApp": "你的工作流",
     "fallbackMessage": "我会在这里陪你稳住节奏。",
     "manifestBadge": "桌宠包",
-    "clickAction": "点击"
+    "clickAction": "点击",
+    "comingSoon": "桌宠小组件正在开发中，敬请期待。"
   },
   "thirdParty": {
     "title": "第三方小组件",
@@ -183,5 +182,6 @@
     "logs": "日志",
     "noLogs": "暂无日志。",
     "loadingManifest": "正在加载清单..."
-  }
+  },
+  "comingSoon": "开发中"
 }

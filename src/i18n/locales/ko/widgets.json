@@ -129,7 +129,7 @@
   "timerDesc": "컴팩트한 플로팅 창에서 뽀모도로, 카운트다운, 스톱워치 모드를 제공합니다.",
   "noteDesc": "워크플로우를 떠나지 않고 아이디어를 적을 수 있는 플로팅 메모 패드입니다.",
   "statusDesc": "매일 목표와 연속 기록을 추적하는 습관 추적 위젯입니다.",
-  "petDesc": "매니페스트 기반 데스크톱 펫. 집중, 휴식, 동반 상태를 갖추고 있습니다. 향후 펫 팩 커스터마이징 준비 완료.",
+  "petDesc": "데스크톱 펫 위젯이 개발 중입니다. 기대해 주세요.",
   "petStudio": {
     "title": "펫 설정",
     "desc": "현재 펫 위젯 크기를 조정하고 JSON 펫 팩을 가져옵니다.",
@@ -148,7 +148,7 @@
   },
   "official": "공식",
   "pet": {
-    "title": "데스크톱 펫",
+    "title": "데스크톱 펫（개발 중）",
     "pack": "팩",
     "focusLabel": "집중 모드",
     "restLabel": "휴식 중",
@@ -158,7 +158,8 @@
     "defaultApp": "당신의 워크플로우",
     "fallbackMessage": "당신의 리듬을 안정적으로 유지하기 위해 여기 있습니다.",
     "manifestBadge": "펫 팩",
-    "clickAction": "탭"
+    "clickAction": "탭",
+    "comingSoon": "Desktop pet widget is under development. Stay tuned."
   },
   "thirdParty": {
     "title": "서드파티 위젯",
@@ -182,5 +183,6 @@
     "logs": "로그",
     "noLogs": "로그가 아직 없습니다.",
     "loadingManifest": "매니페스트 로딩 중…"
-  }
+  },
+  "comingSoon": "Coming Soon"
 }

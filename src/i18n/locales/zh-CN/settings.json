@@ -178,7 +178,27 @@
     "diffToUpdate": "{{count}} 待更新",
     "diffConflicts": "{{count}} 冲突",
     "diffSettingsConflicts": "设置冲突",
-    "applySuccessProfile": "已恢复到新配置 '{{profile}}'"
+    "applySuccessProfile": "已恢复到新配置 '{{profile}}'",
+    "exportTitle": "导出备份",
+    "exportDesc": "将当前数据打包为 .timelens-backup 文件，可选择加密。",
+    "restoreTitle": "从备份恢复",
+    "restoreDesc": "选择 .timelens-backup 文件并验证后，恢复到当前或新配置。",
+    "chooseFile": "选择文件",
+    "noFileSelected": "尚未选择文件",
+    "fileSelected": "已选择：{{name}}",
+    "selectFileFirst": "请先选择备份文件",
+    "exporting": "导出中…",
+    "restoring": "恢复中…",
+    "validating": "验证中…",
+    "notification": {
+      "exportTitle": "备份已导出",
+      "restoreTitle": "恢复完成"
+    },
+    "importJsonSuccess": "JSON 数据已导入，页面即将刷新",
+    "importJsonFailed": "JSON 导入失败",
+    "overwriteConfirm": "覆盖模式将清空当前数据并替换为备份内容。是否继续？",
+    "mergeConfirm": "合并模式将把备份内容合并到当前数据中，可能会覆盖冲突项。是否继续？",
+    "newProfileConfirm": "将创建新配置并重启 TimeLens。是否继续？"
   },
   "retention": {
     "title": "数据保留策略",
@@ -329,7 +349,12 @@
     "createConfirm": "创建",
     "switchConfirm": "切换到配置 '{{profile}}' 将重启 TimeLens。是否继续？",
     "switchFailed": "切换配置失败",
-    "createFailed": "创建配置失败"
+    "createFailed": "创建配置失败",
+    "importLegacy": "从旧版本数据导入",
+    "importLegacyBusy": "导入中...",
+    "importLegacyPrompt": "默认配置文件为空，检测到旧版本数据。是否立即导入？",
+    "importLegacyConfirm": "从 {{path}} 导入旧版本数据吗？TimeLens 将重启以完成导入。",
+    "importLegacyFailed": "导入旧版本数据失败"
   },
   "encryption": {
     "title": "数据库加密",

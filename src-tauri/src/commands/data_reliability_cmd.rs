@@ -6,7 +6,7 @@ use chrono::{Duration, Local, NaiveDate};
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use tauri::{Manager, State};
+use tauri::{AppHandle, Manager, State};
 use zip::{write::FileOptions, CompressionMethod, ZipArchive, ZipWriter};
 
 use crate::commands::storage_cmd::DbState;
@@ -2500,6 +2500,67 @@ pub fn create_profile(
         created_at: now,
     })
 }
+
+#[derive(Debug, Serialize)]
+pub struct LegacyDataInfo {
+    pub available: bool,
+    pub source_path: Option<String>,
+    pub default_profile_empty: bool,
+    pub current_profile_is_default: bool,
+    pub can_import: bool,
+}
+
+#[tauri::command]
+pub fn detect_legacy_data(app: AppHandle) -> Result<LegacyDataInfo, String> {
+    let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let app_state_conn = db::migrations::open_app_state_db(&data_dir)
+        .map_err(|e| format!("Failed to open app state database: {}", e))?;
+    let current_profile_id = db::migrations::current_profile_id_from_app_state(&app_state_conn);
+
+    let default_db = db::migrations::db_path_for_profile(
+        &data_dir,
+        db::migrations::DEFAULT_PROFILE_ID,
+    );
+    let default_profile_empty = if default_db.exists() {
+        match db::open(&default_db) {
+            Ok(conn) => {
+                let count: i64 = conn
+                    .query_row("SELECT COUNT(1) FROM app_usage", [], |r| r.get(0))
+                    .unwrap_or(0);
+                count == 0
+            }
+            Err(_) => {
+                // If we cannot open the default profile (e.g. it is encrypted),
+                // treat it as non-empty so we do not risk overwriting data.
+                false
+            }
+        }
+    } else {
+        true
+    };
+
+    let legacy = crate::legacy_db_path();
+    let current_profile_is_default = current_profile_id == db::migrations::DEFAULT_PROFILE_ID;
+    Ok(LegacyDataInfo {
+        available: legacy.is_some(),
+        source_path: legacy.as_ref().map(|p| p.to_string_lossy().to_string()),
+        default_profile_empty,
+        current_profile_is_default,
+        can_import: legacy.is_some() && default_profile_empty && current_profile_is_default,
+    })
+}
+
+#[tauri::command]
+pub fn import_legacy_data(app: AppHandle) -> Result<(), String> {
+    let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let conn = db::migrations::open_app_state_db(&data_dir)
+        .map_err(|e| e.to_string())?;
+    db::set_setting(&conn, crate::PENDING_LEGACY_IMPORT_KEY, "1")
+        .map_err(|e| e.to_string())?;
+    log::info!("User requested legacy data import; restarting to apply");
+    app.restart();
+}
+
 
 #[tauri::command]
 pub fn switch_profile(

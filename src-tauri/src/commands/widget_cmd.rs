@@ -215,6 +215,9 @@ pub async fn create_widget(
     app: AppHandle,
     db: tauri::State<'_, DbState>,
 ) -> Result<WidgetConfig, String> {
+    if widget_type == "pet" {
+        return Err("Desktop pet widget is under development. Stay tuned.".to_string());
+    }
     let id = format!("{}-{}", widget_type, short_id());
     let (width, height) = default_size(&app, &widget_type)?;
 

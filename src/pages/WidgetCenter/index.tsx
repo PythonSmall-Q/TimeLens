@@ -310,13 +310,13 @@ function WidgetCard({
 
 // ── Self-add catalog (official widgets) ──────────────────────
 
-const OFFICIAL_CATALOG: { type: string; icon: typeof Clock; descKey: string }[] = [
+const OFFICIAL_CATALOG: { type: string; icon: typeof Clock; descKey: string; comingSoon?: boolean }[] = [
   { type: "clock", icon: Clock, descKey: "clockDesc" },
   { type: "todo", icon: List, descKey: "todoDesc" },
   { type: "timer", icon: Timer, descKey: "timerDesc" },
   { type: "note", icon: StickyNote, descKey: "noteDesc" },
   { type: "status", icon: Activity, descKey: "statusDesc" },
-  { type: "pet", icon: PawPrint, descKey: "petDesc" },
+  { type: "pet", icon: PawPrint, descKey: "petDesc", comingSoon: true },
 ];
 
 function isPetManifest(input: unknown): input is DesktopPetPackManifest {
@@ -351,10 +351,11 @@ interface MarketplaceCardProps {
   source: "official" | "third-party";
   installedCount: number;
   permissions?: string[];
-  onAdd: (type: string, perms: string[]) => void;
+  comingSoon?: boolean;
+  onAdd: (type: string, perms: string[], comingSoon: boolean) => void;
 }
 
-function MarketplaceCard({ type, title, icon: Icon, description, source, installedCount, permissions = [], onAdd }: MarketplaceCardProps) {
+function MarketplaceCard({ type, title, icon: Icon, description, source, installedCount, permissions = [], comingSoon = false, onAdd }: MarketplaceCardProps) {
   const { t } = useTranslation("widgets");
 
   return (
@@ -370,6 +371,11 @@ function MarketplaceCard({ type, title, icon: Icon, description, source, install
               <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-surface-hover text-text-secondary">
                 {source === "official" ? t("official") : t("thirdParty.source")}
               </span>
+              {comingSoon && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-yellow-500/15 text-yellow-600">
+                  {t("comingSoon")}
+                </span>
+              )}
               {installedCount > 0 && (
                 <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-accent-green/15 text-accent-green">
                   {t("installed")} ×{installedCount}
@@ -384,11 +390,17 @@ function MarketplaceCard({ type, title, icon: Icon, description, source, install
           </div>
         </div>
         <button
-          onClick={() => onAdd(type, permissions)}
-          className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-accent-blue/15 text-accent-blue
-                     text-xs font-medium hover:bg-accent-blue/25 transition-colors flex-shrink-0"
+          onClick={comingSoon ? undefined : () => onAdd(type, permissions, comingSoon)}
+          disabled={comingSoon}
+          className={clsx(
+            "flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex-shrink-0",
+            comingSoon
+              ? "bg-surface-hover text-text-muted cursor-not-allowed disabled:opacity-60"
+              : "bg-accent-blue/15 text-accent-blue hover:bg-accent-blue/25"
+          )}
         >
-          <Plus size={12} /> {t("addFromTemplate")}
+          <Plus size={12} />
+          {comingSoon ? t("comingSoon") : t("addFromTemplate")}
         </button>
       </div>
       <p className="text-xs text-text-muted leading-relaxed">{description}</p>
@@ -489,6 +501,7 @@ export default function WidgetCenter() {
     title: t(`${item.type}.title`),
     description: t(item.descKey),
     permissions: [] as string[],
+    comingSoon: item.comingSoon ?? false,
   }));
 
   // Build third-party entries from registry
@@ -503,7 +516,14 @@ export default function WidgetCenter() {
       permissions: item.permissions ?? [],
     }));
 
-  const handleAdd = (type: string, perms: string[]) => {
+  const handleAdd = (type: string, perms: string[], comingSoon = false) => {
+    if (comingSoon) {
+      const message = t("pet.comingSoon");
+      api.sendNativeNotification(t("pet.title"), message).catch(() => {});
+      setImportMsg({ kind: "err", text: message });
+      setTimeout(() => setImportMsg(null), 4000);
+      return;
+    }
     const isThirdParty = thirdPartyEntries.some((e) => e.type === type);
     if (isThirdParty && perms.length > 0) {
       setPermDialog({ open: true, widgetType: type, permissions: perms });

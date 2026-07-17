@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSettingsStore } from "@/stores/settingsStore";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
@@ -9,7 +9,6 @@ import { APP_VERSION } from "../../version";
 import type {
   ApiAuditLogEntry,
   ApiTokenMetadata,
-  BackupPreview,
   DataHealthSummary,
   DataIntegrityResult,
   DataGapResult,
@@ -19,6 +18,7 @@ import type {
   ArchiveSchedulerSettings,
   CompressionResult,
   ProfileInfo,
+  LegacyDataInfo,
   EncryptionStatus,
   ExecutableOption,
   InstallChannelInfo,
@@ -30,9 +30,9 @@ import type {
   TrackingTransparencyReport,
 } from "@/types";
 import ExePickerInput from "@/components/ExePickerInput";
-import { useAnnouncer } from "@/hooks/useAnnouncer";
+import BackupSection from "./BackupSection";
 
-function Section({
+export function Section({
   icon: Icon,
   title,
   children,
@@ -54,7 +54,7 @@ function Section({
   );
 }
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
+export function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-4">
       <span className="text-sm text-text-secondary flex-shrink-0">{label}</span>
@@ -65,8 +65,10 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 
 export default function Settings() {
   const { t } = useTranslation(["settings", "common"]);
-  const announce = useAnnouncer();
-  const importJsonInputRef = useRef<HTMLInputElement | null>(null);
+  const tauriConfirm = useCallback(async (message: string, title?: string) => {
+    const { confirm } = await import("@tauri-apps/plugin-dialog");
+    return confirm(message, { title: title ?? t("title"), kind: "warning" });
+  }, [t]);
   const [launchAtStartup, setLaunchAtStartup] = useState(false);
   const [silentStartup, setSilentStartup] = useState(true);
   const [autoOpenWidgets, setAutoOpenWidgets] = useState(true);
@@ -74,9 +76,6 @@ export default function Settings() {
   const [installChannelInfo, setInstallChannelInfo] = useState<InstallChannelInfo | null>(null);
   const [dataHealth, setDataHealth] = useState<DataHealthSummary | null>(null);
   const [repairPreview, setRepairPreview] = useState<RepairAssistantResult | null>(null);
-  const [backupPreview, setBackupPreview] = useState<BackupPreview | null>(null);
-  const [backupPackagePath, setBackupPackagePath] = useState<string | null>(null);
-  const [backupStrategy, setBackupStrategy] = useState<"overwrite" | "merge" | "new_profile">("overwrite");
   const [retentionInfo, setRetentionInfo] = useState<RetentionPolicyInfo | null>(null);
   const [trackingTransparency, setTrackingTransparency] = useState<TrackingTransparencyReport | null>(null);
   const [repairing, setRepairing] = useState(false);
@@ -125,14 +124,6 @@ export default function Settings() {
   >(null);
   const [apiGovernanceMessage, setApiGovernanceMessage] = useState<string | null>(null);
   const [trayIconStyle, setTrayIconStyleState] = useState<"auto" | "color" | "black" | "white">("auto");
-  const [backupBusy, setBackupBusy] = useState<"export" | "validate" | "apply" | "import" | null>(null);
-  const [backupMessage, setBackupMessage] = useState<{ type: "success" | "error" | "info"; text: string } | null>(null);
-
-  useEffect(() => {
-    if (backupMessage?.text) {
-      announce(backupMessage.text);
-    }
-  }, [backupMessage, announce]);
   const [retentionRunning, setRetentionRunning] = useState(false);
   const [retentionRunResult, setRetentionRunResult] = useState<RetentionRunResult | null>(null);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
@@ -153,11 +144,6 @@ export default function Settings() {
   const [migrationBusy, setMigrationBusy] = useState(false);
   const [dataHealthActionError, setDataHealthActionError] = useState<string | null>(null);
 
-  // v2.0.0 backup state
-  const [backupPassphrase, setBackupPassphrase] = useState("");
-  const [encryptExport, setEncryptExport] = useState(false);
-  const [backupNeedsPassphrase, setBackupNeedsPassphrase] = useState(false);
-
   // v2.0.0 retention/archive state
   const [archiveSchedulerSettings, setArchiveSchedulerSettingsState] = useState<ArchiveSchedulerSettings>({
     enabled: false,
@@ -175,6 +161,10 @@ export default function Settings() {
   const [profileDialogOpen, setProfileDialogOpen] = useState(false);
   const [newProfileName, setNewProfileName] = useState("");
   const [profilesBusy, setProfilesBusy] = useState(false);
+
+  // v2.0.0 legacy data import state
+  const [legacyDataInfo, setLegacyDataInfo] = useState<LegacyDataInfo | null>(null);
+  const [legacyImportBusy, setLegacyImportBusy] = useState(false);
 
   // v2.0.0 encryption state
   const [encryptionStatus, setEncryptionStatus] = useState<EncryptionStatus | null>(null);
@@ -283,6 +273,10 @@ export default function Settings() {
       .then(setCurrentProfile)
       .catch(() => {});
 
+    api.detectLegacyData()
+      .then(setLegacyDataInfo)
+      .catch(() => {});
+
     api.getDatabaseEncryptionStatus()
       .then(setEncryptionStatus)
       .catch(() => {});
@@ -364,18 +358,6 @@ export default function Settings() {
       return [{ app_name: appName, exe_path: exePath }, ...prev];
     });
     setExcludePickerValue("");
-  };
-
-  const downloadTextFile = (fileName: string, content: string, contentType: string) => {
-    const blob = new Blob([content], { type: contentType });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = fileName;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
   };
 
   const refreshReliabilityPanels = async () => {
@@ -508,163 +490,6 @@ export default function Settings() {
     return `${(bytes / 1024 / 1024 / 1024).toFixed(1)} GB`;
   };
 
-  const openBackupPackage = async () => {
-    const { open } = await import("@tauri-apps/plugin-dialog");
-    try {
-      const selected = await open({
-        multiple: false,
-        title: t("backup.openTitle"),
-        filters: [{ name: t("backup.filterName"), extensions: ["timelens-backup", "timelensbackup", "zip"] }],
-      });
-      return typeof selected === "string" ? selected : null;
-    } catch {
-      const selected = await open({ multiple: false, title: t("backup.openTitle") });
-      return typeof selected === "string" ? selected : null;
-    }
-  };
-
-  const saveBackupPackage = async () => {
-    const { save } = await import("@tauri-apps/plugin-dialog");
-    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
-    try {
-      return save({
-        defaultPath: `timelens-backup-${stamp}.timelens-backup`,
-        title: t("backup.saveTitle"),
-        filters: [{ name: t("backup.filterName"), extensions: ["timelens-backup", "timelensbackup", "zip"] }],
-      });
-    } catch {
-      return save({
-        defaultPath: `timelens-backup-${stamp}.timelens-backup`,
-        title: t("backup.saveTitle"),
-      });
-    }
-  };
-
-  const importPassphrase = (): string | undefined => {
-    const pass = backupPassphrase.trim();
-    return pass.length > 0 ? pass : undefined;
-  };
-
-  const handleBackupError = (error: unknown) => {
-    const text = error instanceof Error ? error.message : t("backup.failed");
-    if (text.toLowerCase().includes("passphrase")) {
-      setBackupNeedsPassphrase(true);
-    }
-    setBackupMessage({ type: "error", text });
-  };
-
-  const validateBackupPackage = async () => {
-    const path = await openBackupPackage();
-    if (!path) return;
-    setBackupBusy("validate");
-    setBackupMessage(null);
-    setBackupNeedsPassphrase(false);
-    try {
-      setBackupPackagePath(path);
-      const preview = await api.importBackupV2Validate(path, importPassphrase());
-      setBackupPreview(preview);
-      if (preview.manifest.encrypted) {
-        setBackupNeedsPassphrase(true);
-      }
-      setBackupMessage({ type: "info", text: t("backup.validated") });
-    } catch (error) {
-      handleBackupError(error);
-    } finally {
-      setBackupBusy(null);
-    }
-  };
-
-  const applyBackupPackage = async () => {
-    const path = backupPackagePath ?? await openBackupPackage();
-    if (!path) return;
-    setBackupBusy("apply");
-    setBackupMessage(null);
-    try {
-      setBackupPackagePath(path);
-      const isEncrypted = backupPreview?.manifest.encrypted ?? false;
-      if (isEncrypted && !backupPassphrase) {
-        throw new Error(t("backup.passphraseRequired"));
-      }
-      const result = await api.importBackupV2Apply(path, backupStrategy, importPassphrase());
-      setBackupPreview({
-        manifest: result.manifest,
-        compatible: true,
-        supported_strategies: ["overwrite", "merge", "new_profile"],
-        warnings: result.warnings,
-      });
-      const successText = result.new_profile_id
-        ? t("backup.applySuccessProfile", { profile: result.new_profile_id })
-        : t("backup.applySuccess", { count: result.imported_rows });
-      setBackupMessage({ type: "success", text: successText });
-      setBackupNeedsPassphrase(false);
-      await refreshReliabilityPanels();
-    } catch (error) {
-      handleBackupError(error);
-    } finally {
-      setBackupBusy(null);
-    }
-  };
-
-  const importAndApplyBackupPackage = async () => {
-    const path = await openBackupPackage();
-    if (!path) return;
-    setBackupPackagePath(path);
-    setBackupBusy("import");
-    setBackupMessage(null);
-    setBackupNeedsPassphrase(false);
-    try {
-      const preview = await api.importBackupV2Validate(path, importPassphrase());
-      setBackupPreview(preview);
-      if (preview.manifest.encrypted && !backupPassphrase) {
-        throw new Error(t("backup.passphraseRequired"));
-      }
-      const result = await api.importBackupV2Apply(path, backupStrategy, importPassphrase());
-      setBackupPreview({
-        manifest: result.manifest,
-        compatible: true,
-        supported_strategies: ["overwrite", "merge", "new_profile"],
-        warnings: result.warnings,
-      });
-      const successText = result.new_profile_id
-        ? t("backup.applySuccessProfile", { profile: result.new_profile_id })
-        : t("backup.applySuccess", { count: result.imported_rows });
-      setBackupMessage({ type: "success", text: successText });
-      await refreshReliabilityPanels();
-    } catch (error) {
-      handleBackupError(error);
-    } finally {
-      setBackupBusy(null);
-    }
-  };
-
-  const exportBackupPackage = async () => {
-    const path = await saveBackupPackage();
-    if (!path) return;
-    if (encryptExport && !backupPassphrase) {
-      setBackupMessage({ type: "error", text: t("backup.passphraseRequiredForExport") });
-      return;
-    }
-    setBackupBusy("export");
-    setBackupMessage(null);
-    try {
-      const passphrase = encryptExport ? backupPassphrase : undefined;
-      const manifest = await api.exportBackupV2(path, passphrase);
-      setBackupPackagePath(path);
-      setBackupPreview({
-        manifest,
-        compatible: true,
-        supported_strategies: ["overwrite", "merge", "new_profile"],
-        warnings: [],
-      });
-      setBackupMessage({ type: "success", text: t("backup.exportSuccess") });
-      await refreshReliabilityPanels();
-    } catch (error) {
-      handleBackupError(error);
-    } finally {
-      setBackupBusy(null);
-    }
-  };
-
   const runRetentionArchive = async () => {
     setRetentionRunning(true);
     try {
@@ -792,16 +617,37 @@ export default function Settings() {
     }
   };
 
-  const handleSwitchProfile = async (profileId: string) => {
-    if (!window.confirm(t("profiles.switchConfirm", { profile: profileId }))) return;
-    setProfilesBusy(true);
-    try {
-      await api.switchProfile(profileId);
-    } catch (error) {
-      setDataHealthActionError(error instanceof Error ? error.message : t("profiles.switchFailed"));
-      setProfilesBusy(false);
+  const handleImportLegacyData = useCallback(async () => {
+    if (!legacyDataInfo?.can_import) return;
+    if (!(await tauriConfirm(t("profiles.importLegacyConfirm", { path: legacyDataInfo.source_path ?? "" }), t("profiles.title")))) {
+      return;
     }
-  };
+    setLegacyImportBusy(true);
+    setDataHealthActionError(null);
+    try {
+      await api.importLegacyData();
+    } catch (error) {
+      setDataHealthActionError(
+        error instanceof Error ? error.message : t("profiles.importLegacyFailed")
+      );
+      setLegacyImportBusy(false);
+    }
+  }, [legacyDataInfo, t, tauriConfirm]);
+
+  // Prompt once to import legacy 1.x data when the default profile is empty.
+  useEffect(() => {
+    if (!legacyDataInfo?.can_import) return;
+    const flagKey = "timelens-legacy-import-prompt-shown";
+    if (localStorage.getItem(flagKey)) return;
+    localStorage.setItem(flagKey, "1");
+
+    void (async () => {
+      const confirmed = await tauriConfirm(t("profiles.importLegacyPrompt"), t("profiles.title"));
+      if (confirmed) {
+        void handleImportLegacyData();
+      }
+    })();
+  }, [legacyDataInfo, t, handleImportLegacyData, tauriConfirm]);
 
   const handleCreateProfile = async () => {
     const name = newProfileName.trim();
@@ -835,7 +681,7 @@ export default function Settings() {
       setDataHealthActionError(t("encryption.passphraseRequired"));
       return;
     }
-    if (!window.confirm(t("encryption.enableConfirm"))) return;
+    if (!(await tauriConfirm(t("encryption.enableConfirm"), t("encryption.title")))) return;
     setEncryptionBusy(true);
     setDataHealthActionError(null);
     try {
@@ -852,7 +698,7 @@ export default function Settings() {
       setDataHealthActionError(t("encryption.passphraseRequired"));
       return;
     }
-    if (!window.confirm(t("encryption.disableConfirm"))) return;
+    if (!(await tauriConfirm(t("encryption.disableConfirm"), t("encryption.title")))) return;
     setEncryptionBusy(true);
     setDataHealthActionError(null);
     try {
@@ -885,7 +731,7 @@ export default function Settings() {
     { key: "dataHealth", title: t("dataHealth.title"), icon: Database, keywords: [t("dataHealth.integrity"), t("dataHealth.applyRepair")] },
     { key: "backup", title: t("backup.title"), icon: Database, keywords: [t("backup.exportAction"), t("backup.applyAction")] },
     { key: "retention", title: t("retention.title"), icon: Rocket, keywords: [t("retention.current"), t("retention.runNow")] },
-    { key: "profiles", title: t("profiles.title"), icon: User, keywords: [t("profiles.current"), t("profiles.switch")] },
+    { key: "profiles", title: t("profiles.title"), icon: User, keywords: [t("profiles.current"), t("profiles.importLegacy")] },
     { key: "encryption", title: t("encryption.title"), icon: Shield, keywords: [t("encryption.status"), t("encryption.enable")] },
     { key: "transparency", title: t("transparency.title"), icon: Info, keywords: [t("transparency.active"), t("transparency.fields")] },
     { key: "extensionBridge", title: t("extensionBridge.title"), icon: Lock, keywords: [t("extensionBridge.key"), "bridge", "extension"] },
@@ -1813,189 +1659,7 @@ export default function Settings() {
 
       {activeSection === "backup" && (
       <Section icon={Database} title={t("backup.title")}>
-        <Row label={t("data.export")}>
-          <div className="flex items-center gap-2 flex-wrap justify-end">
-            <button
-              onClick={async () => {
-                const csv = await api.exportDataCsv();
-                const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
-                downloadTextFile(`timelens-export-${stamp}.csv`, csv, "text/csv;charset=utf-8");
-              }}
-              className="text-xs px-3 py-1.5 rounded-lg border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
-            >
-              {t("data.exportCsv")}
-            </button>
-            <button
-              onClick={async () => {
-                const json = await api.exportDataJson();
-                const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
-                downloadTextFile(`timelens-backup-${stamp}.json`, json, "application/json;charset=utf-8");
-              }}
-              className="text-xs px-3 py-1.5 rounded-lg border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
-            >
-              {t("data.exportJson")}
-            </button>
-            <button
-              onClick={() => importJsonInputRef.current?.click()}
-              className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
-            >
-              {t("data.importJson")}
-            </button>
-            <input
-              ref={importJsonInputRef}
-              type="file"
-              accept="application/json,.json"
-              className="hidden"
-              title={t("data.importJson")}
-              onChange={async (e) => {
-                const file = e.target.files?.[0];
-                if (!file) return;
-                try {
-                  const content = await file.text();
-                  await api.importDataJson(content);
-                  window.location.reload();
-                } catch {
-                  // Keep silent for now to match existing settings behavior.
-                } finally {
-                  e.target.value = "";
-                }
-              }}
-            />
-          </div>
-        </Row>
-
-        <Row label={t("backup.passphrase")}>
-          <div className="flex items-center gap-2 flex-wrap justify-end">
-            <label className="flex items-center gap-1.5 text-xs text-text-secondary">
-              <input
-                type="checkbox"
-                className="ui-checkbox"
-                checked={encryptExport}
-                onChange={(e) => setEncryptExport(e.target.checked)}
-              />
-              {t("backup.encryptExport")}
-            </label>
-            <input
-              type="password"
-              value={backupPassphrase}
-              onChange={(e) => setBackupPassphrase(e.target.value)}
-              placeholder={t("backup.passphrase")}
-              className="ui-field max-w-44"
-            />
-          </div>
-        </Row>
-        {backupNeedsPassphrase && (
-          <p className="text-xs text-yellow-300 text-right">{t("backup.passphraseRequired")}</p>
-        )}
-
-        <Row label={t("backup.export")}>
-          <div className="flex items-center gap-2 flex-wrap justify-end">
-            <button
-              onClick={exportBackupPackage}
-              disabled={backupBusy !== null}
-              className="text-xs px-3 py-1.5 rounded-lg border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
-            >
-              {backupBusy === "export" ? t("backup.working") : t("backup.exportAction")}
-            </button>
-            <button
-              onClick={validateBackupPackage}
-              disabled={backupBusy !== null}
-              className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
-            >
-              {backupBusy === "validate" ? t("backup.working") : t("backup.validateAction")}
-            </button>
-            <button
-              onClick={importAndApplyBackupPackage}
-              disabled={backupBusy !== null}
-              className="text-xs px-3 py-1.5 rounded-lg border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
-            >
-              {backupBusy === "import" ? t("backup.working") : t("backup.importRestoreAction")}
-            </button>
-          </div>
-        </Row>
-        <Row label={t("backup.restoreMode")}>
-          <div className="flex gap-2 flex-wrap justify-end">
-            {(["overwrite", "merge", "new_profile"] as const).map((mode) => (
-              <button
-                key={mode}
-                onClick={() => setBackupStrategy(mode)}
-                className={clsx(
-                  "px-3 py-1.5 rounded-lg text-xs border transition-colors",
-                  backupStrategy === mode
-                    ? "border-accent-blue bg-accent-blue/15 text-accent-blue"
-                    : "border-surface-border text-text-muted hover:text-text-secondary"
-                )}
-              >
-                {t(`backup.${mode}`)}
-              </button>
-            ))}
-            <button
-              onClick={applyBackupPackage}
-              disabled={backupBusy !== null}
-              className="text-xs px-3 py-1.5 rounded-lg border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
-            >
-              {backupBusy === "apply" ? t("backup.working") : t("backup.applyAction")}
-            </button>
-          </div>
-        </Row>
-        <div className="rounded-lg border border-surface-border bg-surface-hover/40 p-3 space-y-2 text-xs">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-text-secondary">{t("backup.currentPath")}</span>
-            <span className="text-text-primary truncate max-w-80">{backupPackagePath || t("backup.none")}</span>
-          </div>
-          {backupPreview && (
-            <div className="space-y-1 text-text-muted">
-              <p>{t("backup.previewVersion", { version: backupPreview.manifest.version, appVersion: backupPreview.manifest.app_version })}</p>
-              <p>{t("backup.previewSchema", { schema: backupPreview.manifest.schema_version })}</p>
-              <p>{t("backup.previewCounts", { appUsage: backupPreview.manifest.counts.app_usage, todos: backupPreview.manifest.counts.todos, widgets: backupPreview.manifest.counts.widget_configs })}</p>
-              <p>{t("backup.previewChecksum", { checksum: backupPreview.manifest.checksum.slice(0, 12) })}</p>
-              {backupPreview.manifest.encrypted && (
-                <p className="text-yellow-300">{t("backup.encrypted")}</p>
-              )}
-              {backupPreview.warnings.length > 0 && (
-                <div className="space-y-1">
-                  {backupPreview.warnings.map((warning) => (
-                    <p key={warning} className="text-yellow-300">{warning}</p>
-                  ))}
-                </div>
-              )}
-              {backupPreview.diff && (
-                <div className="space-y-2 border-t border-surface-border pt-2">
-                  <p className="text-text-secondary">{t("backup.diffTitle")}</p>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    {Object.entries(backupPreview.diff.table_counts).map(([table, counts]) => (
-                      <div key={table} className="rounded-md border border-surface-border px-2 py-1.5">
-                        <p className="text-text-primary font-medium">{table}</p>
-                        <p className="text-[11px]">{t("backup.diffBackupRows", { count: counts.backup_rows })} / {t("backup.diffCurrentRows", { count: counts.current_rows })}</p>
-                        <p className="text-[11px]">{t("backup.diffToAdd", { count: counts.to_add })} · {t("backup.diffToUpdate", { count: counts.to_update })} · {t("backup.diffConflicts", { count: counts.conflicts })}</p>
-                      </div>
-                    ))}
-                  </div>
-                  {backupPreview.diff.settings_conflicts.length > 0 && (
-                    <div className="space-y-1">
-                      <p className="text-text-secondary">{t("backup.diffSettingsConflicts")}</p>
-                      {backupPreview.diff.settings_conflicts.map((conflict, idx) => (
-                        <p key={idx} className="text-yellow-300">{conflict}</p>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-          {backupMessage && (
-            <p
-              className={clsx(
-                "text-xs",
-                backupMessage.type === "success" && "text-accent-green",
-                backupMessage.type === "error" && "text-red-300",
-                backupMessage.type === "info" && "text-accent-blue",
-              )}
-            >
-              {backupMessage.text}
-            </p>
-          )}
-        </div>
+        <BackupSection />
       </Section>
       )}
 
@@ -2120,8 +1784,19 @@ export default function Settings() {
 
       {activeSection === "profiles" && (
       <Section icon={User} title={t("profiles.title")}>
-        <div className="rounded-lg border border-surface-border bg-surface-hover/40 p-3 text-xs text-text-muted">
+        <div className="rounded-lg border border-surface-border bg-surface-hover/40 p-3 text-xs text-text-muted space-y-2">
           <p>{t("profiles.current", { profile: currentProfile })}</p>
+          {legacyDataInfo?.can_import && (
+            <div className="flex justify-end">
+              <button
+                onClick={handleImportLegacyData}
+                disabled={legacyImportBusy}
+                className="text-xs px-3 py-1.5 rounded-lg border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
+              >
+                {legacyImportBusy ? t("profiles.importLegacyBusy") : t("profiles.importLegacy")}
+              </button>
+            </div>
+          )}
         </div>
         <div className="space-y-2">
           <p className="text-xs text-text-secondary">{t("profiles.listTitle")}</p>
@@ -2140,15 +1815,6 @@ export default function Settings() {
                   <p className="text-text-primary font-medium truncate">{profile.name}</p>
                   <p className="text-text-muted truncate">{profile.id}{profile.is_default ? ` · ${t("profiles.default")}` : ""}</p>
                 </div>
-                {!profile.is_current && (
-                  <button
-                    onClick={() => handleSwitchProfile(profile.id)}
-                    disabled={profilesBusy}
-                    className="text-xs px-2 py-1 rounded-lg border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
-                  >
-                    {t("profiles.switch")}
-                  </button>
-                )}
               </div>
             ))}
             {profiles.length === 0 && <p className="text-xs text-text-muted">{t("profiles.noProfiles")}</p>}
@@ -2157,13 +1823,13 @@ export default function Settings() {
         <div className="flex justify-end">
           <button
             onClick={() => setProfileDialogOpen(true)}
-            disabled={profilesBusy}
-            className="text-xs px-3 py-1.5 rounded-lg border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
+            disabled={true}
+            className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-text-muted bg-surface-hover/40 opacity-60 cursor-not-allowed transition-colors"
           >
             {t("profiles.create")}
           </button>
         </div>
-        {profileDialogOpen && (
+        {profileDialogOpen && false && (
           <div className="rounded-lg border border-surface-border bg-surface-hover/40 p-3 space-y-2">
             <p className="text-xs text-text-secondary">{t("profiles.createTitle")}</p>
             <input

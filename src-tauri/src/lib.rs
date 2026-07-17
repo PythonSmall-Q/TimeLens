@@ -94,6 +94,7 @@ fn format_seconds(secs: i64) -> String {
 
 const LEGACY_APP_DIR_NAME: &str = "ShanWenxiao.TimeLens-TimeManagementAppwithWidgets";
 const DEFAULT_PROFILE_ID: &str = "default";
+pub(crate) const PENDING_LEGACY_IMPORT_KEY: &str = "pending_legacy_import";
 
 fn copy_if_exists(src: &Path, dst: &Path) -> std::io::Result<()> {
     if src.exists() {
@@ -156,7 +157,7 @@ fn copy_db_with_sidecars(src: &Path, dst: &Path) -> std::io::Result<()> {
 /// Best-effort detection of a legacy 1.x database path on all supported
 /// platforms. Tauri v1 placed app data differently than v2; this function
 /// probes the most likely locations without requiring Tauri APIs.
-fn legacy_db_path() -> Option<PathBuf> {
+pub(crate) fn legacy_db_path() -> Option<PathBuf> {
     #[cfg(target_os = "windows")]
     {
         let appdata = std::env::var_os("APPDATA")?;
@@ -208,43 +209,62 @@ fn migrate_legacy_db(legacy_db: &Path, target_db: &Path) -> std::io::Result<()> 
 
 fn resolve_database_path(data_dir: &Path, profile_id: Option<&str>) -> PathBuf {
     let profile_id = profile_id.unwrap_or(DEFAULT_PROFILE_ID);
-    let target_db = db_path_for_profile(data_dir, profile_id);
+    db_path_for_profile(data_dir, profile_id)
+}
 
-    // Only the default profile attempts to auto-migrate from legacy 1.x paths.
-    if profile_id == DEFAULT_PROFILE_ID {
-        if let Some(legacy_path) = legacy_db_path() {
-            let current_size = std::fs::metadata(&target_db).map(|m| m.len()).unwrap_or(0);
-            let legacy_size = std::fs::metadata(&legacy_path)
-                .map(|m| m.len())
-                .unwrap_or(0);
-
-            let should_migrate =
-                !target_db.exists() || (current_size <= 4096 && legacy_size > current_size);
-
-            if should_migrate {
-                match migrate_legacy_db(&legacy_path, &target_db) {
-                    Ok(()) => {
-                        log::info!(
-                            "TimeLens DB migrated from legacy path to profile path: {} -> {}",
-                            legacy_path.display(),
-                            target_db.display()
-                        );
-                    }
-                    Err(err) => {
-                        log::warn!(
-                            "TimeLens DB migration failed ({} -> {}): {}. Falling back to legacy DB path.",
-                            legacy_path.display(),
-                            target_db.display(),
-                            err
-                        );
-                        return legacy_path;
-                    }
-                }
-            }
-        }
+/// Apply a pending user-approved legacy import before any profile database is
+/// opened. This is invoked once per restart after the frontend confirms the
+/// import; it copies the legacy 1.x database into the default profile and
+/// leaves the flag cleared so the prompt does not repeat.
+fn maybe_apply_pending_legacy_import(
+    app_state_conn: &rusqlite::Connection,
+    data_dir: &Path,
+) -> Result<(), String> {
+    let pending = db::get_setting(app_state_conn, PENDING_LEGACY_IMPORT_KEY)
+        .ok()
+        .flatten()
+        .unwrap_or_default()
+        == "1";
+    if !pending {
+        return Ok(());
     }
 
-    target_db
+    // Clear the flag immediately so a failed import does not loop on restart.
+    let _ = db::set_setting(app_state_conn, PENDING_LEGACY_IMPORT_KEY, "0");
+
+    let current_profile_id = db::migrations::current_profile_id_from_app_state(app_state_conn);
+    if current_profile_id != db::migrations::DEFAULT_PROFILE_ID {
+        log::info!("Pending legacy import ignored: current profile is not default");
+        return Ok(());
+    }
+
+    let Some(legacy_path) = legacy_db_path() else {
+        log::info!("Pending legacy import ignored: no legacy database found");
+        return Ok(());
+    };
+
+    let target_db = db::migrations::db_path_for_profile(data_dir, db::migrations::DEFAULT_PROFILE_ID);
+    let target_size = std::fs::metadata(&target_db).map(|m| m.len()).unwrap_or(0);
+    if target_size > 4096 {
+        log::info!("Pending legacy import ignored: default profile already contains data");
+        return Ok(());
+    }
+
+    // Remove any existing empty/small default profile database so the copy is clean.
+    let _ = std::fs::remove_file(&target_db);
+    let _ = std::fs::remove_file(format!("{}-wal", target_db.display()));
+    let _ = std::fs::remove_file(format!("{}-shm", target_db.display()));
+
+    migrate_legacy_db(&legacy_path, &target_db).map_err(|e| {
+        format!("Failed to import legacy data into default profile: {}", e)
+    })?;
+
+    log::info!(
+        "TimeLens legacy database imported into default profile: {} -> {}",
+        legacy_path.display(),
+        target_db.display()
+    );
+    Ok(())
 }
 
 fn init_file_logger(log_dir: &Path) -> Result<(), String> {
@@ -491,14 +511,18 @@ pub fn run() {
             let data_dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&data_dir)?;
 
-            // Compute the default profile path first so legacy migration can run
-            // before we read global profile state.
-            let default_db_path = resolve_database_path(&data_dir, None);
-
             // Open the unencrypted app state database first (before any profile DB)
             // so profile metadata is available even when profile DBs are encrypted.
             let app_state_conn = db::migrations::open_app_state_db(&data_dir)
                 .map_err(|e| format!("Failed to open app state database: {}", e))?;
+
+            // Apply any user-approved legacy 1.x import before we resolve the default
+            // profile path so the imported database is used on this startup.
+            if let Err(e) = maybe_apply_pending_legacy_import(&app_state_conn, &data_dir) {
+                log::warn!("Failed to apply pending legacy import: {}", e);
+            }
+
+            let default_db_path = resolve_database_path(&data_dir, None);
 
             // One-time migration of profile metadata from the legacy default
             // profile DB into the separate app state DB.
@@ -946,6 +970,8 @@ pub fn run() {
             commands::create_profile,
             commands::switch_profile,
             commands::get_current_profile,
+            commands::detect_legacy_data,
+            commands::import_legacy_data,
             commands::repair_data_issues,
             commands::export_backup_v2,
             commands::import_backup_v2_validate,

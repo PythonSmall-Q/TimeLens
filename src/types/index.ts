@@ -600,6 +600,14 @@ export interface ProfileInfo {
   created_at: string;
 }
 
+export interface LegacyDataInfo {
+  available: boolean;
+  source_path: string | null;
+  default_profile_empty: boolean;
+  current_profile_is_default: boolean;
+  can_import: boolean;
+}
+
 export interface EncryptionStatus {
   enabled: boolean;
 }

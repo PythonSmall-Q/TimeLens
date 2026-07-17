@@ -5,7 +5,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [2.0.0] - 2026-06-12
+## [2.0.0] - 2026-07-17
 
 ### Added
 
@@ -45,6 +45,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Local API server governance** — hardened all API server routes to enforce widget-scoped API token scopes and reject unscoped or revoked tokens.
 - **Offline test harness scripts** — added `scripts/offline-journey-tests.sh` and `scripts/migration-rehearsal.sh` for local critical-journey and migration validation.
 - **VS Code extension sidebar home page redesign** — added connection status badge, focus-mode indicator, today's VS Code time card, language/project breakdown with progress bars, top desktop apps, and cleaner action buttons; sidebar API calls now include `X-Api-Token` and `X-Client-Id` headers for local API governance compatibility.
+- **Legacy 1.x data import prompt** — when the default profile is empty and a legacy 1.x database (e.g. upgraded from 1.4.4) is detected, Settings now shows a one-time dialog asking whether to import the existing data. An "Import legacy data" button is also shown below the current profile card.
+- **Backend commands for legacy data import** — added `detect_legacy_data` and `import_legacy_data` commands to support the new import flow.
+
 
 ### Changed
 
@@ -71,9 +74,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **`getProjectDisplayName` helper** in `src/utils/format.ts` with unit tests: prefers `project_name`, falls back to the basename of `project_path`, and finally returns the localized `dashboard:unknownProject` label.
 - **`dashboard:unknownProject`** i18n key across all desktop locales (`en`, `zh-CN`, `zh-TW`, `ja`, `ko`, `fr`, `de`, `es`).
 - **`unknownProject`** runtime string to the VS Code extension i18n module, used by the extension dashboard panel when a project name is missing.
+- **Profile switching UI entry removed** — the profile switch buttons in Settings > Profiles are no longer shown. The `switch_profile` backend command remains available for API/internal use.
+- **Legacy data migration is now user-confirmed** — startup no longer silently imports legacy 1.x data into the default profile. Importing now requires explicit confirmation via the new prompt or button, and is applied on the next restart through a pending-import flag.
+- **Desktop pet widget temporarily disabled** — the pet widget is marked as “Coming Soon ” in the Widget Center; its title, description, and add button are grayed out and disabled. A backend guard in `create_widget` also rejects `widget_type == "pet"` to prevent creation through any path.
+- **Profile creation button disabled** — the “Create profile” button in Settings > Profiles is temporarily disabled and the creation dialog is hidden.
 
 ### Fixed
 
+- **Backup & Restore UI/UX** — rewrote the Settings page into a clear export/import card layout, added explicit file-selection feedback, a step-by-step validate-then-restore flow, and native notifications on success.
+- **Restore feedback** — restoring a backup now shows a clear status message instead of failing silently; encrypted backups correctly prompt for the passphrase before applying.
+- **Native confirmation dialogs in Settings** — replaced `window.confirm` with `@tauri-apps/plugin-dialog` `confirm()` to prevent `dialog.confirm not allowed` errors in the Tauri webview.
 - **Settings excluded apps could not be unchecked after saving** — fixed a path-normalization mismatch: the backend stores ignored app paths lowercased, but the frontend compared original-case paths, causing excluded apps to vanish from the list. The list now renders ignored apps directly with case-insensitive matching so they remain visible and togglable.
 - **VS Code extension sidebar title showed raw `%timelens.homeView.name%`** — fixed invalid JSON in `vscode-extension/package.nls.json` and `vscode-extension/package.nls.zh-CN.json` (missing comma after `timelens.apiToken.description`), which prevented VS Code from resolving all `%...%` placeholder strings in `package.json`.
 - **Profile switching reliability** — fixed a bug where switching profiles could result in a "connection refused" error or missing profiles because `current_profile_id` was stored inside the encrypted profile database.

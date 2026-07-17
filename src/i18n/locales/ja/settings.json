@@ -178,7 +178,27 @@
     "diffToAdd": "+{{count}} 追加",
     "diffToUpdate": "{{count}} 更新",
     "diffConflicts": "{{count}} 競合",
-    "diffSettingsConflicts": "設定の競合"
+    "diffSettingsConflicts": "設定の競合",
+    "exportTitle": "Export Backup",
+    "exportDesc": "Package your current data into a .timelens-backup file. Optional encryption is supported.",
+    "restoreTitle": "Restore from Backup",
+    "restoreDesc": "Select a .timelens-backup file, validate it, and restore to the current or a new profile.",
+    "chooseFile": "Choose file",
+    "noFileSelected": "No file selected",
+    "fileSelected": "Selected: {{name}}",
+    "selectFileFirst": "Please select a backup file first",
+    "exporting": "Exporting...",
+    "restoring": "Restoring...",
+    "validating": "Validating...",
+    "notification": {
+      "exportTitle": "Backup exported",
+      "restoreTitle": "Restore completed"
+    },
+    "importJsonSuccess": "JSON data imported. The page will refresh shortly.",
+    "importJsonFailed": "Failed to import JSON data",
+    "overwriteConfirm": "Overwrite mode will erase current data and replace it with the backup. Continue?",
+    "mergeConfirm": "Merge mode will merge backup contents into current data and may overwrite conflicts. Continue?",
+    "newProfileConfirm": "A new profile will be created and TimeLens will restart. Continue?"
   },
   "retention": {
     "title": "データ保持ポリシー",

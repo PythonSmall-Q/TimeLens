@@ -129,7 +129,7 @@
   "timerDesc": "Pomodoro, Countdown und Stoppuhr in einem kompakten schwebenden Fenster.",
   "noteDesc": "Schwebender Notizblock, um Ideen festzuhalten, ohne den Workflow zu verlassen.",
   "statusDesc": "Gewohnheits-Tracker-Widget zur Verfolgung täglicher Ziele und Serien.",
-  "petDesc": "Manifest-gesteuertes Desktop-Haustier mit Fokus-, Ruhe- und Begleiter-Zuständen. Bereit für zukünftige Haustierpaket-Anpassungen.",
+  "petDesc": "Das Desktop-Haustier-Widget befindet sich in der Entwicklung. Bleiben Sie dran.",
   "petStudio": {
     "title": "Haustier-Einstellungen",
     "desc": "Passen Sie die Größe des aktuellen Haustier-Widgets an und importieren Sie ein JSON-Haustierpaket.",
@@ -148,7 +148,7 @@
   },
   "official": "Offiziell",
   "pet": {
-    "title": "Desktop-Haustier",
+    "title": "Desktop-Haustier（In Entwicklung）",
     "pack": "Paket",
     "focusLabel": "Fokusmodus",
     "restLabel": "Ruhephase",
@@ -158,7 +158,8 @@
     "defaultApp": "Ihr Workflow",
     "fallbackMessage": "Ich bin hier, um Ihren Rhythmus stabil zu halten.",
     "manifestBadge": "Haustierpaket",
-    "clickAction": "Tippen"
+    "clickAction": "Tippen",
+    "comingSoon": "Desktop pet widget is under development. Stay tuned."
   },
   "thirdParty": {
     "title": "Drittanbieter-Widget",
@@ -182,5 +183,6 @@
     "logs": "Logs",
     "noLogs": "Noch keine Logs.",
     "loadingManifest": "Manifest wird geladen…"
-  }
+  },
+  "comingSoon": "Coming Soon"
 }

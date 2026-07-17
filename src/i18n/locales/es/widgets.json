@@ -129,7 +129,7 @@
   "timerDesc": "Modos pomodoro, cuenta regresiva y cronómetro en una ventana flotante compacta.",
   "noteDesc": "Bloc de notas flotante para anotar ideas sin salir de tu flujo de trabajo.",
   "statusDesc": "Widget de seguimiento de hábitos para rastrear metas diarias y rachas.",
-  "petDesc": "Mascota de escritorio basada en manifiesto con estados de enfoque, descanso y compañía. Lista para futuras personalizaciones de paquetes.",
+  "petDesc": "El widget de mascota de escritorio está en desarrollo. Mantente atento.",
   "petStudio": {
     "title": "Configuración de mascota",
     "desc": "Ajusta el tamaño del widget de mascota actual e importa un paquete de mascota JSON.",
@@ -148,7 +148,7 @@
   },
   "official": "Oficial",
   "pet": {
-    "title": "Mascota de escritorio",
+    "title": "Mascota de escritorio（En desarrollo）",
     "pack": "Paquete",
     "focusLabel": "Modo enfoque",
     "restLabel": "Descansando",
@@ -158,7 +158,8 @@
     "defaultApp": "tu flujo de trabajo",
     "fallbackMessage": "Estoy aquí para mantener tu ritmo estable.",
     "manifestBadge": "Paquete de mascota",
-    "clickAction": "Tocar"
+    "clickAction": "Tocar",
+    "comingSoon": "Desktop pet widget is under development. Stay tuned."
   },
   "thirdParty": {
     "title": "Widget de terceros",
@@ -182,5 +183,6 @@
     "logs": "Registros",
     "noLogs": "Aún no hay registros.",
     "loadingManifest": "Cargando manifiesto…"
-  }
+  },
+  "comingSoon": "Coming Soon"
 }

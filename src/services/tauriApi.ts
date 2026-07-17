@@ -46,6 +46,7 @@ import type {
   ArchiveSchedulerSettings,
   CompressionResult,
   ProfileInfo,
+  LegacyDataInfo,
   EncryptionStatus,
   WidgetRegistryResponse,
   WidgetRegistryItem,
@@ -369,6 +370,11 @@ export const switchProfile = (profileId: string): Promise<void> =>
   invoke("switch_profile", { profileId });
 
 export const getCurrentProfile = (): Promise<string> => invoke("get_current_profile");
+
+export const detectLegacyData = (): Promise<LegacyDataInfo> =>
+  invoke("detect_legacy_data");
+
+export const importLegacyData = (): Promise<void> => invoke("import_legacy_data");
 
 // ── Database encryption ────────────────────────────────────────
 

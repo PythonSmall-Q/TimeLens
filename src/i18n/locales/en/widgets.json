@@ -3,7 +3,7 @@
   "widgetCenterDesc": "Manage and create floating widgets",
   "myWidgets": "My Widgets",
   "addWidget": "Add Widget",
-  "selfAdd": "Add Widget",
+  "selfAdd": "Add Widgets",
   "myWidgetsTab": "My Widgets",
   "importLocalWidget": "Import Local Widget",
   "importSuccess": "Widget imported successfully",
@@ -119,8 +119,6 @@
     "breakComplete": "Break over. Back to work!"
   },
   "marketplace": "Marketplace",
-  "selfAdd": "Add Widgets",
-  "myWidgetsTab": "My Widgets",
   "installed": "Installed",
   "addOne": "Add",
   "addFromTemplate": "Add",
@@ -131,7 +129,7 @@
   "timerDesc": "Pomodoro, countdown, and stopwatch modes in a compact floating window.",
   "noteDesc": "Floating sticky-note pad for jotting down ideas without leaving your workflow.",
   "statusDesc": "Habit tracker widget to track daily goals and streaks.",
-  "petDesc": "Manifest-driven desktop pet with focus, rest, and companion states. Ready for future pet-pack customization.",
+  "petDesc": "Desktop pet widget is under development. Stay tuned.",
   "petStudio": {
     "title": "Pet Settings",
     "desc": "Adjust the current pet widget size and import a JSON pet pack.",
@@ -150,7 +148,7 @@
   },
   "official": "Official",
   "pet": {
-    "title": "Desktop Pet",
+    "title": "Desktop Pet (Coming Soon)",
     "pack": "Pack",
     "focusLabel": "Focus mode",
     "restLabel": "Resting",
@@ -160,7 +158,8 @@
     "defaultApp": "your workflow",
     "fallbackMessage": "I am here to keep your rhythm steady.",
     "manifestBadge": "Pet Pack",
-    "clickAction": "Tap"
+    "clickAction": "Tap",
+    "comingSoon": "Desktop pet widget is under development. Stay tuned."
   },
   "thirdParty": {
     "title": "Third-party Widget",
@@ -184,5 +183,6 @@
     "logs": "Logs",
     "noLogs": "No logs yet.",
     "loadingManifest": "Loading manifest..."
-  }
+  },
+  "comingSoon": "Coming Soon"
 }
