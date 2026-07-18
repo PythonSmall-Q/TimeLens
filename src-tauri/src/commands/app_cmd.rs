@@ -182,7 +182,7 @@ pub fn get_browser_extension_status(db: State<DbState>) -> Result<BrowserExtensi
 
     Ok(BrowserExtensionStatus {
         enabled,
-        api_base_url: "http://127.0.0.1:49152".to_string(),
+        api_base_url: crate::api_server::local_api_base_url(),
         connected: last_sync_at.is_some(),
         last_sync_at,
         last_browser_name,
@@ -190,6 +190,11 @@ pub fn get_browser_extension_status(db: State<DbState>) -> Result<BrowserExtensi
         recent_session_count,
         recent_sessions,
     })
+}
+
+#[tauri::command]
+pub fn get_local_api_base_url() -> String {
+    crate::api_server::local_api_base_url()
 }
 
 #[tauri::command]

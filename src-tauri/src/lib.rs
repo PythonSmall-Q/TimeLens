@@ -696,7 +696,6 @@ pub fn run() {
                 api_server::start_api_server(
                     api_db,
                     monitor_status.clone(),
-                    49152,
                     api_token,
                 );
             }
@@ -1083,6 +1082,7 @@ pub fn run() {
             // App settings / startup / shortcuts
             commands::get_app_settings,
             commands::get_browser_extension_status,
+            commands::get_local_api_base_url,
             commands::get_install_channel_info,
             commands::set_launch_at_startup,
             commands::get_tray_icon_style,

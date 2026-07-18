@@ -6,6 +6,7 @@
 ///   GET  /api/categories                 → Vec<AppCategoryRule>
 ///   GET  /api/status                     → { version, focus_active }
 ///   WS   /ws/active-window               → streams ActiveWindowInfo JSON
+use std::sync::atomic::{AtomicU16, Ordering};
 use std::sync::{Arc, Mutex};
 
 use axum::{
@@ -23,6 +24,27 @@ use crate::commands::extension_bridge_cmd;
 use crate::db;
 use crate::models::{AppUsageSummary, BrowserSession, VsCodeLanguageDuration, VsCodeSession};
 use crate::monitor::SharedMonitorStatus;
+
+/// Default local API port. Extensions and widgets hardcode this as the primary
+/// port; the backend falls back to a range if it is unavailable.
+const DEFAULT_LOCAL_API_PORT: u16 = 49152;
+
+/// Number of fallback ports to try if the default port cannot be bound.
+const LOCAL_API_PORT_FALLBACK_COUNT: u16 = 1000;
+
+static LOCAL_API_PORT: AtomicU16 = AtomicU16::new(DEFAULT_LOCAL_API_PORT);
+
+/// Return the currently bound local API port. Before the server starts this is
+/// the default port; afterwards it reflects the actual port the server is
+/// listening on.
+pub fn local_api_port() -> u16 {
+    LOCAL_API_PORT.load(Ordering::SeqCst)
+}
+
+/// Return the base URL for the local API, e.g. `http://127.0.0.1:49152`.
+pub fn local_api_base_url() -> String {
+    format!("http://127.0.0.1:{}", local_api_port())
+}
 
 /// Shared state threaded through axum handlers.
 #[derive(Clone)]
@@ -51,7 +73,7 @@ struct BrowserLinkResponse {
     enabled: bool,
     app_name: &'static str,
     version: &'static str,
-    api_base_url: &'static str,
+    api_base_url: String,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -422,7 +444,7 @@ async fn get_browser_link(State(s): State<ApiState>, headers: HeaderMap) -> impl
         enabled,
         app_name: "TimeLens",
         version: env!("CARGO_PKG_VERSION"),
-        api_base_url: "http://127.0.0.1:49152",
+        api_base_url: local_api_base_url(),
     })
     .into_response()
 }
@@ -910,11 +932,12 @@ async fn handle_ws(mut socket: WebSocket, state: ApiState) {
 }
 
 /// Build and spawn the axum HTTP server.
-/// Binds to 127.0.0.1:`port` (default 49152).
+/// Binds to 127.0.0.1 on the default port (49152) and falls back to a small
+/// range of higher ports if the default is unavailable (e.g. blocked by the
+/// OS or an antivirus).
 pub fn start_api_server(
     db: Arc<Mutex<rusqlite::Connection>>,
     monitor_status: SharedMonitorStatus,
-    port: u16,
     api_token: String,
 ) {
     let state = ApiState {
@@ -952,16 +975,32 @@ pub fn start_api_server(
         .layer(cors)
         .with_state(state);
 
-    let addr = std::net::SocketAddr::from(([127, 0, 0, 1], port));
     tauri::async_runtime::spawn(async move {
-        let listener = match tokio::net::TcpListener::bind(addr).await {
-            Ok(l) => l,
-            Err(e) => {
-                log::error!("Local API server failed to bind {addr}: {e}");
-                return;
+        let mut bound_listener = None;
+        let mut chosen_port = DEFAULT_LOCAL_API_PORT;
+        for port in DEFAULT_LOCAL_API_PORT..=DEFAULT_LOCAL_API_PORT + LOCAL_API_PORT_FALLBACK_COUNT {
+            let addr = std::net::SocketAddr::from(([127, 0, 0, 1], port));
+            match tokio::net::TcpListener::bind(addr).await {
+                Ok(listener) => {
+                    bound_listener = Some(listener);
+                    chosen_port = port;
+                    break;
+                }
+                Err(e) => {
+                    log::warn!("Local API server failed to bind {addr}: {e}");
+                }
             }
+        }
+        let Some(listener) = bound_listener else {
+            log::error!(
+                "Local API server could not bind to any port in the range {}-{}",
+                DEFAULT_LOCAL_API_PORT,
+                DEFAULT_LOCAL_API_PORT + LOCAL_API_PORT_FALLBACK_COUNT
+            );
+            return;
         };
-        log::info!("TimeLens local API listening on http://{addr}");
+        LOCAL_API_PORT.store(chosen_port, Ordering::SeqCst);
+        log::info!("TimeLens local API listening on http://127.0.0.1:{chosen_port}");
         if let Err(e) = axum::serve(listener, app).await {
             log::error!("Local API server error: {e}");
         }

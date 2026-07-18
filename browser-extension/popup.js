@@ -1,6 +1,46 @@
 import { getLocale, t } from "./i18n.js";
 
 const API_BASE = "http://127.0.0.1:49152";
+const DEFAULT_API_PORT = 49152;
+const API_PORT_FALLBACK_COUNT = 1000;
+let discoveredApiBaseCache = null;
+
+async function discoverApiBaseUrl() {
+  const now = Date.now();
+  if (discoveredApiBaseCache && discoveredApiBaseCache.expiresAt > now) {
+    return discoveredApiBaseCache.value;
+  }
+
+  for (let offset = 0; offset <= API_PORT_FALLBACK_COUNT; offset += 1) {
+    const port = DEFAULT_API_PORT + offset;
+    const baseUrl = `http://127.0.0.1:${port}`;
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 800);
+      const response = await fetch(`${baseUrl}/api/status`, {
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+      if (response.ok) {
+        const data = await response.json();
+        if (data && typeof data.version === "string") {
+          discoveredApiBaseCache = { value: baseUrl, expiresAt: now + 60_000 };
+          return baseUrl;
+        }
+      }
+    } catch {
+      // try next port
+    }
+  }
+
+  discoveredApiBaseCache = { value: "", expiresAt: now + 5_000 };
+  return null;
+}
+
+function getApiBaseUrl() {
+  return discoveredApiBaseCache?.value || API_BASE;
+}
+
 const STORAGE_KEYS = {
   activeSession: "timelens.activeSession",
   recentSessions: "timelens.recentSessions",
@@ -75,7 +115,9 @@ async function loadApiStatus() {
   ]);
 
   try {
-    const response = await fetch(`${API_BASE}/api/status`);
+    const baseUrl = await discoverApiBaseUrl();
+    if (!baseUrl) throw new Error("desktop_unreachable");
+    const response = await fetch(`${baseUrl}/api/status`);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();
     renderStatus({ ok: true, data, checkedAt: Date.now(), pendingCount: pendingSessions.length, lastSyncError });
@@ -92,7 +134,9 @@ async function loadApiStatus() {
 
 async function loadTodayUsage() {
   try {
-    const response = await fetch(`${API_BASE}/api/screen-time/today`);
+    const baseUrl = await discoverApiBaseUrl();
+    if (!baseUrl) throw new Error("desktop_unreachable");
+    const response = await fetch(`${baseUrl}/api/screen-time/today`);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const rows = await response.json();
     renderTodayUsage(Array.isArray(rows) ? rows.slice(0, 5) : []);

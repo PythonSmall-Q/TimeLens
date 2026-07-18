@@ -6,6 +6,7 @@ import {
   getVsCodeTrackingEnabled,
   setFocusModeActive,
   setVsCodeTrackingEnabled,
+  getLocalApiBaseUrl,
 } from "@/services/tauriApi";
 import { formatDuration, getProjectDisplayName, todayString } from "@/utils/format";
 

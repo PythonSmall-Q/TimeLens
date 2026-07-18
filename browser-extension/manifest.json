@@ -5,7 +5,7 @@
   "description": "__MSG_extensionDescription__",
   "default_locale": "en",
   "permissions": ["storage", "tabs", "alarms", "idle"],
-  "host_permissions": ["http://127.0.0.1:49152/*"],
+  "host_permissions": ["http://127.0.0.1:*/*"],
   "background": {
     "service_worker": "background.js",
     "type": "module"

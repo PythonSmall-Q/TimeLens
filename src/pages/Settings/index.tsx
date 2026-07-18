@@ -32,29 +32,9 @@ import type {
 import ExePickerInput from "@/components/ExePickerInput";
 import BackupSection from "./BackupSection";
 
-export function Section({
-  icon: Icon,
-  title,
-  children,
-}: {
-  icon: React.ElementType;
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="glass-card p-5">
-      <div className="flex items-center gap-2 mb-4">
-        <span className="text-accent-blue">
-          <Icon size={15} />
-        </span>
-        <h2 className="text-sm font-semibold text-text-primary">{title}</h2>
-      </div>
-      <div className="space-y-4">{children}</div>
-    </div>
-  );
-}
+import SettingsCard from "./SettingsCard";
 
-export function Row({ label, children }: { label: string; children: React.ReactNode }) {
+function SettingsRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-4">
       <span className="text-sm text-text-secondary flex-shrink-0">{label}</span>
@@ -716,26 +696,27 @@ export default function Settings() {
   const sectionCards: Array<{
     key: NonNullable<typeof activeSection>;
     title: string;
+    description: string;
     icon: React.ElementType;
     keywords: string[];
   }> = [
-    { key: "general", title: t("general"), icon: Sun, keywords: [t("language")] },
-    { key: "appearance", title: t("appearance"), icon: Moon, keywords: [t("theme.label")] },
-    { key: "trayIcon", title: t("trayIconStyle.label"), icon: PanelsTopLeft, keywords: [t("trayIconStyle.auto"), t("trayIconStyle.color"), t("trayIconStyle.black"), t("trayIconStyle.white")] },
-    { key: "privacyCenter", title: t("privacyCenter.title"), icon: Lock, keywords: [t("privacyCenter.subtitle"), t("apiSecurity.title"), t("backup.title"), t("transparency.title")] },
-    { key: "tracking", title: t("tracking.title"), icon: Activity, keywords: [t("tracking.active"), t("tracking.samplingInterval"), t("tracking.idleTimePolicy")] },
-    { key: "startup", title: t("startup.title"), icon: Rocket, keywords: [t("startup.launchAtStartup"), t("startup.silentStartup"), t("startup.autoOpenWidgets")] },
-    { key: "widgets", title: t("widgets.title"), icon: PanelsTopLeft, keywords: [t("widgets.fadeOnBlur")] },
-    { key: "shortcuts", title: t("shortcuts.title"), icon: Keyboard, keywords: [t("shortcuts.openWidgetCenter"), t("shortcuts.toggleWidgetVisibility")] },
-    { key: "data", title: t("data.title"), icon: Database, keywords: [t("data.excludeApps")] },
-    { key: "dataHealth", title: t("dataHealth.title"), icon: Database, keywords: [t("dataHealth.integrity"), t("dataHealth.applyRepair")] },
-    { key: "backup", title: t("backup.title"), icon: Database, keywords: [t("backup.exportAction"), t("backup.applyAction")] },
-    { key: "retention", title: t("retention.title"), icon: Rocket, keywords: [t("retention.current"), t("retention.runNow")] },
-    { key: "profiles", title: t("profiles.title"), icon: User, keywords: [t("profiles.current"), t("profiles.importLegacy")] },
-    { key: "encryption", title: t("encryption.title"), icon: Shield, keywords: [t("encryption.status"), t("encryption.enable")] },
-    { key: "transparency", title: t("transparency.title"), icon: Info, keywords: [t("transparency.active"), t("transparency.fields")] },
-    { key: "extensionBridge", title: t("extensionBridge.title"), icon: Lock, keywords: [t("extensionBridge.key"), "bridge", "extension"] },
-    { key: "about", title: t("about.title"), icon: Info, keywords: [t("about.version"), "github"] },
+    { key: "general", title: t("general"), description: t("generalDesc"), icon: Sun, keywords: [t("language")] },
+    { key: "appearance", title: t("appearance"), description: t("appearanceDesc"), icon: Moon, keywords: [t("theme.label")] },
+    { key: "trayIcon", title: t("trayIconStyle.label"), description: t("trayIconDesc"), icon: PanelsTopLeft, keywords: [t("trayIconStyle.auto"), t("trayIconStyle.color"), t("trayIconStyle.black"), t("trayIconStyle.white")] },
+    { key: "privacyCenter", title: t("privacyCenter.title"), description: t("privacyCenterDesc"), icon: Lock, keywords: [t("privacyCenter.subtitle"), t("apiSecurity.title"), t("backup.title"), t("transparency.title")] },
+    { key: "tracking", title: t("tracking.title"), description: t("trackingDesc"), icon: Activity, keywords: [t("tracking.active"), t("tracking.samplingInterval"), t("tracking.idleTimePolicy")] },
+    { key: "startup", title: t("startup.title"), description: t("startupDesc"), icon: Rocket, keywords: [t("startup.launchAtStartup"), t("startup.silentStartup"), t("startup.autoOpenWidgets")] },
+    { key: "widgets", title: t("widgets.title"), description: t("widgetsDesc"), icon: PanelsTopLeft, keywords: [t("widgets.fadeOnBlur")] },
+    { key: "shortcuts", title: t("shortcuts.title"), description: t("shortcutsDesc"), icon: Keyboard, keywords: [t("shortcuts.openWidgetCenter"), t("shortcuts.toggleWidgetVisibility")] },
+    { key: "data", title: t("data.title"), description: t("dataDesc"), icon: Database, keywords: [t("data.excludeApps")] },
+    { key: "dataHealth", title: t("dataHealth.title"), description: t("dataHealthDesc"), icon: Database, keywords: [t("dataHealth.integrity"), t("dataHealth.applyRepair")] },
+    { key: "backup", title: t("backup.title"), description: t("backupDesc"), icon: Database, keywords: [t("backup.exportAction"), t("backup.applyAction")] },
+    { key: "retention", title: t("retention.title"), description: t("retentionDesc"), icon: Rocket, keywords: [t("retention.current"), t("retention.runNow")] },
+    { key: "profiles", title: t("profiles.title"), description: t("profilesDesc"), icon: User, keywords: [t("profiles.current"), t("profiles.importLegacy")] },
+    { key: "encryption", title: t("encryption.title"), description: t("encryptionDesc"), icon: Shield, keywords: [t("encryption.status"), t("encryption.enable")] },
+    { key: "transparency", title: t("transparency.title"), description: t("transparencyDesc"), icon: Info, keywords: [t("transparency.active"), t("transparency.fields")] },
+    { key: "extensionBridge", title: t("extensionBridge.title"), description: t("extensionBridgeDesc"), icon: Lock, keywords: [t("extensionBridge.key"), "bridge", "extension"] },
+    { key: "about", title: t("about.title"), description: t("aboutDesc"), icon: Info, keywords: [t("about.version"), "github"] },
   ];
   const settingSearchLower = settingSearch.trim().toLowerCase();
   const filteredSectionCards = sectionCards.filter((section) => {
@@ -767,17 +748,14 @@ export default function Settings() {
           />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {filteredSectionCards.map(({ key, title, icon: Icon }) => (
-            <button
+          {filteredSectionCards.map(({ key, title, description, icon: Icon }) => (
+            <SettingsCard
               key={key}
+              icon={Icon}
+              title={title}
+              description={description}
               onClick={() => setActiveSection(key)}
-              className="glass-card p-4 text-left border border-surface-border hover:border-accent-blue/40 hover:bg-surface-hover transition-colors"
-            >
-              <div className="flex items-center gap-2 text-text-primary">
-                <Icon size={15} className="text-accent-blue" />
-                <span className="text-sm font-medium">{title}</span>
-              </div>
-            </button>
+            />
           ))}
         </div>
         {filteredSectionCards.length === 0 && (
@@ -789,7 +767,7 @@ export default function Settings() {
       {activeSection && (
         <button
           onClick={() => setActiveSection(null)}
-          className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
+          className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
         >
           <ArrowLeft size={13} />
           {t("common:previous")}
@@ -798,17 +776,17 @@ export default function Settings() {
 
       {/* General */}
       {activeSection === "general" && (
-      <Section icon={Sun} title={t("general")}>
-        <Row label={t("language")}>
+      <SettingsCard icon={Sun} title={t("general")} description={t("generalDesc")}>
+        <SettingsRow label={t("language")}>
           <LanguageSwitcher />
-        </Row>
-      </Section>
+        </SettingsRow>
+      </SettingsCard>
       )}
 
       {/* Appearance */}
       {activeSection === "appearance" && (
-      <Section icon={Moon} title={t("appearance")}>
-        <Row label={t("theme.label")}>
+      <SettingsCard icon={Moon} title={t("appearance")} description={t("appearanceDesc")}>
+        <SettingsRow label={t("theme.label")}>
           <div className="flex gap-2">
             {(["dark", "light"] as const).map((th) => (
               <button
@@ -825,14 +803,14 @@ export default function Settings() {
               </button>
             ))}
           </div>
-        </Row>
-      </Section>
+        </SettingsRow>
+      </SettingsCard>
       )}
 
       {/* Tray Icon */}
       {activeSection === "trayIcon" && (
-      <Section icon={PanelsTopLeft} title={t("trayIconStyle.label")}>
-        <Row label={t("trayIconStyle.label")}>
+      <SettingsCard icon={PanelsTopLeft} title={t("trayIconStyle.label")} description={t("trayIconDesc")}>
+        <SettingsRow label={t("trayIconStyle.label")}>
           <div className="flex gap-2">
             {(["auto", "color", "black", "white"] as const).map((style) => (
               <button
@@ -853,13 +831,13 @@ export default function Settings() {
               </button>
             ))}
           </div>
-        </Row>
-      </Section>
+        </SettingsRow>
+      </SettingsCard>
       )}
 
       {/* Tracking */}
       {activeSection === "privacyCenter" && (
-      <Section icon={Lock} title={t("privacyCenter.title")}>
+      <SettingsCard icon={Lock} title={t("privacyCenter.title")} description={t("privacyCenterDesc")}>
         <p className="text-xs text-text-muted">{t("privacyCenter.subtitle")}</p>
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           <div className="rounded-lg border border-surface-border bg-surface-hover/40 p-3">
@@ -913,37 +891,37 @@ export default function Settings() {
           <div className="flex flex-wrap gap-2 justify-end">
             <button
               onClick={() => setActiveSection("tracking")}
-              className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
+              className="text-xs px-3 py-1.5 rounded-xl border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
             >
               {t("privacyCenter.openTracking")}
             </button>
             <button
               onClick={() => setActiveSection("extensionBridge")}
-              className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
+              className="text-xs px-3 py-1.5 rounded-xl border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
             >
               {t("privacyCenter.openApiSecurity")}
             </button>
             <button
               onClick={() => setActiveSection("backup")}
-              className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
+              className="text-xs px-3 py-1.5 rounded-xl border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
             >
               {t("privacyCenter.openBackup")}
             </button>
             <button
               onClick={() => setActiveSection("dataHealth")}
-              className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
+              className="text-xs px-3 py-1.5 rounded-xl border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
             >
               {t("privacyCenter.openDataHealth")}
             </button>
             <button
               onClick={() => setActiveSection("profiles")}
-              className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
+              className="text-xs px-3 py-1.5 rounded-xl border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
             >
               {t("privacyCenter.openProfiles")}
             </button>
             <button
               onClick={() => setActiveSection("encryption")}
-              className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
+              className="text-xs px-3 py-1.5 rounded-xl border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
             >
               {t("privacyCenter.openEncryption")}
             </button>
@@ -954,19 +932,19 @@ export default function Settings() {
                 void refreshProfiles();
                 void refreshEncryptionStatus();
               }}
-              className="text-xs px-3 py-1.5 rounded-lg border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
+              className="text-xs px-3 py-1.5 rounded-xl border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
             >
               {t("privacyCenter.refresh")}
             </button>
           </div>
         </div>
-      </Section>
+      </SettingsCard>
       )}
 
       {/* Tracking */}
       {activeSection === "tracking" && (
-      <Section icon={Activity} title={t("tracking.title")}>
-        <Row label={t("tracking.active")}>
+      <SettingsCard icon={Activity} title={t("tracking.title")} description={t("trackingDesc")}>
+        <SettingsRow label={t("tracking.active")}>
           <button
             onClick={async () => {
               await setMonitoringActive(!monitoringActive);
@@ -985,8 +963,8 @@ export default function Settings() {
               )}
             />
           </button>
-        </Row>
-        <Row label={t("tracking.samplingInterval")}>
+        </SettingsRow>
+        <SettingsRow label={t("tracking.samplingInterval")}>
           <div className="flex items-center gap-2">
             <input
               type="range"
@@ -1003,8 +981,8 @@ export default function Settings() {
               {samplingIntervalMs}ms
             </span>
           </div>
-        </Row>
-        <Row label={t("tracking.debounce")}>
+        </SettingsRow>
+        <SettingsRow label={t("tracking.debounce")}>
           <div className="flex items-center gap-2">
             <input
               type="range"
@@ -1021,8 +999,8 @@ export default function Settings() {
               {debounceMs}ms
             </span>
           </div>
-        </Row>
-        <Row label={t("tracking.weekStartDay")}>
+        </SettingsRow>
+        <SettingsRow label={t("tracking.weekStartDay")}>
           <div className="flex gap-2">
             {([1, 0] as const).map((d) => (
               <button
@@ -1039,8 +1017,8 @@ export default function Settings() {
               </button>
             ))}
           </div>
-        </Row>
-        <Row label={t("tracking.excludeTimelens")}>
+        </SettingsRow>
+        <SettingsRow label={t("tracking.excludeTimelens")}>
           <button
             onClick={() => {
               const next = !excludeTimelens;
@@ -1074,9 +1052,9 @@ export default function Settings() {
               )}
             />
           </button>
-        </Row>
+        </SettingsRow>
         <p className="text-xs text-text-muted text-right">{t("tracking.excludeTimelensHint")}</p>
-        <Row label={t("tracking.ignoreSystemProcesses")}>
+        <SettingsRow label={t("tracking.ignoreSystemProcesses")}>
           <button
             onClick={() => {
               const next = !ignoreSystemProcesses;
@@ -1095,9 +1073,9 @@ export default function Settings() {
               )}
             />
           </button>
-        </Row>
+        </SettingsRow>
         <p className="text-xs text-text-muted text-right">{t("tracking.ignoreSystemProcessesHint")}</p>
-        <Row label={t("tracking.trackWindowTitles")}>
+        <SettingsRow label={t("tracking.trackWindowTitles")}>
           <button
             onClick={() => {
               const next = !trackWindowTitles;
@@ -1116,9 +1094,9 @@ export default function Settings() {
               )}
             />
           </button>
-        </Row>
+        </SettingsRow>
         <p className="text-xs text-text-muted text-right">{t("tracking.trackWindowTitlesHint")}</p>
-        <Row label={t("tracking.idleTimePolicy")}> 
+        <SettingsRow label={t("tracking.idleTimePolicy")}> 
           <div className="flex gap-2">
             {([
               ["count", t("tracking.idleCount")],
@@ -1138,10 +1116,10 @@ export default function Settings() {
               </button>
             ))}
           </div>
-        </Row>
+        </SettingsRow>
         <p className="text-xs text-text-muted text-right">{t("tracking.idleTimePolicyHint")}</p>
 
-        <Row label={t("tracking.quietHoursEnabled")}>
+        <SettingsRow label={t("tracking.quietHoursEnabled")}>
           <button
             onClick={() => setNotificationQuietHoursEnabled(!notificationQuietHoursEnabled)}
             title={t("tracking.quietHoursEnabled")}
@@ -1157,10 +1135,10 @@ export default function Settings() {
               )}
             />
           </button>
-        </Row>
+        </SettingsRow>
 
         {notificationQuietHoursEnabled && (
-          <Row label={t("tracking.quietHoursRange")}>
+          <SettingsRow label={t("tracking.quietHoursRange")}>
             <div className="flex items-center gap-2">
               <input
                 type="time"
@@ -1176,11 +1154,11 @@ export default function Settings() {
                 className="ui-field !w-28"
               />
             </div>
-          </Row>
+          </SettingsRow>
         )}
         <p className="text-xs text-text-muted text-right">{t("tracking.quietHoursHint")}</p>
 
-        <Row label={t("tracking.notificationCooldown")}>
+        <SettingsRow label={t("tracking.notificationCooldown")}>
           <div className="flex items-center gap-2">
             <input
               type="range"
@@ -1197,18 +1175,18 @@ export default function Settings() {
               {notificationCooldownMin}{t("tracking.minuteUnit")}
             </span>
           </div>
-        </Row>
+        </SettingsRow>
         <p className="text-xs text-text-muted text-right">{t("tracking.notificationCooldownHint")}</p>
 
-    </Section>
+    </SettingsCard>
       )}
 
   {/* Startup */}
       {activeSection === "startup" && (
-      <Section icon={Rocket} title={t("startup.title")}>
+      <SettingsCard icon={Rocket} title={t("startup.title")} description={t("startupDesc")}>
         {showStartupSettings && (
           <>
-            <Row label={t("startup.launchAtStartup")}>
+            <SettingsRow label={t("startup.launchAtStartup")}>
               <button
                 onClick={async () => {
                   const next = !launchAtStartup;
@@ -1228,8 +1206,8 @@ export default function Settings() {
                   )}
                 />
               </button>
-            </Row>
-            <Row label={t("startup.silentStartup")}>
+            </SettingsRow>
+            <SettingsRow label={t("startup.silentStartup")}>
               <button
                 onClick={async () => {
                   const next = !silentStartup;
@@ -1249,10 +1227,10 @@ export default function Settings() {
                   )}
                 />
               </button>
-            </Row>
+            </SettingsRow>
           </>
         )}
-        <Row label={t("startup.autoOpenWidgets")}>
+        <SettingsRow label={t("startup.autoOpenWidgets")}>
           <button
             onClick={async () => {
               const next = !autoOpenWidgets;
@@ -1272,17 +1250,17 @@ export default function Settings() {
               )}
             />
           </button>
-        </Row>
+        </SettingsRow>
         {showStartupSettings && (
           <p className="text-xs text-text-muted text-right">{t("startup.silentHint")}</p>
         )}
-      </Section>
+      </SettingsCard>
       )}
 
       {/* Widgets */}
       {activeSection === "widgets" && (
-      <Section icon={PanelsTopLeft} title={t("widgets.title")}>
-        <Row label={t("widgets.fadeOnBlur")}>
+      <SettingsCard icon={PanelsTopLeft} title={t("widgets.title")} description={t("widgetsDesc")}>
+        <SettingsRow label={t("widgets.fadeOnBlur")}>
           <button
             onClick={() => {
               const next = !fadeOnBlur;
@@ -1302,15 +1280,15 @@ export default function Settings() {
               )}
             />
           </button>
-        </Row>
+        </SettingsRow>
         <p className="text-xs text-text-muted text-right">{t("widgets.fadeHint")}</p>
-      </Section>
+      </SettingsCard>
       )}
 
       {/* Shortcuts */}
       {activeSection === "shortcuts" && (
-      <Section icon={Keyboard} title={t("shortcuts.title")}>
-        <Row label={t("shortcuts.openWidgetCenter")}>
+      <SettingsCard icon={Keyboard} title={t("shortcuts.title")} description={t("shortcutsDesc")}>
+        <SettingsRow label={t("shortcuts.openWidgetCenter")}>
           <input
             value={shortcuts.open_widget_center}
             onChange={(e) => setShortcut("open_widget_center", e.target.value)}
@@ -1318,8 +1296,8 @@ export default function Settings() {
             title={t("shortcuts.openWidgetCenter")}
             aria-label={t("shortcuts.openWidgetCenter")}
           />
-        </Row>
-        <Row label={t("shortcuts.toggleWidgetVisibility")}>
+        </SettingsRow>
+        <SettingsRow label={t("shortcuts.toggleWidgetVisibility")}>
           <input
             value={shortcuts.toggle_widget_visibility}
             onChange={(e) => setShortcut("toggle_widget_visibility", e.target.value)}
@@ -1327,8 +1305,8 @@ export default function Settings() {
             title={t("shortcuts.toggleWidgetVisibility")}
             aria-label={t("shortcuts.toggleWidgetVisibility")}
           />
-        </Row>
-        <Row label={t("shortcuts.startRecording")}>
+        </SettingsRow>
+        <SettingsRow label={t("shortcuts.startRecording")}>
           <input
             value={shortcuts.start_recording}
             onChange={(e) => setShortcut("start_recording", e.target.value)}
@@ -1336,8 +1314,8 @@ export default function Settings() {
             title={t("shortcuts.startRecording")}
             aria-label={t("shortcuts.startRecording")}
           />
-        </Row>
-        <Row label={t("shortcuts.pauseRecording")}>
+        </SettingsRow>
+        <SettingsRow label={t("shortcuts.pauseRecording")}>
           <input
             value={shortcuts.pause_recording}
             onChange={(e) => setShortcut("pause_recording", e.target.value)}
@@ -1345,7 +1323,7 @@ export default function Settings() {
             title={t("shortcuts.pauseRecording")}
             aria-label={t("shortcuts.pauseRecording")}
           />
-        </Row>
+        </SettingsRow>
         <div className="flex justify-end">
           <button
             onClick={async () => {
@@ -1361,12 +1339,12 @@ export default function Settings() {
             {t("shortcuts.save")}
           </button>
         </div>
-      </Section>
+      </SettingsCard>
       )}
 
       {/* Data */}
       {activeSection === "data" && (
-      <Section icon={Database} title={t("data.title")}>
+      <SettingsCard icon={Database} title={t("data.title")} description={t("dataDesc")}>
         <div className="space-y-2">
           <div className="text-sm text-text-secondary">{t("data.excludeApps")}</div>
           <ExePickerInput
@@ -1422,17 +1400,17 @@ export default function Settings() {
               onClick={async () => {
                 await api.setIgnoredApps(ignoredApps);
               }}
-              className="text-xs px-3 py-1.5 rounded-lg border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
+              className="text-xs px-3 py-1.5 rounded-xl border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
             >
               {t("data.saveExcludedApps")}
             </button>
           </div>
         </div>
-      </Section>
+      </SettingsCard>
       )}
 
       {activeSection === "dataHealth" && (
-      <Section icon={Database} title={t("dataHealth.title")}>
+      <SettingsCard icon={Database} title={t("dataHealth.title")} description={t("dataHealthDesc")}>
         <div className="grid gap-2 sm:grid-cols-3">
           <div className="rounded-lg border border-surface-border bg-surface-hover/40 p-3">
             <div className="text-[11px] text-text-muted">{t("dataHealth.integrity")}</div>
@@ -1470,14 +1448,14 @@ export default function Settings() {
           <button
             onClick={previewRepairAssistant}
             disabled={repairing}
-            className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
+            className="text-xs px-3 py-1.5 rounded-xl border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
           >
             {t("dataHealth.previewRepair")}
           </button>
           <button
             onClick={applyRepairAssistant}
             disabled={repairing}
-            className="text-xs px-3 py-1.5 rounded-lg border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
+            className="text-xs px-3 py-1.5 rounded-xl border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
           >
             {repairing ? t("dataHealth.repairing") : t("dataHealth.applyRepair")}
           </button>
@@ -1516,21 +1494,21 @@ export default function Settings() {
             <button
               onClick={runCheckDataIntegrity}
               disabled={repairing}
-              className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
+              className="text-xs px-3 py-1.5 rounded-xl border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
             >
               {t("dataHealth.checkIntegrity")}
             </button>
             <button
               onClick={runScanDataGaps}
               disabled={repairing}
-              className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
+              className="text-xs px-3 py-1.5 rounded-xl border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
             >
               {t("dataHealth.scanGaps")}
             </button>
             <button
               onClick={runCheckOrphanRows}
               disabled={repairing}
-              className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
+              className="text-xs px-3 py-1.5 rounded-xl border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
             >
               {t("dataHealth.checkOrphanRows")}
             </button>
@@ -1606,14 +1584,14 @@ export default function Settings() {
             <button
               onClick={refreshMigrationStatusNow}
               disabled={migrationBusy}
-              className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
+              className="text-xs px-3 py-1.5 rounded-xl border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
             >
               {t("dataHealth.refresh")}
             </button>
             <button
               onClick={runMigrationRehearsalNow}
               disabled={migrationBusy}
-              className="text-xs px-3 py-1.5 rounded-lg border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
+              className="text-xs px-3 py-1.5 rounded-xl border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
             >
               {migrationBusy ? t("dataHealth.rehearsing") : t("dataHealth.runRehearsal")}
             </button>
@@ -1649,23 +1627,23 @@ export default function Settings() {
         <div className="flex justify-end">
           <button
             onClick={refreshReliabilityPanels}
-            className="text-xs px-3 py-1.5 rounded-lg border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
+            className="text-xs px-3 py-1.5 rounded-xl border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
           >
             {t("dataHealth.refresh")}
           </button>
         </div>
-      </Section>
+      </SettingsCard>
       )}
 
       {activeSection === "backup" && (
-      <Section icon={Database} title={t("backup.title")}>
+      <SettingsCard icon={Database} title={t("backup.title")} description={t("backupDesc")}>
         <BackupSection />
-      </Section>
+      </SettingsCard>
       )}
 
       {activeSection === "retention" && (
-      <Section icon={Rocket} title={t("retention.title")}>
-        <Row label={t("retention.current")}>
+      <SettingsCard icon={Rocket} title={t("retention.title")} description={t("retentionDesc")}>
+        <SettingsRow label={t("retention.current")}>
           <div className="flex gap-2 flex-wrap justify-end">
             {(["keep_all", "3m", "6m", "12m"] as const).map((policy) => (
               <button
@@ -1685,7 +1663,7 @@ export default function Settings() {
               </button>
             ))}
           </div>
-        </Row>
+        </SettingsRow>
         <div className="rounded-lg border border-surface-border bg-surface-hover/40 p-3 text-xs text-text-muted space-y-1">
           <p>{t("retention.preview", { label: retentionInfo?.label ?? t("backup.none") })}</p>
           <p>{t("retention.cutoff", { date: retentionInfo?.cutoff_date ?? t("backup.none") })}</p>
@@ -1695,7 +1673,7 @@ export default function Settings() {
           <button
             onClick={runRetentionArchive}
             disabled={retentionRunning}
-            className="text-xs px-3 py-1.5 rounded-lg border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
+            className="text-xs px-3 py-1.5 rounded-xl border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
           >
             {retentionRunning ? t("retention.running") : t("retention.runNow")}
           </button>
@@ -1768,7 +1746,7 @@ export default function Settings() {
             <button
               onClick={runCompressArchives}
               disabled={compressBusy}
-              className="text-xs px-3 py-1.5 rounded-lg border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
+              className="text-xs px-3 py-1.5 rounded-xl border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
             >
               {compressBusy ? t("retention.compressing") : t("retention.compressAction")}
             </button>
@@ -1779,11 +1757,11 @@ export default function Settings() {
             </div>
           )}
         </div>
-      </Section>
+      </SettingsCard>
       )}
 
       {activeSection === "profiles" && (
-      <Section icon={User} title={t("profiles.title")}>
+      <SettingsCard icon={User} title={t("profiles.title")} description={t("profilesDesc")}>
         <div className="rounded-lg border border-surface-border bg-surface-hover/40 p-3 text-xs text-text-muted space-y-2">
           <p>{t("profiles.current", { profile: currentProfile })}</p>
           {legacyDataInfo?.can_import && (
@@ -1791,7 +1769,7 @@ export default function Settings() {
               <button
                 onClick={handleImportLegacyData}
                 disabled={legacyImportBusy}
-                className="text-xs px-3 py-1.5 rounded-lg border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
+                className="text-xs px-3 py-1.5 rounded-xl border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
               >
                 {legacyImportBusy ? t("profiles.importLegacyBusy") : t("profiles.importLegacy")}
               </button>
@@ -1842,14 +1820,14 @@ export default function Settings() {
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => { setProfileDialogOpen(false); setNewProfileName(""); }}
-                className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
+                className="text-xs px-3 py-1.5 rounded-xl border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
               >
                 {t("profiles.cancel")}
               </button>
               <button
                 onClick={handleCreateProfile}
                 disabled={profilesBusy || !newProfileName.trim()}
-                className="text-xs px-3 py-1.5 rounded-lg border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
+                className="text-xs px-3 py-1.5 rounded-xl border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
               >
                 {profilesBusy ? t("profiles.creating") : t("profiles.createConfirm")}
               </button>
@@ -1861,11 +1839,11 @@ export default function Settings() {
             {dataHealthActionError}
           </div>
         )}
-      </Section>
+      </SettingsCard>
       )}
 
       {activeSection === "encryption" && (
-      <Section icon={Shield} title={t("encryption.title")}>
+      <SettingsCard icon={Shield} title={t("encryption.title")} description={t("encryptionDesc")}>
         <div className="grid gap-2 sm:grid-cols-2">
           <div className="rounded-lg border border-surface-border bg-surface-hover/40 p-3">
             <p className="text-[11px] text-text-muted">{t("encryption.status")}</p>
@@ -1878,7 +1856,7 @@ export default function Settings() {
             <p className="text-sm font-semibold text-yellow-300">{t("encryption.restartRequired")}</p>
           </div>
         </div>
-        <Row label={t("encryption.passphrase")}>
+        <SettingsRow label={t("encryption.passphrase")}>
           <input
             type="password"
             value={encryptionPassphrase}
@@ -1886,19 +1864,19 @@ export default function Settings() {
             placeholder={t("encryption.passphrase")}
             className="ui-field max-w-44"
           />
-        </Row>
+        </SettingsRow>
         <div className="flex justify-end gap-2">
           <button
             onClick={handleDisableEncryption}
             disabled={encryptionBusy || !encryptionStatus?.enabled}
-            className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
+            className="text-xs px-3 py-1.5 rounded-xl border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
           >
             {encryptionBusy ? t("encryption.working") : t("encryption.disable")}
           </button>
           <button
             onClick={handleEnableEncryption}
             disabled={encryptionBusy || encryptionStatus?.enabled}
-            className="text-xs px-3 py-1.5 rounded-lg border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
+            className="text-xs px-3 py-1.5 rounded-xl border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
           >
             {encryptionBusy ? t("encryption.working") : t("encryption.enable")}
           </button>
@@ -1908,12 +1886,12 @@ export default function Settings() {
             {dataHealthActionError}
           </div>
         )}
-      </Section>
+      </SettingsCard>
       )}
 
       {activeSection === "transparency" && (
-      <Section icon={Info} title={t("transparency.title")}>
-        <Row label={t("transparency.active")}>
+      <SettingsCard icon={Info} title={t("transparency.title")} description={t("transparencyDesc")}>
+        <SettingsRow label={t("transparency.active")}>
           <button
             onClick={async () => {
               await setMonitoringActive(!monitoringActive);
@@ -1932,7 +1910,7 @@ export default function Settings() {
               )}
             />
           </button>
-        </Row>
+        </SettingsRow>
         <div className="rounded-lg border border-surface-border bg-surface-hover/40 p-3 text-xs text-text-muted space-y-1">
           <p>{t("transparency.pausedAt", { value: trackingTransparency?.paused_at ?? t("backup.none") })}</p>
           <p>{t("transparency.pausedBy", { value: trackingTransparency?.paused_by ?? t("backup.none") })}</p>
@@ -1963,13 +1941,13 @@ export default function Settings() {
             <p className="text-xs text-text-muted">{t("transparency.noWrites")}</p>
           )}
         </div>
-      </Section>
+      </SettingsCard>
       )}
 
       {/* Extension Bridge */}
       {activeSection === "extensionBridge" && (
-      <Section icon={Lock} title={t("extensionBridge.title")}>
-        <Row label={t("extensionBridge.key")}>
+      <SettingsCard icon={Lock} title={t("extensionBridge.title")} description={t("extensionBridgeDesc")}>
+        <SettingsRow label={t("extensionBridge.key")}>
           <div className="flex items-center gap-2">
             <span className="text-xs font-mono text-text-secondary break-all whitespace-normal">{extensionBridgeKey || t("extensionBridge.none")}</span>
             {extensionBridgeKey && (
@@ -2007,7 +1985,7 @@ export default function Settings() {
               </>
             )}
           </div>
-        </Row>
+        </SettingsRow>
         <p className="text-xs text-text-muted text-right">{t("extensionBridge.hint")}</p>
         <div className="rounded-lg border border-surface-border bg-surface-hover/40 p-3 text-xs text-text-muted space-y-1">
           <p>{t("extensionBridge.description")}</p>
@@ -2089,14 +2067,14 @@ export default function Settings() {
             <button
               onClick={() => void issueScopedToken()}
               disabled={apiGovernanceBusy !== null}
-              className="text-xs px-3 py-1.5 rounded-lg border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
+              className="text-xs px-3 py-1.5 rounded-xl border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
             >
               {apiGovernanceBusy === "issue" ? t("apiSecurity.issuing") : t("apiSecurity.issueToken")}
             </button>
             <button
               onClick={() => void refreshApiGovernancePanels()}
               disabled={apiGovernanceBusy !== null}
-              className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
+              className="text-xs px-3 py-1.5 rounded-xl border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
             >
               {apiGovernanceBusy === "refresh" ? t("apiSecurity.refreshing") : t("apiSecurity.refreshGovernance")}
             </button>
@@ -2133,7 +2111,7 @@ export default function Settings() {
               <button
                 onClick={() => void persistAllowlist()}
                 disabled={apiGovernanceBusy !== null}
-                className="text-xs px-3 py-1.5 rounded-lg border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
+                className="text-xs px-3 py-1.5 rounded-xl border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
               >
                 {apiGovernanceBusy === "allowlist" ? t("apiSecurity.saving") : t("apiSecurity.saveAllowlist")}
               </button>
@@ -2200,28 +2178,28 @@ export default function Settings() {
             <p className="text-xs text-accent-blue">{apiGovernanceMessage}</p>
           )}
         </div>
-      </Section>
+      </SettingsCard>
       )}
 
       {/* About */}
       {activeSection === "about" && (
-      <Section icon={Info} title={t("about.title")}>
-        <Row label={t("about.version")}>
+      <SettingsCard icon={Info} title={t("about.title")} description={t("aboutDesc")}>
+        <SettingsRow label={t("about.version")}>
           <span className="text-xs font-mono text-text-secondary">v{APP_VERSION}</span>
-        </Row>
-        <Row label={t("about.logs")}>
+        </SettingsRow>
+        <SettingsRow label={t("about.logs")}>
           <button
             onClick={async () => {
               await api.openLogDirectory().catch((err) => {
                 console.error("Failed to open log directory:", err);
               });
             }}
-            className="text-xs px-3 py-1.5 rounded-lg border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
+            className="text-xs px-3 py-1.5 rounded-xl border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
           >
             {t("about.openLogFolder")}
           </button>
-        </Row>
-        <Row label={t("about.autoCheckUpdates")}> 
+        </SettingsRow>
+        <SettingsRow label={t("about.autoCheckUpdates")}> 
           <button
             onClick={() => setAutoCheckUpdates(!autoCheckUpdates)}
             title={t("about.autoCheckUpdates")}
@@ -2237,13 +2215,13 @@ export default function Settings() {
               )}
             />
           </button>
-        </Row>
-        <Row label={t("about.checkUpdate")}>
+        </SettingsRow>
+        <SettingsRow label={t("about.checkUpdate")}>
           <div className="flex items-center gap-2">
             <button
               onClick={checkForUpdatesNow}
               disabled={checkingUpdate}
-              className="text-xs px-3 py-1.5 rounded-lg border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
+              className="text-xs px-3 py-1.5 rounded-xl border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
             >
               {checkingUpdate ? t("about.checking") : t("about.checkUpdate")}
             </button>
@@ -2252,13 +2230,13 @@ export default function Settings() {
                 href={updateCheckResult.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
+                className="text-xs px-3 py-1.5 rounded-xl border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
               >
                 {t("about.viewRelease")}
               </a>
             )}
           </div>
-        </Row>
+        </SettingsRow>
         {updateCheckResult?.status === "upToDate" && (
           <p className="text-xs text-accent-green text-right">{t("about.upToDate")}</p>
         )}
@@ -2268,7 +2246,7 @@ export default function Settings() {
         {updateCheckResult?.status === "error" && (
           <p className="text-xs text-red-300 text-right">{updateCheckResult.message || t("about.checkFailed")}</p>
         )}
-        <Row label="GitHub">
+        <SettingsRow label="GitHub">
           <a
             href="https://github.com/PythonSmall-Q/TimeLens"
             target="_blank"
@@ -2277,8 +2255,8 @@ export default function Settings() {
           >
             github.com/PythonSmall-Q/TimeLens
           </a>
-        </Row>
-      </Section>
+        </SettingsRow>
+      </SettingsCard>
       )}
     </div>
   );

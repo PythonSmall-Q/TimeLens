@@ -140,7 +140,8 @@ function buildChannel(widgetId: string, grantedPerms: string[]) {
         throw new Error("localApiCall requires a path string");
       }
       const token = await api.issueWidgetApiToken(widgetId, scopes);
-      const resp = await fetch(`http://127.0.0.1:49152${path}`, {
+      const baseUrl = await api.getLocalApiBaseUrl();
+      const resp = await fetch(`${baseUrl}${path}`, {
         method: method.toUpperCase(),
         headers: {
           "Content-Type": "application/json",

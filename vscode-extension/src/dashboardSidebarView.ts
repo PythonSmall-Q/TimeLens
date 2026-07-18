@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { t } from "./i18n";
+import { resolveApiBaseUrl } from "./api/timelensApi";
 
 interface VsCodeStatsSummary {
   total_seconds: number;
@@ -174,7 +175,8 @@ export class DashboardSidebarViewProvider implements vscode.WebviewViewProvider 
     const enabled = cfg.get<boolean>("enabled", true);
     const level = cfg.get<string>("trackingLevel", "standard");
     const bridgeKey = cfg.get<string>("bridgeKey", "").trim();
-    const apiBase = cfg.get<string>("apiBaseUrl", "http://127.0.0.1:49152").replace(/\/$/, "");
+    const configuredApiBase = cfg.get<string>("apiBaseUrl", "http://127.0.0.1:49152").replace(/\/$/, "");
+    const apiBase = await resolveApiBaseUrl(configuredApiBase);
     const today = new Date().toISOString().slice(0, 10);
     const authHeaders = getAuthHeaders();
 
@@ -449,8 +451,9 @@ export class DashboardSidebarViewProvider implements vscode.WebviewViewProvider 
     const cfg = vscode.workspace.getConfiguration("timelens");
     const enabled = cfg.get<boolean>("enabled", true);
     const level = cfg.get<string>("trackingLevel", "standard");
-    const apiBase = cfg.get<string>("apiBaseUrl", "http://127.0.0.1:49152").replace(/\/$/, "");
+    const configuredApiBase = cfg.get<string>("apiBaseUrl", "http://127.0.0.1:49152").replace(/\/$/, "");
     try {
+      const apiBase = await resolveApiBaseUrl(configuredApiBase);
       const ctrl = new AbortController();
       const timer = setTimeout(() => ctrl.abort(), 4000);
       await fetch(`${apiBase}/api/vscode/enabled`, {

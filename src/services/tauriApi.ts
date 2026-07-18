@@ -69,12 +69,36 @@ import type {
   WidgetPermissionAuditEntry,
 } from "@/types";
 
-const LOCAL_API_BASE_URL = "http://127.0.0.1:49152";
+let localApiBaseUrl = "http://127.0.0.1:49152";
+let localApiBaseUrlPromise: Promise<string> | null = null;
 const unsupportedLocalApiPaths = new Set<string>();
 let vscodeApiUnavailable = false;
 let vscodeUnavailableNotified = false;
 
 export const VSCODE_EXTENSION_UNAVAILABLE_EVENT = "timelens-vscode-extension-unavailable";
+
+/**
+ * Resolve the actual local API base URL from the backend. The backend may bind
+ * to a fallback port when the default port (49152) is blocked, so the URL is
+ * fetched from the Tauri command and cached for the rest of the session.
+ */
+export async function getLocalApiBaseUrl(): Promise<string> {
+  if (localApiBaseUrlPromise) {
+    return localApiBaseUrlPromise;
+  }
+  localApiBaseUrlPromise = (async () => {
+    try {
+      const url = await invoke<string>("get_local_api_base_url");
+      if (url) {
+        localApiBaseUrl = url;
+      }
+    } catch {
+      // Fall back to the default URL if the command is unavailable.
+    }
+    return localApiBaseUrl;
+  })();
+  return localApiBaseUrlPromise;
+}
 
 function localApiPathKey(path: string): string {
   const idx = path.indexOf("?");
@@ -97,7 +121,8 @@ async function localApiRequest<T>(
   path: string,
   init?: RequestInit
 ): Promise<T> {
-  const resp = await fetch(`${LOCAL_API_BASE_URL}${path}`, {
+  const baseUrl = await getLocalApiBaseUrl();
+  const resp = await fetch(`${baseUrl}${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
@@ -139,6 +164,22 @@ async function localApiRequestWith404Fallback<T>(
       }
       return fallback;
     }
+
+    // The VS Code extension endpoints are optional. Network errors such as
+    // "Failed to fetch" (server not yet started or extension not connected)
+    // should be treated as "unavailable" rather than crashing the dashboard.
+    if (
+      isVsCodeApiPath(path) &&
+      (error instanceof TypeError ||
+        message.includes("Failed to fetch") ||
+        message.includes("NetworkError") ||
+        message.includes("fetch"))
+    ) {
+      vscodeApiUnavailable = true;
+      emitVsCodeUnavailableOnce();
+      return fallback;
+    }
+
     throw error;
   }
 }

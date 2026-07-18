@@ -1,5 +1,50 @@
 import { workspace } from "vscode";
 
+const DEFAULT_LOCAL_API_URL = "http://127.0.0.1:49152";
+const LOCAL_API_PORT_FALLBACK_COUNT = 1000;
+
+let resolvedApiBaseUrlCache: { url: string; expiresAt: number } | null = null;
+
+/**
+ * Resolve the actual local API base URL. When the configured URL is the
+ * default `http://127.0.0.1:49152`, the desktop backend may have bound to a
+ * fallback port (e.g. when 49152 is blocked by Windows / AV). Scan the
+ * fallback range and return the first reachable TimeLens API. A custom URL set
+ * by the user is returned unchanged.
+ */
+export async function resolveApiBaseUrl(configuredUrl: string): Promise<string> {
+  if (configuredUrl !== DEFAULT_LOCAL_API_URL) {
+    return configuredUrl;
+  }
+
+  const now = Date.now();
+  if (resolvedApiBaseUrlCache && resolvedApiBaseUrlCache.expiresAt > now) {
+    return resolvedApiBaseUrlCache.url;
+  }
+
+  for (let offset = 0; offset <= LOCAL_API_PORT_FALLBACK_COUNT; offset += 1) {
+    const port = 49152 + offset;
+    const url = `http://127.0.0.1:${port}`;
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 800);
+      const resp = await fetch(`${url}/api/status`, { signal: controller.signal });
+      clearTimeout(timeout);
+      if (resp.ok) {
+        const data = (await resp.json()) as { version?: string };
+        if (data && typeof data.version === "string") {
+          resolvedApiBaseUrlCache = { url, expiresAt: now + 60_000 };
+          return url;
+        }
+      }
+    } catch {
+      // try next port
+    }
+  }
+
+  return DEFAULT_LOCAL_API_URL;
+}
+
 export interface VsCodeLanguageDuration {
   language: string;
   seconds: number;
@@ -81,7 +126,8 @@ export async function postVsCodeSession(
   bridgeKey?: string,
   timeoutMs = 5000
 ): Promise<void> {
-  const url = `${apiBaseUrl.replace(/\/$/, "")}/api/vscode/sessions`;
+  const resolvedBaseUrl = await resolveApiBaseUrl(apiBaseUrl);
+  const url = `${resolvedBaseUrl.replace(/\/$/, "")}/api/vscode/sessions`;
 
   // Build canonical JSON matching serde_json's re-serialization of VsCodeSessionInput.
   // The server verifies the signature against serde_json::to_string(&deserialized_payload),
@@ -112,7 +158,7 @@ export async function postVsCodeSession(
   }
 
   // Only attach signature when desktop API explicitly requires bridge auth.
-  if (bridgeKey && await shouldAttachBridgeSignature(apiBaseUrl)) {
+  if (bridgeKey && await shouldAttachBridgeSignature(resolvedBaseUrl)) {
     headers["X-Extension-Signature"] = signRequestBody(bodyJson, bridgeKey);
   }
   

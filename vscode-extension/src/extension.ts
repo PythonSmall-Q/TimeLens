@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { postVsCodeSession, resolveApiBaseUrl } from "./api/timelensApi";
 import { SessionTracker } from "./sessionTracker";
 import { DashboardPanel } from "./dashboardPanel";
 import { DashboardSidebarViewProvider } from "./dashboardSidebarView";
@@ -214,9 +215,10 @@ async function syncTrackingLevelToBackend(): Promise<void> {
   const level = cfg.get<string>("trackingLevel", "standard");
   const apiBase = cfg.get<string>("apiBaseUrl", "http://127.0.0.1:49152");
   try {
+    const resolvedBase = await resolveApiBaseUrl(apiBase);
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), 4000);
-    await fetch(`${apiBase}/api/vscode/enabled`, {
+    await fetch(`${resolvedBase}/api/vscode/enabled`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ enabled, tracking_level: level }),

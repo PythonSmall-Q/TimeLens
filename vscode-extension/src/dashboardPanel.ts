@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { t } from "./i18n";
+import { resolveApiBaseUrl } from "./api/timelensApi";
 
 /** Fetch JSON from the TimeLens local API, returns null on any error. */
 async function fetchJson<T>(url: string): Promise<T | null> {
@@ -101,9 +102,10 @@ export class DashboardPanel {
   public async refresh(): Promise<void> {
     this.panel.webview.html = buildLoadingHtml();
 
-    const apiBase = vscode.workspace
+    const configuredApiBase = vscode.workspace
       .getConfiguration("timelens")
       .get<string>("apiBaseUrl", "http://127.0.0.1:49152");
+    const apiBase = await resolveApiBaseUrl(configuredApiBase);
 
     try {
       const [todayStats, todayApps, langStats, projectStats, trackingStatus, appStatus] =
@@ -142,9 +144,10 @@ export class DashboardPanel {
   }
 
   private async handleMessage(msg: { command: string; payload?: unknown }): Promise<void> {
-    const apiBase = vscode.workspace
+    const configuredApiBase = vscode.workspace
       .getConfiguration("timelens")
       .get<string>("apiBaseUrl", "http://127.0.0.1:49152");
+    const apiBase = await resolveApiBaseUrl(configuredApiBase);
 
     if (msg.command === "setEnabled") {
       const p = msg.payload as { enabled: boolean };
