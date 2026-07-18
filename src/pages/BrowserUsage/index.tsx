@@ -557,6 +557,7 @@ export default function BrowserUsage() {
             </div>
 
             <div className="rounded-lg border border-surface-border bg-surface-hover/40 p-3 space-y-2">
+              <p className="text-xs text-text-secondary">{t("browserUsage:localApiPort", { port: browserExtensionStatus?.api_base_url ? new URL(browserExtensionStatus.api_base_url).port || "49152" : "49152" })}</p>
               <p className="text-xs text-text-secondary">{t("settings:browser.hint")}</p>
               <div className="flex items-center gap-2 justify-between flex-wrap">
                 <span className="text-xs font-mono text-text-secondary">

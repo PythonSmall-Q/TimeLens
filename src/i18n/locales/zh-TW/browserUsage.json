@@ -55,5 +55,6 @@
   "hideIgnored": "隱藏已忽略",
   "totalDomains": "{{count}} 個網域",
   "totalDomains_plural": "{{count}} 個網域",
+  "localApiPort": "本機 API 連接埠：{{port}}",
   "refresh": "重新整理"
 }

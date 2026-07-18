@@ -46,6 +46,15 @@ export default function VsCodeInsights() {
   const [focusEnabled, setFocusEnabled] = useState(false);
   const [saving, setSaving] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [localApiBaseUrl, setLocalApiBaseUrl] = useState<string>("http://127.0.0.1:49152");
+
+  const localApiPort = useMemo(() => {
+    try {
+      return new URL(localApiBaseUrl).port || "49152";
+    } catch {
+      return "49152";
+    }
+  }, [localApiBaseUrl]);
 
   const range = useMemo(() => {
     if (periodMode === "month") {
@@ -88,6 +97,10 @@ export default function VsCodeInsights() {
     getFocusModeActive()
       .then(setFocusEnabled)
       .catch(() => setFocusEnabled(false));
+
+    getLocalApiBaseUrl()
+      .then(setLocalApiBaseUrl)
+      .catch(() => {});
   }, []);
 
   const onToggleTracking = async () => {
@@ -198,6 +211,9 @@ export default function VsCodeInsights() {
         <div>
           <h2 className="text-sm font-semibold text-text-primary">{t("dashboard:vscodeExtensionTitle")}</h2>
           <p className="text-xs text-text-muted mt-0.5">{t("dashboard:vscodeExtensionHint")}</p>
+          <p className="text-xs text-text-secondary mt-1">
+            {t("dashboard:localApiPort", { port: localApiPort })}
+          </p>
         </div>
         <a
           href={VSCODE_EXTENSION_DOWNLOAD_URL}

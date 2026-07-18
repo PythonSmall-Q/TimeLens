@@ -3,7 +3,7 @@
   "displayName": "TimeLens",
   "description": "Track VS Code session time and send local analytics to TimeLens desktop app.",
   "icon": "icons/icon.png",
-  "version": "0.3.4",
+  "version": "0.4.0",
   "publisher": "ShanWenxiao",
   "license": "MIT",
   "repository": {
@@ -100,6 +100,13 @@
           "type": "string",
           "default": "http://127.0.0.1:49152",
           "description": "%timelens.apiBaseUrl.description%"
+        },
+        "timelens.apiBaseUrlCacheSeconds": {
+          "type": "number",
+          "default": 60,
+          "minimum": 0,
+          "maximum": 3600,
+          "description": "%timelens.apiBaseUrlCacheSeconds.description%"
         },
         "timelens.bridgeKey": {
           "type": "string",

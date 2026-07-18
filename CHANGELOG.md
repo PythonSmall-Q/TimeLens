@@ -9,10 +9,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- **Extension connection settings** — the browser extension popup now lets users set a manual API port and choose the discovered-port cache duration. The VS Code extension gained a new `timelens.apiBaseUrlCacheSeconds` setting for the same purpose. Both extensions still scan the fallback range automatically when no manual port is set.
 - **Settings page UI redesign** — rewrote the Settings page to use a reusable card-based layout consistent with Backup & Restore v2, including `glass-card` containers, icon-header cards, and inner content wells.
 
 ### Fixed
 
+- **Local API port binding failure** — if the default port `49152` is blocked by Windows (excluded port range) or antivirus, the desktop backend now scans up to 1000 fallback ports (49152–50151) and binds to the first available one. A new `get_local_api_base_url` Tauri command exposes the actual bound URL, and the frontend, browser extension, and VS Code extension all discover the port dynamically instead of assuming `49152`. The Browser Usage and VS Code Insights pages now display the current local API port.
 - **Extension bridge key migration** — when merging a v2.0.0 `profiles/default` database back into the legacy root path, the `extension_bridge_key` (and its rotation timestamp) from the v2.0.0 profile is now preserved and overwrites any legacy value. Previously the generic `INSERT OR IGNORE` merge kept the legacy root key, which broke VS Code and browser extensions that had already been paired with the v2.0.0 key.
 - **Default profile storage path regression** — the default profile now uses the legacy low-version database path (`app_data/timelens.db`) instead of a separate `app_data/profiles/default/timelens.db` folder. On startup, any data already written to the v2.0.0 `profiles/default` folder is automatically merged into the legacy database; raw usage rows are inserted without their synthetic `id` to avoid accidental data loss, and `daily_app_usage` is rebuilt from the merged raw rows so today’s totals stay correct. Other conflicting rows are skipped (`INSERT OR IGNORE`). Encrypted default-profile databases are relocated to the legacy path before decryption so they continue to work.
 - **Dashboard period total label** — the overview card now shows “Week Total” / “Month Total” instead of “Today’s Total” when the period selector is set to week or month; the numeric value already matched the selected range.

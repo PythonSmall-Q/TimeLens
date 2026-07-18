@@ -55,5 +55,6 @@
   "hideIgnored": "Hide ignored",
   "totalDomains": "{{count}} domain",
   "totalDomains_plural": "{{count}} domains",
+  "localApiPort": "Local API port: {{port}}",
   "refresh": "Refresh"
 }

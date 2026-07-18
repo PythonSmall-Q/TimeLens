@@ -100,6 +100,7 @@
   "vscodeExtensionTitle": "VS Code 擴充功能",
   "vscodeExtensionHint": "請從 Visual Studio Marketplace 安裝本機伴侶擴充功能。",
   "vscodeExtensionDownload": "下載擴充功能",
+  "localApiPort": "本機 API 連接埠：{{port}}",
   "focusModeToggle": "專注模式",
   "vscodeLangRanking": "語言排行",
   "vscodeProjectRanking": "項目排行",

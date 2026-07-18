@@ -100,6 +100,7 @@
   "vscodeExtensionTitle": "Extensión de VS Code",
   "vscodeExtensionHint": "Instala la extensión compañera local desde Visual Studio Marketplace.",
   "vscodeExtensionDownload": "Descargar extensión",
+  "localApiPort": "Puerto de API local: {{port}}",
   "focusModeToggle": "Modo enfoque",
   "vscodeLangRanking": "Clasificación de lenguajes",
   "vscodeProjectRanking": "Clasificación de proyectos",

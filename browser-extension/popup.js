@@ -1,45 +1,11 @@
 import { getLocale, t } from "./i18n.js";
-
-const API_BASE = "http://127.0.0.1:49152";
-const DEFAULT_API_PORT = 49152;
-const API_PORT_FALLBACK_COUNT = 1000;
-let discoveredApiBaseCache = null;
-
-async function discoverApiBaseUrl() {
-  const now = Date.now();
-  if (discoveredApiBaseCache && discoveredApiBaseCache.expiresAt > now) {
-    return discoveredApiBaseCache.value;
-  }
-
-  for (let offset = 0; offset <= API_PORT_FALLBACK_COUNT; offset += 1) {
-    const port = DEFAULT_API_PORT + offset;
-    const baseUrl = `http://127.0.0.1:${port}`;
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 800);
-      const response = await fetch(`${baseUrl}/api/status`, {
-        signal: controller.signal,
-      });
-      clearTimeout(timeout);
-      if (response.ok) {
-        const data = await response.json();
-        if (data && typeof data.version === "string") {
-          discoveredApiBaseCache = { value: baseUrl, expiresAt: now + 60_000 };
-          return baseUrl;
-        }
-      }
-    } catch {
-      // try next port
-    }
-  }
-
-  discoveredApiBaseCache = { value: "", expiresAt: now + 5_000 };
-  return null;
-}
-
-function getApiBaseUrl() {
-  return discoveredApiBaseCache?.value || API_BASE;
-}
+import {
+  discoverApiBaseUrl,
+  getApiBaseUrl,
+  clearApiBaseUrlCache,
+  API_STORAGE_KEYS,
+  DEFAULT_CACHE_SECONDS_VALUE,
+} from "./api.js";
 
 const STORAGE_KEYS = {
   activeSession: "timelens.activeSession",
@@ -58,6 +24,9 @@ const refreshButton = document.querySelector("#refresh-button");
 const bridgeKeyPanel = document.querySelector("#bridge-key-panel");
 const bridgeKeyInput = document.querySelector("#bridge-key-input");
 const saveKeyButton = document.querySelector("#save-key-button");
+const apiPortInput = document.querySelector("#api-port-input");
+const cacheDurationInput = document.querySelector("#cache-duration-input");
+const saveConnectionSettingsButton = document.querySelector("#save-connection-settings-button");
 const locale = getLocale();
 
 applyStaticTranslations();
@@ -78,6 +47,34 @@ if (saveKeyButton) {
     }
   });
 }
+
+// Load and save connection settings
+async function loadConnectionSettings() {
+  const { [API_STORAGE_KEYS.apiPort]: port, [API_STORAGE_KEYS.apiCacheSeconds]: cacheSeconds } =
+    await chrome.storage.local.get([API_STORAGE_KEYS.apiPort, API_STORAGE_KEYS.apiCacheSeconds]);
+  if (apiPortInput) {
+    apiPortInput.value = port === 0 || port === "0" ? "0" : (port ? String(port) : "");
+  }
+  if (cacheDurationInput) {
+    cacheDurationInput.value = String(cacheSeconds ?? DEFAULT_CACHE_SECONDS_VALUE);
+  }
+}
+
+if (saveConnectionSettingsButton) {
+  saveConnectionSettingsButton.addEventListener("click", async () => {
+    const port = parseInt(apiPortInput?.value || "0", 10) || 0;
+    const cacheSeconds = parseInt(cacheDurationInput?.value || String(DEFAULT_CACHE_SECONDS_VALUE), 10) || DEFAULT_CACHE_SECONDS_VALUE;
+    await chrome.storage.local.set({
+      [API_STORAGE_KEYS.apiPort]: port,
+      [API_STORAGE_KEYS.apiCacheSeconds]: cacheSeconds,
+    });
+    clearApiBaseUrlCache();
+    alert(t("saveOrUpdate", {}, locale));
+    await loadAll();
+  });
+}
+
+void loadConnectionSettings();
 
 // Load saved bridge key into input so users can modify it anytime.
 async function loadBridgeKey() {

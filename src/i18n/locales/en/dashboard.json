@@ -100,6 +100,7 @@
   "vscodeExtensionTitle": "VS Code Extension",
   "vscodeExtensionHint": "Install the local companion extension from the Visual Studio Marketplace.",
   "vscodeExtensionDownload": "Download extension",
+  "localApiPort": "Local API port: {{port}}",
   "focusModeToggle": "Focus mode",
   "vscodeLangRanking": "Language Ranking",
   "vscodeProjectRanking": "Project Ranking",

@@ -100,6 +100,7 @@
   "vscodeExtensionTitle": "VS Code-Erweiterung",
   "vscodeExtensionHint": "Installieren Sie die lokale Begleiter-Erweiterung aus dem Visual Studio Marketplace.",
   "vscodeExtensionDownload": "Erweiterung herunterladen",
+  "localApiPort": "Lokaler API-Port: {{port}}",
   "focusModeToggle": "Fokusmodus",
   "vscodeLangRanking": "Sprachen-Rangliste",
   "vscodeProjectRanking": "Projekt-Rangliste",

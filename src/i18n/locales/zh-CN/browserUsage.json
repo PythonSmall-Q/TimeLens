@@ -55,5 +55,6 @@
   "hideIgnored": "隐藏已忽略",
   "totalDomains": "{{count}} 个域名",
   "totalDomains_plural": "{{count}} 个域名",
+  "localApiPort": "本地 API 端口：{{port}}",
   "refresh": "刷新"
 }

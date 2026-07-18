@@ -100,6 +100,7 @@
   "vscodeExtensionTitle": "VS Code 扩展",
   "vscodeExtensionHint": "请从 Visual Studio Marketplace 安装本地伴侣扩展。",
   "vscodeExtensionDownload": "下载扩展",
+  "localApiPort": "本地 API 端口：{{port}}",
   "focusModeToggle": "专注模式",
   "vscodeLangRanking": "语言排行",
   "vscodeProjectRanking": "项目排行",

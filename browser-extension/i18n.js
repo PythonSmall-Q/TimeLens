@@ -29,6 +29,10 @@ const TRANSLATIONS = {
     saveOrUpdate: "Save / Update",
     bridgeKeySaved: "Extension bridge key saved successfully.",
     bridgeKeyCleared: "Extension bridge key cleared.",
+    connectionSettings: "Connection settings",
+    apiPort: "API Port:",
+    cacheDuration: "Cache (s):",
+    connectionSettingsHint: "Set the port to 0 to scan the fallback range. Cache duration controls how long the discovered port is remembered.",
   },
   "zh-CN": {
     connection: "桌面端连接",
@@ -60,6 +64,10 @@ const TRANSLATIONS = {
     saveOrUpdate: "保存/更新",
     bridgeKeySaved: "扩展网桥密钥已保存。",
     bridgeKeyCleared: "扩展网桥密钥已清除。",
+    connectionSettings: "连接设置",
+    apiPort: "API 端口：",
+    cacheDuration: "缓存（秒）：",
+    connectionSettingsHint: "端口设为 0 将扫描回退范围。缓存时长控制记住已发现端口的时长。",
   },
   "zh-TW": {
     connection: "桌面端連線",
@@ -91,6 +99,10 @@ const TRANSLATIONS = {
     saveOrUpdate: "儲存/更新",
     bridgeKeySaved: "擴充功能橋接金鑰已儲存。",
     bridgeKeyCleared: "擴充功能橋接金鑰已清除。",
+    connectionSettings: "連線設定",
+    apiPort: "API 連接埠：",
+    cacheDuration: "快取（秒）：",
+    connectionSettingsHint: "連接埠設為 0 將掃描回退範圍。快取時長控制記住已發現連接埠的時間。",
   },
 };
 

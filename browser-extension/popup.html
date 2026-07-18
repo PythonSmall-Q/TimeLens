@@ -38,6 +38,38 @@
         <p class="muted" style="margin-top: 8px; font-size: 11px;" data-i18n="bridgeKeyHint">Get the key from TimeLens Settings > Local API / Extension Bridge.</p>
       </section>
 
+      <section id="connection-settings-panel" class="panel">
+        <div class="panel-head">
+          <h2 data-i18n="connectionSettings">Connection settings</h2>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <label for="api-port-input" class="muted" style="font-size: 12px; width: 80px;" data-i18n="apiPort">API Port:</label>
+            <input
+              id="api-port-input"
+              type="number"
+              min="1"
+              max="65535"
+              placeholder="49152"
+              style="flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 12px;"
+            />
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <label for="cache-duration-input" class="muted" style="font-size: 12px; width: 80px;" data-i18n="cacheDuration">Cache (s):</label>
+            <input
+              id="cache-duration-input"
+              type="number"
+              min="0"
+              max="3600"
+              placeholder="60"
+              style="flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 12px;"
+            />
+          </div>
+          <button id="save-connection-settings-button" class="ghost-button" type="button" data-i18n="saveOrUpdate">Save / Update</button>
+          <p class="muted" style="font-size: 11px;" data-i18n="connectionSettingsHint">Set the port to 0 to scan the fallback range. Cache duration controls how long the discovered port is remembered.</p>
+        </div>
+      </section>
+
       <section class="panel">
         <div class="panel-head">
           <h2 data-i18n="today">Today in TimeLens</h2>

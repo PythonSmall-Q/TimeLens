@@ -22,6 +22,9 @@ export async function resolveApiBaseUrl(configuredUrl: string): Promise<string> 
     return resolvedApiBaseUrlCache.url;
   }
 
+  const cacheSeconds = workspace.getConfiguration("timelens").get<number>("apiBaseUrlCacheSeconds", 60);
+  const cacheMs = Math.max(0, cacheSeconds) * 1000;
+
   for (let offset = 0; offset <= LOCAL_API_PORT_FALLBACK_COUNT; offset += 1) {
     const port = 49152 + offset;
     const url = `http://127.0.0.1:${port}`;
@@ -33,7 +36,7 @@ export async function resolveApiBaseUrl(configuredUrl: string): Promise<string> 
       if (resp.ok) {
         const data = (await resp.json()) as { version?: string };
         if (data && typeof data.version === "string") {
-          resolvedApiBaseUrlCache = { url, expiresAt: now + 60_000 };
+          resolvedApiBaseUrlCache = { url, expiresAt: now + cacheMs };
           return url;
         }
       }

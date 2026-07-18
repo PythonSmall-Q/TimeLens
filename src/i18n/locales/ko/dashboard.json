@@ -100,6 +100,7 @@
   "vscodeExtensionTitle": "VS Code 확장 프로그램",
   "vscodeExtensionHint": "Visual Studio Marketplace에서 로컬 컴패니언 확장 프로그램을 설치하세요.",
   "vscodeExtensionDownload": "확장 프로그램 다운로드",
+  "localApiPort": "로컬 API 포트: {{port}}",
   "focusModeToggle": "집중 모드",
   "vscodeLangRanking": "언어 순위",
   "vscodeProjectRanking": "프로젝트 순위",
