@@ -1,6 +1,8 @@
 {
   "title": "화면 사용 시간",
   "todayTotal": "오늘 총계",
+  "weekTotal": "이번 주 총계",
+  "monthTotal": "이번 달 총계",
   "currentApp": "현재 앱",
   "mostUsed": "가장 많이 사용",
   "topApps": "상위 앱",

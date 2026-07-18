@@ -1,6 +1,6 @@
 [package]
 name = "timelens"
-version = "2.0.0"
+version = "2.0.1"
 description = "A screen time tracker and desktop widget manager"
 authors = ["Shan Wenxiao"]
 license = "MIT"

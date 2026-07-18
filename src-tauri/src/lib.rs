@@ -93,7 +93,6 @@ fn format_seconds(secs: i64) -> String {
 }
 
 const LEGACY_APP_DIR_NAME: &str = "ShanWenxiao.TimeLens-TimeManagementAppwithWidgets";
-const DEFAULT_PROFILE_ID: &str = "default";
 pub(crate) const PENDING_LEGACY_IMPORT_KEY: &str = "pending_legacy_import";
 
 fn copy_if_exists(src: &Path, dst: &Path) -> std::io::Result<()> {
@@ -196,20 +195,52 @@ pub(crate) fn legacy_db_path() -> Option<PathBuf> {
     None
 }
 
-fn db_path_for_profile(data_dir: &Path, profile_id: &str) -> PathBuf {
-    data_dir
-        .join("profiles")
-        .join(profile_id)
-        .join("timelens.db")
-}
-
 fn migrate_legacy_db(legacy_db: &Path, target_db: &Path) -> std::io::Result<()> {
     copy_db_with_sidecars(legacy_db, target_db)
 }
 
 fn resolve_database_path(data_dir: &Path, profile_id: Option<&str>) -> PathBuf {
-    let profile_id = profile_id.unwrap_or(DEFAULT_PROFILE_ID);
-    db_path_for_profile(data_dir, profile_id)
+    let profile_id = profile_id.unwrap_or(db::migrations::DEFAULT_PROFILE_ID);
+    db::migrations::db_path_for_profile(data_dir, profile_id)
+}
+
+/// If the legacy root database does not exist yet but an encrypted default
+/// profile was created by v2.0.0, move its encryption artifacts to the root
+/// path so the normal decryption step handles them on the next startup.
+fn maybe_relocate_encrypted_default_profile(data_dir: &Path) -> std::io::Result<()> {
+    let old_default = db::migrations::old_default_profile_db_path(data_dir);
+    let legacy = db::migrations::db_path_for_profile(data_dir, db::migrations::DEFAULT_PROFILE_ID);
+
+    if !old_default.exists() || legacy.exists() {
+        return Ok(());
+    }
+    if !db_encryption::is_database_encrypted(&old_default) {
+        return Ok(());
+    }
+
+    let old_meta = db_encryption::encryption_meta_path(&old_default);
+    let old_encrypted = db_encryption::encrypted_db_path(&old_default);
+    let new_meta = db_encryption::encryption_meta_path(&legacy);
+    let new_encrypted = db_encryption::encrypted_db_path(&legacy);
+
+    if old_meta.exists() {
+        std::fs::rename(&old_meta, &new_meta)?;
+    }
+    if old_encrypted.exists() {
+        std::fs::rename(&old_encrypted, &new_encrypted)?;
+    }
+    std::fs::rename(&old_default, &legacy)?;
+
+    let old_dir = data_dir.join("profiles").join("default");
+    if old_dir.exists() && old_dir.read_dir().map(|mut d| d.next().is_none()).unwrap_or(false) {
+        let _ = std::fs::remove_dir(&old_dir);
+    }
+
+    log::info!(
+        "Relocated encrypted default profile database to legacy path: {}",
+        legacy.display()
+    );
+    Ok(())
 }
 
 /// Apply a pending user-approved legacy import before any profile database is
@@ -534,6 +565,12 @@ pub fn run() {
             let active_profile_id = db::migrations::current_profile_id_from_app_state(&app_state_conn);
             drop(app_state_conn);
 
+            // If a v2.0.0 default-profile database was encrypted and the legacy root
+            // path is empty, relocate its encryption artifacts before decryption.
+            if let Err(e) = maybe_relocate_encrypted_default_profile(&data_dir) {
+                log::warn!("Failed to relocate encrypted default profile: {}", e);
+            }
+
             let target_db_path: PathBuf = if active_profile_id == db::migrations::DEFAULT_PROFILE_ID {
                 default_db_path.clone()
             } else {
@@ -543,6 +580,15 @@ pub fn run() {
             // Prepare target database (handle at-rest encryption if enabled).
             prepare_encrypted_database(&target_db_path, &data_dir)
                 .map_err(|e| format!("Failed to prepare target database: {}", e))?;
+
+            // For the default profile, automatically merge any v2.0.0 data that
+            // lives in the separate `profiles/default` folder into the legacy root
+            // database. Conflicting rows are skipped.
+            if active_profile_id == db::migrations::DEFAULT_PROFILE_ID {
+                if let Err(e) = db::migrations::merge_default_profile_into_legacy_db(&data_dir) {
+                    log::warn!("Failed to merge default profile database into legacy path: {}", e);
+                }
+            }
 
             let conn = open_db_with_retry(&target_db_path, 10, Duration::from_millis(100))
                 .map_err(|e| format!("Failed to open active profile SQLite database: {}", e))?;

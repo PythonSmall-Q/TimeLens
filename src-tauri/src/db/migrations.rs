@@ -612,11 +612,225 @@ fn migration_010_compressed_archive(conn: &Connection) -> Result<()> {
 pub const DEFAULT_PROFILE_ID: &str = "default";
 
 /// Compute the database file path for a given profile.
+/// The default profile lives at the legacy root path so existing low-version
+/// data remains accessible without moving into a separate folder.
 pub fn db_path_for_profile(data_dir: &Path, profile_id: &str) -> PathBuf {
-    data_dir
-        .join("profiles")
-        .join(profile_id)
-        .join("timelens.db")
+    if profile_id == DEFAULT_PROFILE_ID {
+        data_dir.join("timelens.db")
+    } else {
+        data_dir.join("profiles").join(profile_id).join("timelens.db")
+    }
+}
+
+/// Path used by the 2.0.0 release to store the default profile. Kept so
+/// upgrades can migrate any data created there back into the legacy root.
+pub fn old_default_profile_db_path(data_dir: &Path) -> PathBuf {
+    data_dir.join("profiles").join("default").join("timelens.db")
+}
+
+/// Move a database file and its WAL/SHM sidecars from `src` to `dst`.
+fn move_db_with_sidecars(src: &Path, dst: &Path) -> std::io::Result<()> {
+    if let Some(parent) = dst.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    std::fs::rename(src, dst)?;
+    for ext in ["-wal", "-shm"] {
+        let src_sidecar = PathBuf::from(format!("{}{}", src.display(), ext));
+        let dst_sidecar = PathBuf::from(format!("{}{}", dst.display(), ext));
+        if src_sidecar.exists() {
+            std::fs::rename(&src_sidecar, &dst_sidecar)?;
+        }
+    }
+    Ok(())
+}
+
+fn remove_db_with_sidecars(path: &Path) -> std::io::Result<()> {
+    for ext in ["", "-wal", "-shm"] {
+        let p = PathBuf::from(format!("{}{}", path.display(), ext));
+        if p.exists() {
+            std::fs::remove_file(p)?;
+        }
+    }
+    Ok(())
+}
+
+fn table_columns_in_schema(
+    conn: &Connection,
+    schema: &str,
+    table: &str,
+) -> Result<Vec<String>, rusqlite::Error> {
+    let mut stmt = conn.prepare(&format!("PRAGMA {}.table_info({})", schema, table))?;
+    let rows = stmt.query_map([], |row| row.get::<_, String>(1))?;
+    rows.collect()
+}
+
+fn merge_table(conn: &Connection, table: &str, exclude_cols: &[&str]) -> Result<(), rusqlite::Error> {
+    let source_cols = table_columns_in_schema(conn, "source", table)?;
+    if source_cols.is_empty() {
+        return Ok(());
+    }
+    let target_cols = super::table_columns(conn, table)?;
+    let common_cols: Vec<String> = source_cols
+        .into_iter()
+        .filter(|c| target_cols.contains(c) && !exclude_cols.contains(&c.as_str()))
+        .collect();
+    if common_cols.is_empty() {
+        return Ok(());
+    }
+    let cols = common_cols.join(", ");
+    conn.execute(
+        &format!(
+            "INSERT OR IGNORE INTO {table} ({cols}) SELECT {cols} FROM source.{table}",
+        ),
+        [],
+    )?;
+    Ok(())
+}
+
+/// Rebuild `daily_app_usage` from the raw `app_usage` rows so that merged
+/// segments are reflected in daily totals. This mirrors migration 003.
+fn rebuild_daily_app_usage_from_raw(conn: &Connection) -> Result<(), rusqlite::Error> {
+    conn.execute("DELETE FROM daily_app_usage", [])?;
+    conn.execute(
+        "INSERT INTO daily_app_usage (date, app_name, exe_path, total_seconds, first_seen_at, last_seen_at)
+         SELECT date,
+                app_name,
+                COALESCE(exe_path, '') as exe_path,
+                SUM(active_seconds) as total_seconds,
+                MIN(first_seen_at) as first_seen_at,
+                MAX(last_seen_at) as last_seen_at
+         FROM app_usage
+         GROUP BY date, app_name, COALESCE(exe_path, '')
+         ON CONFLICT(date, app_name, exe_path) DO UPDATE SET
+            total_seconds = excluded.total_seconds,
+            first_seen_at = excluded.first_seen_at,
+            last_seen_at = excluded.last_seen_at",
+        [],
+    )?;
+    Ok(())
+}
+
+/// Merge data from the 2.0.0 default-profile folder (`profiles/default`)
+/// into the legacy root database (`timelens.db`). If the root database does not
+/// exist yet, the default-profile database is moved there instead. Conflicting
+/// rows are skipped (INSERT OR IGNORE). This runs automatically on startup for
+/// the default profile.
+pub fn merge_default_profile_into_legacy_db(data_dir: &Path) -> Result<(), String> {
+    let old_default_path = old_default_profile_db_path(data_dir);
+    let legacy_path = db_path_for_profile(data_dir, DEFAULT_PROFILE_ID);
+
+    if !old_default_path.exists() {
+        return Ok(());
+    }
+
+    // If the source is encrypted, we cannot safely merge it here. Leave it in
+    // place; the user can still switch profiles or use backup restore.
+    if crate::db_encryption::is_database_encrypted(&old_default_path) {
+        log::warn!(
+            "Old default profile database at {} is encrypted; skipping automatic merge",
+            old_default_path.display()
+        );
+        return Ok(());
+    }
+
+    // Make sure the source schema is current before merging.
+    let _source_conn = db::open(&old_default_path).map_err(|e| {
+        format!("Failed to open old default profile database: {}", e)
+    })?;
+    drop(_source_conn);
+
+    if !legacy_path.exists() {
+        move_db_with_sidecars(&old_default_path, &legacy_path).map_err(|e| {
+            format!("Failed to move default profile database to legacy path: {}", e)
+        })?;
+        log::info!(
+            "Moved default profile database to legacy storage path: {}",
+            legacy_path.display()
+        );
+        cleanup_old_default_profile_dir(data_dir);
+        return Ok(());
+    }
+
+    let target_conn = db::open(&legacy_path).map_err(|e| {
+        format!("Failed to open legacy database for merge: {}", e)
+    })?;
+
+    target_conn
+        .execute_batch("PRAGMA foreign_keys=OFF;")
+        .map_err(|e| format!("Failed to disable foreign keys for merge: {}", e))?;
+
+    target_conn
+        .execute("ATTACH ? AS source", params![old_default_path.to_string_lossy().as_ref()])
+        .map_err(|e| format!("Failed to attach old default profile database: {}", e))?;
+
+    // Tables whose primary key is a synthetic rowid are merged without the id
+    // column so that rows from the source database are not lost just because the
+    // auto-increment counters happen to overlap. Daily aggregates are rebuilt
+    // afterwards so the displayed totals stay correct.
+    let tables = [
+        ("app_usage", &["id"][..]),
+        ("app_usage_archive", &["id"][..]),
+        ("app_usage_archive_compressed", &["id"][..]),
+        ("daily_app_usage", &[][..]),
+        ("daily_app_usage_archive", &[][..]),
+        ("todos", &[][..]),
+        ("widget_configs", &[][..]),
+        ("ignored_apps", &[][..]),
+        ("app_settings", &[][..]),
+        ("app_categories", &[][..]),
+        ("usage_goals", &[][..]),
+        ("focus_sessions", &[][..]),
+        ("focus_rules", &[][..]),
+        ("browser_sessions", &[][..]),
+        ("browser_ignored_domains", &[][..]),
+        ("browser_domain_limits", &[][..]),
+        ("widget_permissions", &[][..]),
+        ("widget_permission_audit_log", &[][..]),
+        ("vscode_sessions", &[][..]),
+        ("vscode_session_languages", &[][..]),
+        ("api_tokens", &[][..]),
+        ("api_client_allowlist", &[][..]),
+        ("api_audit_log", &[][..]),
+        ("app_switch_density", &[][..]),
+        ("focus_streaks", &[][..]),
+        ("interruption_summary", &[][..]),
+        ("archive_scheduler_state", &[][..]),
+        ("encryption_metadata", &[][..]),
+    ];
+
+    for (table, exclude) in tables {
+        if let Err(e) = merge_table(&target_conn, table, exclude) {
+            log::warn!("Failed to merge table {} from old default profile: {}", table, e);
+        }
+    }
+
+    if let Err(e) = rebuild_daily_app_usage_from_raw(&target_conn) {
+        log::warn!("Failed to rebuild daily totals after merge: {}", e);
+    }
+
+    let _ = target_conn.execute("DETACH source", []);
+    drop(target_conn);
+
+    // Back up the old default database so it is not merged again.
+    let mut backup_path = old_default_path.clone();
+    backup_path.set_extension("db.migrated");
+    let _ = remove_db_with_sidecars(&backup_path);
+    let _ = move_db_with_sidecars(&old_default_path, &backup_path);
+
+    cleanup_old_default_profile_dir(data_dir);
+
+    log::info!(
+        "Merged default profile database into legacy storage path: {}",
+        legacy_path.display()
+    );
+    Ok(())
+}
+
+fn cleanup_old_default_profile_dir(data_dir: &Path) {
+    let old_dir = data_dir.join("profiles").join("default");
+    if old_dir.exists() && old_dir.read_dir().map(|mut d| d.next().is_none()).unwrap_or(false) {
+        let _ = std::fs::remove_dir(&old_dir);
+    }
 }
 
 /// Path to the unencrypted application state database.
@@ -1030,5 +1244,118 @@ mod tests {
         assert_eq!(report.start_version, 0);
         assert_eq!(report.end_version, latest_version());
         assert_eq!(report.integrity_check, "ok");
+    }
+
+    fn temp_data_dir(name: &str) -> PathBuf {
+        let ts = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis();
+        let dir = std::env::temp_dir().join(format!("timelens_merge_test_{}_{}", name, ts));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn test_move_default_profile_when_legacy_missing() {
+        use crate::db;
+        let base = temp_data_dir("move_default");
+        let old_default = old_default_profile_db_path(&base);
+        let conn = db::open(&old_default).unwrap();
+        db::upsert_app_usage(
+            &conn,
+            "2026-07-01",
+            "AppA",
+            "C:\\a.exe",
+            "A",
+            60,
+            "2026-07-01T10:00:00",
+            "2026-07-01T10:01:00",
+        )
+        .unwrap();
+        drop(conn);
+
+        merge_default_profile_into_legacy_db(&base).unwrap();
+
+        let legacy = db_path_for_profile(&base, DEFAULT_PROFILE_ID);
+        assert!(legacy.exists());
+        let conn = db::open(&legacy).unwrap();
+        let count: i64 = conn
+            .query_row("SELECT COUNT(1) FROM app_usage", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 1);
+        drop(conn);
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn test_merge_default_profile_skips_conflicts() {
+        use crate::db;
+        let base = temp_data_dir("merge_default");
+
+        let legacy = db_path_for_profile(&base, DEFAULT_PROFILE_ID);
+        let conn = db::open(&legacy).unwrap();
+        db::upsert_app_usage(
+            &conn,
+            "2026-07-01",
+            "AppA",
+            "C:\\a.exe",
+            "A",
+            60,
+            "2026-07-01T10:00:00",
+            "2026-07-01T10:01:00",
+        )
+        .unwrap();
+        drop(conn);
+
+        let old_default = old_default_profile_db_path(&base);
+        let conn = db::open(&old_default).unwrap();
+        // Source has two rows for different apps; with the id-less merge they
+        // should both be inserted even though the first source id would have
+        // conflicted with the target's row id=1.
+        db::upsert_app_usage(
+            &conn,
+            "2026-07-02",
+            "AppB",
+            "C:\\b.exe",
+            "B",
+            600,
+            "2026-07-02T10:00:00",
+            "2026-07-02T10:10:00",
+        )
+        .unwrap();
+        db::upsert_app_usage(
+            &conn,
+            "2026-07-03",
+            "AppC",
+            "C:\\c.exe",
+            "C",
+            60,
+            "2026-07-03T10:00:00",
+            "2026-07-03T10:01:00",
+        )
+        .unwrap();
+        drop(conn);
+
+        merge_default_profile_into_legacy_db(&base).unwrap();
+
+        let conn = db::open(&legacy).unwrap();
+        let app_usage_count: i64 = conn
+            .query_row("SELECT COUNT(1) FROM app_usage", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(app_usage_count, 3, "all source raw rows should be preserved");
+
+        let total: i64 = conn
+            .query_row(
+                "SELECT COALESCE(SUM(total_seconds), 0) FROM daily_app_usage",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(total, 720, "daily totals should be rebuilt from merged raw rows");
+        assert!(!old_default.exists());
+        drop(conn);
+        let _ = std::fs::remove_dir_all(&base);
     }
 }

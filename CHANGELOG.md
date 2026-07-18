@@ -5,6 +5,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [2.0.1] - 2026-07-18
+
+### Fixed
+
+- **Default profile storage path regression** — the default profile now uses the legacy low-version database path (`app_data/timelens.db`) instead of a separate `app_data/profiles/default/timelens.db` folder. On startup, any data already written to the v2.0.0 `profiles/default` folder is automatically merged into the legacy database; raw usage rows are inserted without their synthetic `id` to avoid accidental data loss, and `daily_app_usage` is rebuilt from the merged raw rows so today’s totals stay correct. Other conflicting rows are skipped (`INSERT OR IGNORE`). Encrypted default-profile databases are relocated to the legacy path before decryption so they continue to work.
+- **Dashboard period total label** — the overview card now shows “Week Total” / “Month Total” instead of “Today’s Total” when the period selector is set to week or month; the numeric value already matched the selected range.
+
+---
+
 ## [2.0.0] - 2026-07-17
 
 ### Added

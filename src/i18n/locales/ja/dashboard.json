@@ -1,6 +1,8 @@
 {
   "title": "スクリーンタイム",
   "todayTotal": "今日の合計",
+  "weekTotal": "今週の合計",
+  "monthTotal": "今月の合計",
   "currentApp": "現在のアプリ",
   "mostUsed": "最も使用したアプリ",
   "topApps": "トップアプリ",

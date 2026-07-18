@@ -1,6 +1,8 @@
 {
   "title": "Tiempo de pantalla",
   "todayTotal": "Total de hoy",
+  "weekTotal": "Total de la semana",
+  "monthTotal": "Total del mes",
   "currentApp": "App actual",
   "mostUsed": "Más usada",
   "topApps": "Apps principales",

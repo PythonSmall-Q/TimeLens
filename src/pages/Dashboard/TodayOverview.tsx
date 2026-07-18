@@ -24,6 +24,12 @@ export default function TodayOverview() {
   const { setMonitoringActive } = useSettingsStore();
   const { todayOverviewCards } = useDashboardLayoutStore();
   const showCurrentApp = periodMode === "day" && selectedDate === todayString();
+  const totalLabelKey =
+    periodMode === "week"
+      ? "dashboard:weekTotal"
+      : periodMode === "month"
+      ? "dashboard:monthTotal"
+      : "dashboard:todayTotal";
 
   const topApp = todayTotals[0];
   const toggleMonitoring = () => {
@@ -45,7 +51,7 @@ export default function TodayOverview() {
       <div className="glass-card p-5">
         <div className="flex items-center gap-2 text-text-muted text-xs mb-3">
           <Monitor size={13} />
-          <span>{t("dashboard:todayTotal")}</span>
+          <span>{t(totalLabelKey)}</span>
         </div>
         <div className="text-3xl font-bold text-gradient mb-1">
           {formatDuration(totalSecondsToday)}

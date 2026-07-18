@@ -1,6 +1,8 @@
 {
   "title": "屏幕时间",
   "todayTotal": "今日总计",
+  "weekTotal": "本周总计",
+  "monthTotal": "本月总计",
   "currentApp": "正在使用",
   "mostUsed": "最常使用",
   "topApps": "应用排行",
