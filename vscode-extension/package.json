@@ -146,7 +146,7 @@
     "package:pre": "npx @vscode/vsce package --pre-release"
   },
   "devDependencies": {
-    "@vscode/vsce": "^3.6.2",
+    "@vscode/vsce": "^3.9.2",
     "@types/node": "^20.17.47",
     "@types/vscode": "^1.100.0",
     "typescript": "^5.8.3"
