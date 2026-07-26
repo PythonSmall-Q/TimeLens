@@ -108,6 +108,16 @@
           "maximum": 3600,
           "description": "%timelens.apiBaseUrlCacheSeconds.description%"
         },
+        "timelens.apiBaseUrlCacheMode": {
+          "type": "string",
+          "default": "duration",
+          "enum": ["duration", "startup"],
+          "enumDescriptions": [
+            "%timelens.apiBaseUrlCacheMode.duration%",
+            "%timelens.apiBaseUrlCacheMode.startup%"
+          ],
+          "description": "%timelens.apiBaseUrlCacheMode.description%"
+        },
         "timelens.bridgeKey": {
           "type": "string",
           "default": "",

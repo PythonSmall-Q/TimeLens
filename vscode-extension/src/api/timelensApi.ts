@@ -2,31 +2,90 @@ import { workspace } from "vscode";
 
 const DEFAULT_LOCAL_API_URL = "http://127.0.0.1:49152";
 const LOCAL_API_PORT_FALLBACK_COUNT = 1000;
+const MANUAL_PORT_FAILURE_THRESHOLD = 5;
 
-let resolvedApiBaseUrlCache: { url: string; expiresAt: number } | null = null;
+let resolvedApiBaseUrlCache: { url: string; configuredUrl: string; expiresAt: number } | null = null;
+let manualPortFailureCount = 0;
+let manualPortDisabledUntil = 0;
+
+function isLocalhostApiUrl(urlString: string): boolean {
+  try {
+    const url = new URL(urlString);
+    return url.hostname === "localhost" || url.hostname === "127.0.0.1";
+  } catch {
+    return false;
+  }
+}
+
+function parsePortFromUrl(urlString: string): number {
+  try {
+    const url = new URL(urlString);
+    const port = parseInt(url.port, 10);
+    return Number.isNaN(port) ? 0 : port;
+  } catch {
+    return 0;
+  }
+}
 
 /**
- * Resolve the actual local API base URL. When the configured URL is the
- * default `http://127.0.0.1:49152`, the desktop backend may have bound to a
- * fallback port (e.g. when 49152 is blocked by Windows / AV). Scan the
- * fallback range and return the first reachable TimeLens API. A custom URL set
- * by the user is returned unchanged.
+ * Resolve the actual local API base URL. The configured URL is tried first;
+ * when it points at localhost and is unreachable, the desktop backend may have
+ * bound to a fallback port (e.g. when the port is blocked by Windows / AV). We
+ * then scan the fallback range and return the first reachable TimeLens API.
+ * Non-localhost URLs configured by the user are returned unchanged.
+ *
+ * If the configured localhost port fails repeatedly, it is temporarily ignored
+ * so the fallback scan can take over. This handles wrong ports or ports that
+ * the desktop app no longer uses.
  */
 export async function resolveApiBaseUrl(configuredUrl: string): Promise<string> {
-  if (configuredUrl !== DEFAULT_LOCAL_API_URL) {
-    return configuredUrl;
-  }
-
   const now = Date.now();
-  if (resolvedApiBaseUrlCache && resolvedApiBaseUrlCache.expiresAt > now) {
+
+  // Use cached discovery if it matches the current configuration and hasn't expired.
+  if (
+    resolvedApiBaseUrlCache &&
+    resolvedApiBaseUrlCache.configuredUrl === configuredUrl &&
+    resolvedApiBaseUrlCache.expiresAt > now
+  ) {
     return resolvedApiBaseUrlCache.url;
   }
 
-  const cacheSeconds = workspace.getConfiguration("timelens").get<number>("apiBaseUrlCacheSeconds", 60);
-  const cacheMs = Math.max(0, cacheSeconds) * 1000;
+  const cfg = workspace.getConfiguration("timelens");
+  const cacheMode = cfg.get<string>("apiBaseUrlCacheMode", "duration");
+  const cacheSeconds = cfg.get<number>("apiBaseUrlCacheSeconds", 60);
+  const cacheMs =
+    cacheMode === "startup"
+      ? Number.MAX_SAFE_INTEGER
+      : Math.max(0, cacheSeconds) * 1000;
 
+  // Non-localhost URLs are treated as custom remote servers and returned as-is.
+  if (!isLocalhostApiUrl(configuredUrl)) {
+    return configuredUrl;
+  }
+
+  const manualPort = parsePortFromUrl(configuredUrl);
+  const manualPortAllowed =
+    manualPort > 0 &&
+    manualPort <= 65535 &&
+    now > manualPortDisabledUntil &&
+    manualPortFailureCount < MANUAL_PORT_FAILURE_THRESHOLD;
+
+  const portsToTry: number[] = [];
+  if (manualPortAllowed) {
+    portsToTry.push(manualPort);
+  }
   for (let offset = 0; offset <= LOCAL_API_PORT_FALLBACK_COUNT; offset += 1) {
     const port = 49152 + offset;
+    if (!portsToTry.includes(port)) {
+      portsToTry.push(port);
+    }
+  }
+
+  let manualPortTried = false;
+  for (const port of portsToTry) {
+    if (port === manualPort) {
+      manualPortTried = true;
+    }
     const url = `http://127.0.0.1:${port}`;
     try {
       const controller = new AbortController();
@@ -36,7 +95,11 @@ export async function resolveApiBaseUrl(configuredUrl: string): Promise<string> 
       if (resp.ok) {
         const data = (await resp.json()) as { version?: string };
         if (data && typeof data.version === "string") {
-          resolvedApiBaseUrlCache = { url, expiresAt: now + cacheMs };
+          if (port === manualPort) {
+            manualPortFailureCount = 0;
+            manualPortDisabledUntil = 0;
+          }
+          resolvedApiBaseUrlCache = { url, configuredUrl, expiresAt: now + cacheMs };
           return url;
         }
       }
@@ -45,7 +108,14 @@ export async function resolveApiBaseUrl(configuredUrl: string): Promise<string> 
     }
   }
 
-  return DEFAULT_LOCAL_API_URL;
+  if (manualPortTried) {
+    manualPortFailureCount += 1;
+    if (manualPortFailureCount >= MANUAL_PORT_FAILURE_THRESHOLD) {
+      manualPortDisabledUntil = now + 5 * 60 * 1000;
+    }
+  }
+
+  return configuredUrl;
 }
 
 export interface VsCodeLanguageDuration {

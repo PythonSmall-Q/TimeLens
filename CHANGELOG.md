@@ -9,7 +9,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
-- **Extension connection settings** — the browser extension popup now lets users set a manual API port and choose the discovered-port cache duration. The VS Code extension gained a new `timelens.apiBaseUrlCacheSeconds` setting for the same purpose. Both extensions still scan the fallback range automatically when no manual port is set.
+- **Extension connection settings** — the browser extension popup now lets users set a manual API port, choose between duration-based cache or "until next startup" cache, and configure the cache duration. The VS Code extension gained `timelens.apiBaseUrlCacheMode` (`duration` / `startup`) and `timelens.apiBaseUrlCacheSeconds` settings for the same behavior. If a manually configured localhost port fails repeatedly, both extensions temporarily ignore it and automatically scan the fallback port range.
 - **Settings page UI redesign** — rewrote the Settings page to use a reusable card-based layout consistent with Backup & Restore v2, including `glass-card` containers, icon-header cards, and inner content wells.
 
 ### Fixed

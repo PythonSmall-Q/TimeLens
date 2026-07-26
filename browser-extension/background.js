@@ -12,7 +12,7 @@
  */
 
 import { getLocale, t } from "./i18n.js";
-import { discoverApiBaseUrl, getApiBaseUrl } from "./api.js";
+import { discoverApiBaseUrl, getApiBaseUrl, clearApiBaseUrlCache, resetManualPortFailureTracking } from "./api.js";
 
 const STORAGE_KEYS = {
   activeSession:   "timelens.activeSession",
@@ -35,6 +35,8 @@ chrome.runtime.onInstalled.addListener(() => {
   chrome.alarms.create("timelens-api-heartbeat", { periodInMinutes: 1 });
   safeConfigureIdleDetection();
   initState();
+  clearApiBaseUrlCache();
+  resetManualPortFailureTracking();
   pingApiStatus();
 });
 
@@ -42,6 +44,8 @@ chrome.runtime.onStartup.addListener(() => {
   chrome.alarms.create("timelens-api-heartbeat", { periodInMinutes: 1 });
   safeConfigureIdleDetection();
   initState();
+  clearApiBaseUrlCache();
+  resetManualPortFailureTracking();
   flushPendingSessions();
 });
 

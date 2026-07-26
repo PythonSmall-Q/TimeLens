@@ -25,6 +25,8 @@ const bridgeKeyPanel = document.querySelector("#bridge-key-panel");
 const bridgeKeyInput = document.querySelector("#bridge-key-input");
 const saveKeyButton = document.querySelector("#save-key-button");
 const apiPortInput = document.querySelector("#api-port-input");
+const cacheModeSelect = document.querySelector("#cache-mode-select");
+const cacheDurationRow = document.querySelector("#cache-duration-row");
 const cacheDurationInput = document.querySelector("#cache-duration-input");
 const saveConnectionSettingsButton = document.querySelector("#save-connection-settings-button");
 const locale = getLocale();
@@ -50,22 +52,45 @@ if (saveKeyButton) {
 
 // Load and save connection settings
 async function loadConnectionSettings() {
-  const { [API_STORAGE_KEYS.apiPort]: port, [API_STORAGE_KEYS.apiCacheSeconds]: cacheSeconds } =
-    await chrome.storage.local.get([API_STORAGE_KEYS.apiPort, API_STORAGE_KEYS.apiCacheSeconds]);
+  const {
+    [API_STORAGE_KEYS.apiPort]: port,
+    [API_STORAGE_KEYS.apiCacheMode]: cacheMode,
+    [API_STORAGE_KEYS.apiCacheSeconds]: cacheSeconds,
+  } = await chrome.storage.local.get([
+    API_STORAGE_KEYS.apiPort,
+    API_STORAGE_KEYS.apiCacheMode,
+    API_STORAGE_KEYS.apiCacheSeconds,
+  ]);
   if (apiPortInput) {
     apiPortInput.value = port === 0 || port === "0" ? "0" : (port ? String(port) : "");
+  }
+  if (cacheModeSelect) {
+    cacheModeSelect.value = cacheMode === "startup" ? "startup" : "duration";
   }
   if (cacheDurationInput) {
     cacheDurationInput.value = String(cacheSeconds ?? DEFAULT_CACHE_SECONDS_VALUE);
   }
+  if (cacheDurationRow) {
+    cacheDurationRow.style.display = cacheMode === "startup" ? "none" : "flex";
+  }
+}
+
+if (cacheModeSelect) {
+  cacheModeSelect.addEventListener("change", () => {
+    if (cacheDurationRow) {
+      cacheDurationRow.style.display = cacheModeSelect.value === "startup" ? "none" : "flex";
+    }
+  });
 }
 
 if (saveConnectionSettingsButton) {
   saveConnectionSettingsButton.addEventListener("click", async () => {
     const port = parseInt(apiPortInput?.value || "0", 10) || 0;
+    const cacheMode = cacheModeSelect?.value === "startup" ? "startup" : "duration";
     const cacheSeconds = parseInt(cacheDurationInput?.value || String(DEFAULT_CACHE_SECONDS_VALUE), 10) || DEFAULT_CACHE_SECONDS_VALUE;
     await chrome.storage.local.set({
       [API_STORAGE_KEYS.apiPort]: port,
+      [API_STORAGE_KEYS.apiCacheMode]: cacheMode,
       [API_STORAGE_KEYS.apiCacheSeconds]: cacheSeconds,
     });
     clearApiBaseUrlCache();

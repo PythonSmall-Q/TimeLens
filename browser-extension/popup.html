@@ -55,7 +55,17 @@
             />
           </div>
           <div style="display: flex; align-items: center; gap: 8px;">
-            <label for="cache-duration-input" class="muted" style="font-size: 12px; width: 80px;" data-i18n="cacheDuration">Cache (s):</label>
+            <label for="cache-mode-select" class="muted" style="font-size: 12px; width: 80px;" data-i18n="cacheMode">Cache:</label>
+            <select
+              id="cache-mode-select"
+              style="flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 12px;"
+            >
+              <option value="duration" data-i18n="cacheModeDuration">Duration</option>
+              <option value="startup" data-i18n="cacheModeStartup">Until next startup</option>
+            </select>
+          </div>
+          <div id="cache-duration-row" style="display: flex; align-items: center; gap: 8px;">
+            <label for="cache-duration-input" class="muted" style="font-size: 12px; width: 80px;" data-i18n="cacheDuration">Duration (s):</label>
             <input
               id="cache-duration-input"
               type="number"
@@ -66,7 +76,7 @@
             />
           </div>
           <button id="save-connection-settings-button" class="ghost-button" type="button" data-i18n="saveOrUpdate">Save / Update</button>
-          <p class="muted" style="font-size: 11px;" data-i18n="connectionSettingsHint">Set the port to 0 to scan the fallback range. Cache duration controls how long the discovered port is remembered.</p>
+          <p class="muted" style="font-size: 11px;" data-i18n="connectionSettingsHint">Set the port to 0 to scan the fallback range. If the set port fails repeatedly, the extension will automatically scan again.</p>
         </div>
       </section>
 
