@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>帮助文档 · TimeLens 文档</title>
+  <meta name="description" content="TimeLens 帮助文档与常见问题：快速开始、故障排查、扩展连接、数据备份/恢复、隐私说明等。" />
+  <link rel="icon" type="image/png" href="../assets/icon.png" />
+  <link rel="stylesheet" href="../styles.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- Navbar -->
+  <nav class="navbar">
+    <div class="nav-container">
+      <a href="../index.html" class="nav-brand">
+        <img src="../assets/icon.svg" alt="TimeLens" class="nav-icon" />
+        <span class="nav-title">TimeLens</span>
+      </a>
+      <div class="nav-links">
+        <a href="../index.html#features" class="nav-link">功能</a>
+        <a href="../index.html#showcase" class="nav-link">展示</a>
+        <a href="../index.html#ecosystem" class="nav-link">生态</a>
+        <a href="../index.html#quickstart" class="nav-link">快速开始</a>
+        <a href="../index.html#docs" class="nav-link">文档</a>
+        <a href="https://github.com/PythonSmall-Q/TimeLens" class="nav-link" target="_blank" rel="noopener">
+          <svg class="github-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+          GitHub
+        </a>
+      </div>
+      <button class="nav-toggle" id="navToggle" aria-label="切换导航">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <header class="page-hero">
+    <div class="page-hero-content reveal">
+      <span class="eyebrow">Help Center</span>
+      <h1>TimeLens 帮助文档</h1>
+      <p class="lead">快速开始、常见疑问、故障排查与进阶使用指南。如果这里仍未解决你的问题，欢迎在 <a href="https://github.com/PythonSmall-Q/TimeLens/issues" target="_blank" rel="noopener">GitHub Issues</a> 提问。</p>
+      <div class="page-hero-actions">
+        <a href="#getting-started" class="btn btn-primary">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          快速开始
+        </a>
+        <a href="#faq" class="btn btn-secondary">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          常见问题
+        </a>
+        <a href="../index.html#docs" class="btn btn-ghost">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          返回文档中心
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Getting Started -->
+  <section id="getting-started" class="page-section">
+    <div class="section-container">
+      <div class="page-section-header reveal">
+        <span class="section-tag">快速开始</span>
+        <h2>5 分钟上手</h2>
+      </div>
+      <div class="steps-grid">
+        <div class="step-card reveal">
+          <div class="step-number">1</div>
+          <h3>获取应用</h3>
+          <p>从 <a href="https://apps.microsoft.com/detail/9mvt208csf6p?referrer=appbadge&mode=full" target="_blank" rel="noopener">Microsoft Store</a> 或 <a href="https://github.com/PythonSmall-Q/TimeLens/releases" target="_blank" rel="noopener">GitHub Releases</a> 下载安装 TimeLens 桌面端。</p>
+        </div>
+        <div class="step-card reveal">
+          <div class="step-number">2</div>
+          <h3>保持运行</h3>
+          <p>首次启动后，应用会自动开始追踪前台窗口。点击托盘图标可显示/隐藏主窗口、暂停追踪或创建小组件。</p>
+        </div>
+        <div class="step-card reveal">
+          <div class="step-number">3</div>
+          <h3>查看数据</h3>
+          <p>在主窗口 Dashboard 查看今日总览、应用排行、24 小时分布、生产力评分等；切换到 Insights 页面可查看周期对比与分心热点。</p>
+        </div>
+        <div class="step-card reveal">
+          <div class="step-number">4</div>
+          <h3>按需安装扩展</h3>
+          <p>安装 <a href="../browser-extension/index.html">浏览器扩展</a> 或 <a href="../vscode-extension/index.html">VS Code 扩展</a> 以同步网页/编码数据。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section id="faq" class="page-section alt">
+    <div class="section-container">
+      <div class="page-section-header reveal">
+        <span class="section-tag">常见问题</span>
+        <h2>FAQ</h2>
+      </div>
+      <div class="faq-list">
+        <div class="faq-item reveal">
+          <button class="faq-question" aria-expanded="false">
+            为什么 Dashboard 没有数据？
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="faq-answer">
+            <div class="faq-answer-inner">
+              <p>常见原因与排查步骤：</p>
+              <ol>
+                <li>确认 TimeLens 已启动并在后台运行。最小化后主窗口会隐藏到系统托盘，监控仍在继续。</li>
+                <li>检查 Settings → Tracking 中监控是否被暂停；托盘右键菜单也可恢复。</li>
+                <li>确认 Settings → Data 中没有将当前应用加入忽略列表。</li>
+                <li>如果刚安装，可能需要等待几分钟后刷新 Dashboard（今日视图会自动轮询）。</li>
+                <li>如果使用的是从源码构建版本，请确保以正常方式运行 <code>npm run tauri:dev</code> 或打包后的安装程序。</li>
+              </ol>
+            </div>
+          </div>
+        </div>
+
+        <div class="faq-item reveal">
+          <button class="faq-question" aria-expanded="false">
+            浏览器 / VS Code 扩展如何连接到桌面端？
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="faq-answer">
+            <div class="faq-answer-inner">
+              <p>扩展通过本地 HTTP API（默认 <code>http://127.0.0.1:49152</code>）与桌面端通信，并使用 Extension Bridge Key 对请求签名。</p>
+              <ol>
+                <li>打开 TimeLens 桌面端 → Settings → Local API / Extension Bridge，复制桥接密钥。</li>
+                <li>在扩展弹窗/命令面板中粘贴并保存密钥。</li>
+                <li>确认 Local API 已启用。</li>
+              </ol>
+              <p>详细步骤参见 <a href="../browser-extension/index.html">浏览器扩展文档</a> 与 <a href="../vscode-extension/index.html">VS Code 扩展文档</a>。</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="faq-item reveal">
+          <button class="faq-question" aria-expanded="false">
+            端口 49152 被占用或无法连接怎么办？
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="faq-answer">
+            <div class="faq-answer-inner">
+              <p>TimeLens v2.0.1 已内置端口回退机制：</p>
+              <ul>
+                <li>桌面端启动时若 49152 被 Windows 保留或安全软件拦截，会自动扫描 <code>49152–50151</code> 并绑定第一个可用端口。</li>
+                <li>桌面端的 Browser Usage / VS Code Insights 页面会显示当前实际绑定的本地 API 端口。</li>
+                <li>浏览器扩展和 VS Code 扩展也支持自动扫描备用端口；可在设置中留空 API Port 或设为 <code>0</code> 来启用扫描。</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="faq-item reveal">
+          <button class="faq-question" aria-expanded="false">
+            如何从 v1.x 迁移数据？
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="faq-answer">
+            <div class="faq-answer-inner">
+              <p>v2.0.x 默认使用与 v1.x 相同的低版本数据库路径。当默认 Profile 为空且检测到旧版数据库时，Settings 会显示一次性导入提示：</p>
+              <ol>
+                <li>打开 Settings → Profiles / Data。</li>
+                <li>点击“导入旧数据”并按提示重启应用。</li>
+                <li>也可以通过 Settings → Backup & Restore 导入之前导出的 JSON 备份。</li>
+              </ol>
+              <p>导入过程会合并原始使用记录并重建 <code>daily_app_usage</code> 等派生表，确保今日统计正确。</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="faq-item reveal">
+          <button class="faq-question" aria-expanded="false">
+            如何备份 / 恢复数据？
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="faq-answer">
+            <div class="faq-answer-inner">
+              <p>Settings → Backup & Restore 提供两种备份方式：</p>
+              <ul>
+                <li><strong>普通备份</strong>：打包当前 Profile 的 SQLite 数据库与元数据。</li>
+                <li><strong>密码保护备份</strong>：使用 AES-256-GCM 加密，密码通过 Argon2id 派生密钥。</li>
+              </ul>
+              <p>恢复时可选择覆盖当前 Profile 或新建 Profile。恢复前会先验证备份包完整性，避免数据损坏。</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="faq-item reveal">
+          <button class="faq-question" aria-expanded="false">
+            如何添加 / 管理小组件？
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="faq-answer">
+            <div class="faq-answer-inner">
+              <p>TimeLens 提供多种官方浮动小组件：</p>
+              <ul>
+                <li>点击主窗口侧边栏“小组件”或托盘菜单中的“新建时钟/待办/计时器”。</li>
+                <li>在 Widget Center 可查看已创建的小组件、调整透明度/置顶、设置开机自启。</li>
+                <li>支持导入第三方小组件，需先授予对应的数据访问权限。详见 <a href="../WIDGETS_DEV_GUIDE.zh-CN.html">中文小组件开发指南</a>。</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="faq-item reveal">
+          <button class="faq-question" aria-expanded="false">
+            如何设置应用限额 / 生产力目标？
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="faq-answer">
+            <div class="faq-answer-inner">
+              <ul>
+                <li><strong>应用限额</strong>：前往 Limits 页面，选择应用并设置每日上限。达到 80%、90%、100% 时会触发原生通知。</li>
+                <li><strong>生产力目标</strong>：前往 Goals 页面，创建针对单个应用或分类的目标（每日/每周、至少/至多），Dashboard 会显示目标进度。</li>
+                <li>v2.0.0 新增 Goal Risk 提醒：当目标进度明显落后时，系统会发出 <code>goal-risk-alert</code> 通知。</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="faq-item reveal">
+          <button class="faq-question" aria-expanded="false">
+            TimeLens 如何保护隐私？
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="faq-answer">
+            <div class="faq-answer-inner">
+              <ul>
+                <li>所有使用数据存储在本地 SQLite，不上传云端。</li>
+                <li>浏览器扩展和 VS Code 扩展仅向本机 <code>127.0.0.1</code> API 发送数据，不收集网页内容或源代码。</li>
+                <li>本地 API 通过 Extension Bridge Key、scoped token、allowlist 和速率限制进行访问控制。</li>
+                <li>可选 AES-256-GCM 数据库静态加密，退出时擦除运行时明文。</li>
+              </ul>
+              <p>完整说明请查看 <a href="https://github.com/PythonSmall-Q/TimeLens/blob/main/PRIVACY_POLICY.md" target="_blank" rel="noopener">Privacy Policy</a>。</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="faq-item reveal">
+          <button class="faq-question" aria-expanded="false">
+            数据库文件在哪里？
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="faq-answer">
+            <div class="faq-answer-inner">
+              <ul>
+                <li><strong>Windows:</strong> <code>%APPDATA%\com.timelens.app\timelens.db</code></li>
+                <li><strong>macOS:</strong> <code>~/Library/Application Support/com.timelens.app/timelens.db</code></li>
+              </ul>
+              <p>如果启用了数据库静态加密，原始数据库文件会被加密存储，运行时通过内存解密访问。建议定期使用 Settings → Backup & Restore 导出备份。</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="faq-item reveal">
+          <button class="faq-question" aria-expanded="false">
+            如何参与贡献或报告问题？
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="faq-answer">
+            <div class="faq-answer-inner">
+              <p>TimeLens 是 MIT 许可的开源项目：</p>
+              <ul>
+                <li>在 <a href="https://github.com/PythonSmall-Q/TimeLens" target="_blank" rel="noopener">GitHub</a> 上提交 Issue 或 Pull Request。</li>
+                <li>开发前请阅读 <a href="https://github.com/PythonSmall-Q/TimeLens/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener">CONTRIBUTING.md</a>。</li>
+                <li>查看 <a href="../DEVELOPMENT.html">开发指南</a> 和 <a href="../ARCHITECTURE.html">架构文档</a> 了解如何搭建环境。</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Troubleshooting -->
+  <section id="troubleshooting" class="page-section">
+    <div class="section-container">
+      <div class="page-section-header reveal">
+        <span class="section-tag">故障排查</span>
+        <h2>按场景排查</h2>
+      </div>
+      <div class="trouble-grid">
+        <div class="trouble-card reveal">
+          <h3>应用启动后白屏</h3>
+          <ol>
+            <li>确认 WebView2 已安装（Windows 11 自带，Win10 可从微软官网安装）。</li>
+            <li>如果之前启用了数据库加密，确认没有手动删除或重命名加密文件。</li>
+            <li>查看 <code>%APPDATA%\com.timelens.app\logs</code> 中的日志文件。</li>
+          </ol>
+        </div>
+        <div class="trouble-card reveal">
+          <h3>扩展连接不上</h3>
+          <ol>
+            <li>确认桌面端正在运行且 Local API 已启用。</li>
+            <li>检查桥接密钥是否最新。</li>
+            <li>尝试清空扩展中的手动 API 端口，让自动扫描备用端口。</li>
+            <li>检查 127.0.0.1 是否被防火墙/安全软件拦截。</li>
+          </ol>
+        </div>
+        <div class="trouble-card reveal">
+          <h3>生产力评分或中断检测异常</h3>
+          <ol>
+            <li>派生指标表会自动维护；若发现明显错误，可在 Data Health Center 运行修复。</li>
+            <li>暂停追踪、系统睡眠等时段不会产生有效数据，属于正常缺口。</li>
+          </ol>
+        </div>
+        <div class="trouble-card reveal">
+          <h3>小组件不显示或权限被拒绝</h3>
+          <ol>
+            <li>检查 Widget Center 中对应小组件是否已启用。</li>
+            <li>第三方小组件需先授予 manifest 中声明的权限。</li>
+            <li>右键点击小组件窗口可打开 DevTools 查看报错。</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Related Docs -->
+  <section class="page-section alt">
+    <div class="section-container">
+      <div class="page-section-header reveal">
+        <span class="section-tag">相关文档</span>
+        <h2>继续阅读</h2>
+      </div>
+      <div class="info-cards">
+        <a href="../browser-extension/index.html" class="info-card reveal" style="color: inherit; transition: all 0.3s;">
+          <h3>浏览器扩展</h3>
+          <p>Edge/Chrome 扩展的安装、配置与故障排查。</p>
+        </a>
+        <a href="../vscode-extension/index.html" class="info-card reveal" style="color: inherit; transition: all 0.3s;">
+          <h3>VS Code 扩展</h3>
+          <p>编码时间追踪与 Marketplace/VSIX 安装指南。</p>
+        </a>
+        <a href="../ARCHITECTURE.html" class="info-card reveal" style="color: inherit; transition: all 0.3s;">
+          <h3>架构文档</h3>
+          <p>了解 TimeLens 的整体架构与数据流。</p>
+        </a>
+        <a href="../API_REFERENCE.html" class="info-card reveal" style="color: inherit; transition: all 0.3s;">
+          <h3>API 参考</h3>
+          <p>查看所有可用的 Rust Command 与本地 REST API。</p>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="footer-container">
+      <div class="footer-brand">
+        <img src="../assets/icon.svg" alt="TimeLens" class="footer-icon" />
+        <span>TimeLens</span>
+      </div>
+      <p class="footer-copy">MIT License · Built with Tauri & React · 由社区驱动</p>
+      <div class="footer-links">
+        <a href="https://github.com/PythonSmall-Q/TimeLens" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/PythonSmall-Q/TimeLens/releases" target="_blank" rel="noopener">Releases</a>
+        <a href="https://github.com/PythonSmall-Q/TimeLens/blob/main/README.md" target="_blank" rel="noopener">README</a>
+        <a href="https://github.com/PythonSmall-Q/TimeLens/blob/main/CHANGELOG.md" target="_blank" rel="noopener">Changelog</a>
+        <a href="https://github.com/PythonSmall-Q/TimeLens/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener">Contributing</a>
+        <a href="https://github.com/PythonSmall-Q/TimeLens/blob/main/PRIVACY_POLICY.md" target="_blank" rel="noopener">Privacy</a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // Mobile nav toggle
+    const navToggle = document.getElementById('navToggle');
+    const navLinks = document.querySelector('.nav-links');
+    navToggle.addEventListener('click', () => navLinks.classList.toggle('open'));
+
+    // FAQ accordion
+    document.querySelectorAll('.faq-question').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const item = btn.parentElement;
+        const answer = btn.nextElementSibling;
+        const isOpen = item.classList.contains('open');
+
+        // Optional: close others
+        document.querySelectorAll('.faq-item.open').forEach(openItem => {
+          if (openItem !== item) {
+            openItem.classList.remove('open');
+            openItem.querySelector('.faq-question').setAttribute('aria-expanded', 'false');
+            openItem.querySelector('.faq-answer').style.maxHeight = null;
+          }
+        });
+
+        item.classList.toggle('open');
+        btn.setAttribute('aria-expanded', String(!isOpen));
+        answer.style.maxHeight = isOpen ? null : answer.scrollHeight + 'px';
+      });
+    });
+
+    // Scroll reveal
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+    document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
+  </script>
+</body>
+</html>

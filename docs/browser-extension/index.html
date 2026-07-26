@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>浏览器扩展 · TimeLens 文档</title>
+  <meta name="description" content="TimeLens Edge/Chrome 浏览器扩展：追踪网页访问时长，与桌面端数据合并展示。包含安装、配置与故障排查指南。" />
+  <link rel="icon" type="image/png" href="../assets/icon.png" />
+  <link rel="stylesheet" href="../styles.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- Navbar -->
+  <nav class="navbar">
+    <div class="nav-container">
+      <a href="../index.html" class="nav-brand">
+        <img src="../assets/icon.svg" alt="TimeLens" class="nav-icon" />
+        <span class="nav-title">TimeLens</span>
+      </a>
+      <div class="nav-links">
+        <a href="../index.html#features" class="nav-link">功能</a>
+        <a href="../index.html#showcase" class="nav-link">展示</a>
+        <a href="../index.html#ecosystem" class="nav-link">生态</a>
+        <a href="../index.html#quickstart" class="nav-link">快速开始</a>
+        <a href="../index.html#docs" class="nav-link">文档</a>
+        <a href="https://github.com/PythonSmall-Q/TimeLens" class="nav-link" target="_blank" rel="noopener">
+          <svg class="github-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+          GitHub
+        </a>
+      </div>
+      <button class="nav-toggle" id="navToggle" aria-label="切换导航">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <header class="page-hero">
+    <div class="page-hero-content reveal">
+      <span class="eyebrow">Browser Companion</span>
+      <h1>TimeLens 浏览器扩展</h1>
+      <p class="lead">Edge / Chrome 浏览器伴侣。记录网页访问时长，按域名聚合统计，并与桌面端 TimeLens 数据合并展示。</p>
+      <div class="page-hero-actions">
+        <a href="https://microsoftedge.microsoft.com/addons/detail/ggpfddncgjgicapbhiifkcffbfjcdcpi" class="btn btn-primary" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          Edge 商店安装
+        </a>
+        <a href="https://github.com/PythonSmall-Q/TimeLens/tree/main/browser-extension" class="btn btn-secondary" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
+          查看源码
+        </a>
+        <a href="../index.html#docs" class="btn btn-ghost">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          返回文档中心
+        </a>
+      </div>
+      <p style="margin-top: 16px; font-size: 0.85rem; color: var(--text-muted);">
+        版本 <span class="version-note">v1.1.0</span> · 支持 Chromium 内核浏览器（Edge、Chrome）
+      </p>
+    </div>
+  </header>
+
+  <!-- Overview -->
+  <section class="page-section">
+    <div class="section-container">
+      <div class="page-section-header reveal">
+        <span class="section-tag">概览</span>
+        <h2>它如何工作</h2>
+        <p>浏览器扩展通过 Service Worker 监听浏览器活动，仅在窗口聚焦且用户活跃时记录当前标签页会话，并将数据安全地同步到本地 TimeLens API。</p>
+      </div>
+      <div class="info-cards">
+        <div class="info-card reveal">
+          <h3>标签级会话追踪</h3>
+          <p>只在浏览器窗口获得焦点且用户未空闲（chrome.idle）时计时。切换标签、窗口失焦或进入空闲状态会立即结束当前会话并同步。</p>
+        </div>
+        <div class="info-card reveal">
+          <h3>域名聚合</h3>
+          <p>桌面端 Browser Usage 页面按域名展示总时长、趋势和限额，与本地应用屏幕时间并列呈现。</p>
+        </div>
+        <div class="info-card reveal">
+          <h3>本地优先</h3>
+          <p>所有数据仅发送到本机 <code>127.0.0.1</code> 上的 TimeLens API。不上传云端，不收集页面内容。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section class="page-section alt">
+    <div class="section-container">
+      <div class="page-section-header reveal">
+        <span class="section-tag">功能</span>
+        <h2>扩展功能一览</h2>
+      </div>
+      <div class="feature-grid">
+        <div class="feature-card reveal">
+          <div class="feature-icon-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </div>
+          <h3>网页会话追踪</h3>
+          <p>按标签页记录活跃浏览时间，窗口失焦或用户空闲时自动暂停，恢复后继续计时。</p>
+        </div>
+        <div class="feature-card reveal">
+          <div class="feature-icon-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          </div>
+          <h3>忽略域名</h3>
+          <p>在 TimeLens 桌面端 Browser Usage 页面配置忽略的域名，例如 <code>localhost</code>、企业内部 SSO 页面，避免干扰统计。</p>
+        </div>
+        <div class="feature-card reveal">
+          <div class="feature-icon-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+          </div>
+          <h3>域名限额</h3>
+          <p>为特定网站设置每日使用限额，超额时桌面端会通过原生通知提醒你。</p>
+        </div>
+        <div class="feature-card reveal">
+          <div class="feature-icon-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          </div>
+          <h3>扩展桥接密钥</h3>
+          <p>通过 TimeLens 桌面端 Settings 生成的桥接密钥验证扩展身份，防止未授权工具访问本地 API。</p>
+        </div>
+        <div class="feature-card reveal">
+          <div class="feature-icon-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          </div>
+          <h3>灵活的连接设置</h3>
+          <p>手动指定 API 端口、选择缓存模式（时长 / 下次启动前）、自定义缓存时长。手动端口失败时自动扫描备用端口范围。</p>
+        </div>
+        <div class="feature-card reveal">
+          <div class="feature-icon-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </div>
+          <h3>实时弹窗状态</h3>
+          <p>点击浏览器工具栏图标即可查看桌面连接状态、今日总览和最近网页会话列表。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Install Steps -->
+  <section class="page-section">
+    <div class="section-container">
+      <div class="page-section-header reveal">
+        <span class="section-tag">安装</span>
+        <h2>三步开始使用</h2>
+      </div>
+      <div class="steps-grid">
+        <div class="step-card reveal">
+          <div class="step-number">1</div>
+          <h3>安装扩展</h3>
+          <p>从 <a href="https://microsoftedge.microsoft.com/addons/detail/ggpfddncgjgicapbhiifkcffbfjcdcpi" target="_blank" rel="noopener">Microsoft Edge 加载项</a> 安装，或从源码运行 <code>npm run build:chrome</code> 后手动加载。</p>
+        </div>
+        <div class="step-card reveal">
+          <div class="step-number">2</div>
+          <h3>启动桌面端</h3>
+          <p>确保 TimeLens 桌面应用正在运行，并且 Settings 中启用了 Local API / Extension Bridge。</p>
+        </div>
+        <div class="step-card reveal">
+          <div class="step-number">3</div>
+          <h3>配置桥接密钥</h3>
+          <p>在桌面端 Settings 复制 Extension Bridge Key，粘贴到扩展弹窗的桥接密钥输入框中并保存。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Configuration -->
+  <section class="page-section alt">
+    <div class="section-container">
+      <div class="page-section-header reveal">
+        <span class="section-tag">配置</span>
+        <h2>连接设置说明</h2>
+        <p>v1.1.0 起，扩展支持更精细的本地 API 发现策略，解决 Windows 排除端口或安全软件导致默认端口不可用的问题。</p>
+      </div>
+      <table class="config-table reveal">
+        <thead>
+          <tr><th>设置项</th><th>说明</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>API Port</td>
+            <td>手动指定 TimeLens 本地 API 端口。默认 <code>49152</code>；留空或填 <code>0</code> 时直接扫描备用端口范围。</td>
+          </tr>
+          <tr>
+            <td>Cache mode</td>
+            <td><code>Duration</code>：按秒缓存已发现的 API 地址；<code>Until next startup</code>：浏览器本次运行期间一直使用缓存地址，重启后重新发现。</td>
+          </tr>
+          <tr>
+            <td>Cache duration</td>
+            <td>在 <code>Duration</code> 模式下缓存的秒数，默认 <code>60</code> 秒，最大 <code>3600</code> 秒。</td>
+          </tr>
+          <tr>
+            <td>自动回退扫描</td>
+            <td>当手动端口连续失败 5 次后，扩展会暂时忽略该端口并自动扫描 <code>49152–50151</code> 备用端口范围，5 分钟后恢复手动端口尝试。</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="info-card reveal" style="max-width: 100%;">
+        <h3>获取桥接密钥</h3>
+        <p>打开 TimeLens 桌面端 → Settings → Local API / Extension Bridge → 点击复制 Extension Bridge Key。该密钥用于扩展向本地 API 签名请求，确保只有授权扩展能写入数据。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Troubleshooting -->
+  <section class="page-section">
+    <div class="section-container">
+      <div class="page-section-header reveal">
+        <span class="section-tag">故障排查</span>
+        <h2>常见问题</h2>
+      </div>
+      <div class="trouble-grid">
+        <div class="trouble-card reveal">
+          <h3>扩展一直显示 “Checking” 或连接失败</h3>
+          <ol>
+            <li>确认 TimeLens 桌面端正在运行。</li>
+            <li>在桌面端 Settings 检查 Local API 是否已启用。</li>
+            <li>打开扩展弹窗，确认已保存正确的 Extension Bridge Key。</li>
+            <li>尝试将 API Port 改为 <code>0</code> 让扩展自动扫描备用端口。</li>
+            <li>检查 Windows 防火墙或杀毒软件是否拦截了 <code>127.0.0.1</code> 环回地址。</li>
+          </ol>
+        </div>
+        <div class="trouble-card reveal">
+          <h3>桥接密钥认证失败</h3>
+          <ol>
+            <li>重新从桌面端 Settings 复制完整的 Extension Bridge Key。</li>
+            <li>在扩展弹窗中粘贴并保存，然后刷新弹窗。</li>
+            <li>如果旋转过密钥，所有扩展都需要重新配置。</li>
+          </ol>
+        </div>
+        <div class="trouble-card reveal">
+          <h3>网页数据未显示在桌面端</h3>
+          <ol>
+            <li>在扩展弹窗中点击 Refresh 查看最新状态。</li>
+            <li>确认访问的域名不在 TimeLens 桌面端的“忽略域名”列表中。</li>
+            <li>检查浏览器 DevTools 中是否有 Service Worker 报错。</li>
+            <li>重新启动浏览器或重新安装扩展。</li>
+          </ol>
+        </div>
+        <div class="trouble-card reveal">
+          <h3>端口 49152 被占用</h3>
+          <p>TimeLens v2.0.1 桌面端会在 49152 被占用时自动扫描 <code>49152–50151</code> 并绑定到第一个可用端口。扩展侧也支持自动回退扫描，因此无需手动查找实际端口。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Related links -->
+  <section class="page-section alt">
+    <div class="section-container">
+      <div class="page-section-header reveal">
+        <span class="section-tag">相关文档</span>
+        <h2>继续阅读</h2>
+      </div>
+      <div class="info-cards">
+        <a href="../help/index.html" class="info-card reveal" style="color: inherit; transition: all 0.3s;">
+          <h3>帮助文档</h3>
+          <p>更多使用问题、迁移与备份恢复指南。</p>
+        </a>
+        <a href="../vscode-extension/index.html" class="info-card reveal" style="color: inherit; transition: all 0.3s;">
+          <h3>VS Code 扩展</h3>
+          <p>记录代码时间，按语言/项目维度统计。</p>
+        </a>
+        <a href="../API_REFERENCE.html#browser" class="info-card reveal" style="color: inherit; transition: all 0.3s;">
+          <h3>浏览器扩展 API</h3>
+          <p>查看桌面端暴露的浏览器扩展相关 Rust Command。</p>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="footer-container">
+      <div class="footer-brand">
+        <img src="../assets/icon.svg" alt="TimeLens" class="footer-icon" />
+        <span>TimeLens</span>
+      </div>
+      <p class="footer-copy">MIT License · Built with Tauri & React · 由社区驱动</p>
+      <div class="footer-links">
+        <a href="https://github.com/PythonSmall-Q/TimeLens" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/PythonSmall-Q/TimeLens/releases" target="_blank" rel="noopener">Releases</a>
+        <a href="https://github.com/PythonSmall-Q/TimeLens/blob/main/README.md" target="_blank" rel="noopener">README</a>
+        <a href="https://github.com/PythonSmall-Q/TimeLens/blob/main/CHANGELOG.md" target="_blank" rel="noopener">Changelog</a>
+        <a href="https://github.com/PythonSmall-Q/TimeLens/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener">Contributing</a>
+        <a href="https://github.com/PythonSmall-Q/TimeLens/blob/main/PRIVACY_POLICY.md" target="_blank" rel="noopener">Privacy</a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    const navToggle = document.getElementById('navToggle');
+    const navLinks = document.querySelector('.nav-links');
+    navToggle.addEventListener('click', () => navLinks.classList.toggle('open'));
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+    document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
+  </script>
+</body>
+</html>

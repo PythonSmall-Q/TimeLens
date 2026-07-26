@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VS Code 扩展 · TimeLens 文档</title>
+  <meta name="description" content="TimeLens VS Code 扩展：追踪编码时间，按语言/项目统计，与桌面端 TimeLens 数据合并展示。" />
+  <link rel="icon" type="image/png" href="../assets/icon.png" />
+  <link rel="stylesheet" href="../styles.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- Navbar -->
+  <nav class="navbar">
+    <div class="nav-container">
+      <a href="../index.html" class="nav-brand">
+        <img src="../assets/icon.svg" alt="TimeLens" class="nav-icon" />
+        <span class="nav-title">TimeLens</span>
+      </a>
+      <div class="nav-links">
+        <a href="../index.html#features" class="nav-link">功能</a>
+        <a href="../index.html#showcase" class="nav-link">展示</a>
+        <a href="../index.html#ecosystem" class="nav-link">生态</a>
+        <a href="../index.html#quickstart" class="nav-link">快速开始</a>
+        <a href="../index.html#docs" class="nav-link">文档</a>
+        <a href="https://github.com/PythonSmall-Q/TimeLens" class="nav-link" target="_blank" rel="noopener">
+          <svg class="github-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+          GitHub
+        </a>
+      </div>
+      <button class="nav-toggle" id="navToggle" aria-label="切换导航">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <header class="page-hero">
+    <div class="page-hero-content reveal">
+      <span class="eyebrow">VS Code Companion</span>
+      <h1>TimeLens VS Code 扩展</h1>
+      <p class="lead">记录你在 VS Code 中的编码时间，按语言、项目、工作区维度统计，并与桌面端 TimeLens 数据打通。</p>
+      <div class="page-hero-actions">
+        <a href="https://marketplace.visualstudio.com/items?itemName=ShanWenxiao.timelens-vscode-extension" class="btn btn-primary" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+          Marketplace 安装
+        </a>
+        <a href="https://github.com/PythonSmall-Q/TimeLens/tree/main/vscode-extension" class="btn btn-secondary" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
+          查看源码
+        </a>
+        <a href="../index.html#docs" class="btn btn-ghost">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          返回文档中心
+        </a>
+      </div>
+      <p style="margin-top: 16px; font-size: 0.85rem; color: var(--text-muted);">
+        版本 <span class="version-note">v0.4.0</span> · 支持 VS Code ≥ 1.100.0
+      </p>
+    </div>
+  </header>
+
+  <!-- Overview -->
+  <section class="page-section">
+    <div class="section-container">
+      <div class="page-section-header reveal">
+        <span class="section-tag">概览</span>
+        <h2>它如何工作</h2>
+        <p>扩展在 VS Code 启动后激活，通过监听编辑器活动判断当前编码会话，按项目与语言聚合时间，并周期性推送到本机 TimeLens API。</p>
+      </div>
+      <div class="info-cards">
+        <div class="info-card reveal">
+          <h3>会话追踪</h3>
+          <p>基于编辑器焦点与空闲检测生成编码会话。空闲超过阈值后会自动拆分会话，避免长时间离开被误统计。</p>
+        </div>
+        <div class="info-card reveal">
+          <h3>语言 & 项目统计</h3>
+          <p>支持 basic / standard / detailed 三档追踪粒度，分别记录总时长、语言时长、项目时长。</p>
+        </div>
+        <div class="info-card reveal">
+          <h3>本地优先</h3>
+          <p>数据仅发送到本机 TimeLens API，不收集源代码内容或文件路径，API 密钥仅存储在本地 VS Code 设置中。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section class="page-section alt">
+    <div class="section-container">
+      <div class="page-section-header reveal">
+        <span class="section-tag">功能</span>
+        <h2>扩展功能一览</h2>
+      </div>
+      <div class="feature-grid">
+        <div class="feature-card reveal">
+          <div class="feature-icon-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </div>
+          <h3>编码会话追踪</h3>
+          <p>自动记录每次在 VS Code 中的活跃编码时间，桌面端 VS Code Insights 页面展示总时长与会话数。</p>
+        </div>
+        <div class="feature-card reveal">
+          <div class="feature-icon-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+          </div>
+          <h3>按语言统计</h3>
+          <p>standard / detailed 模式下，统计各类编程语言的使用时长并在桌面端展示排行榜。</p>
+        </div>
+        <div class="feature-card reveal">
+          <div class="feature-icon-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+          </div>
+          <h3>按项目统计</h3>
+          <p>detailed 模式下按项目/工作区聚合时长，帮助识别主要投入项目。</p>
+        </div>
+        <div class="feature-card reveal">
+          <div class="feature-icon-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          </div>
+          <h3>扩展桥接密钥</h3>
+          <p>通过 TimeLens 桌面端生成的桥接密钥对请求签名，未授权工具无法访问本地 API。</p>
+        </div>
+        <div class="feature-card reveal">
+          <div class="feature-icon-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          </div>
+          <h3>智能端口发现</h3>
+          <p>支持手动 API 基础 URL、缓存模式（时长 / 下次启动前）与自动备用端口扫描，适配本地 API 动态绑定的场景。</p>
+        </div>
+        <div class="feature-card reveal">
+          <div class="feature-icon-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="12" y1="8" x2="12" y2="16"/></svg>
+          </div>
+          <h3>侧边栏看板</h3>
+          <p>内置 VS Code 侧边栏视图，显示连接状态、今日编码时长、语言/项目排行与快捷操作按钮。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Install Steps -->
+  <section class="page-section">
+    <div class="section-container">
+      <div class="page-section-header reveal">
+        <span class="section-tag">安装</span>
+        <h2>两种安装方式</h2>
+      </div>
+      <div class="steps-grid">
+        <div class="step-card reveal">
+          <div class="step-number">1</div>
+          <h3>方式 A：Marketplace</h3>
+          <p>在 VS Code 中搜索 <strong>TimeLens</strong> 或访问 <a href="https://marketplace.visualstudio.com/items?itemName=ShanWenxiao.timelens-vscode-extension" target="_blank" rel="noopener">Marketplace 页面</a> 安装。</p>
+        </div>
+        <div class="step-card reveal">
+          <div class="step-number">2</div>
+          <h3>方式 B：本地 VSIX</h3>
+          <p>克隆仓库后进入 <code>vscode-extension/</code> 目录，运行 <code>npm install && npm run package</code> 生成 <code>.vsix</code>，然后在 VS Code 中通过“从 VSIX 安装”加载。</p>
+        </div>
+        <div class="step-card reveal">
+          <div class="step-number">3</div>
+          <h3>配置桥接密钥</h3>
+          <p>首次激活时会提示配置。也可随时运行命令 <code>TimeLens: Set/Update Extension Bridge Key</code> 或点击侧边栏配置按钮。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Configuration -->
+  <section class="page-section alt">
+    <div class="section-container">
+      <div class="page-section-header reveal">
+        <span class="section-tag">配置</span>
+        <h2>设置项说明</h2>
+        <p>v0.4.0 起新增 <code>timelens.apiBaseUrlCacheMode</code> 与 <code>timelens.apiBaseUrlCacheSeconds</code>，与浏览器扩展保持一致。</p>
+      </div>
+      <table class="config-table reveal">
+        <thead>
+          <tr><th>设置项</th><th>说明</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>timelens.enabled</code></td>
+            <td>是否启用追踪。</td>
+          </tr>
+          <tr>
+            <td><code>timelens.apiBaseUrl</code></td>
+            <td>本地 API 地址，默认 <code>http://127.0.0.1:49152</code>。如果桌面端实际绑定了备用端口，可手动修改或清空后依赖自动发现。</td>
+          </tr>
+          <tr>
+            <td><code>timelens.apiBaseUrlCacheMode</code></td>
+            <td><code>duration</code>：按秒缓存发现的 API 地址；<code>startup</code>：本次 VS Code 运行期间缓存，重启后重新发现。</td>
+          </tr>
+          <tr>
+            <td><code>timelens.apiBaseUrlCacheSeconds</code></td>
+            <td><code>duration</code> 模式下的缓存秒数，默认 <code>60</code>，最大 <code>3600</code>。</td>
+          </tr>
+          <tr>
+            <td><code>timelens.bridgeKey</code></td>
+            <td>从 TimeLens 桌面端 Settings 获取的 Extension Bridge Key，用于请求签名。</td>
+          </tr>
+          <tr>
+            <td><code>timelens.trackingLevel</code></td>
+            <td><code>basic</code>（仅时长）、<code>standard</code>（+ 语言）、<code>detailed</code>（+ 项目）。</td>
+          </tr>
+          <tr>
+            <td><code>timelens.flushIntervalSeconds</code></td>
+            <td>队列刷新间隔，默认 30 秒，范围 5–600 秒。</td>
+          </tr>
+          <tr>
+            <td><code>timelens.idleThresholdSeconds</code></td>
+            <td>空闲拆分阈值，默认 120 秒，范围 30–1800 秒。</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="info-card reveal" style="max-width: 100%;">
+        <h3>获取桥接密钥</h3>
+        <p>打开 TimeLens 桌面端 → Settings → Local API / Extension Bridge → 点击复制 Extension Bridge Key。侧边栏和命令面板均可输入并保存。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Commands -->
+  <section class="page-section">
+    <div class="section-container">
+      <div class="page-section-header reveal">
+        <span class="section-tag">命令</span>
+        <h2>可用命令</h2>
+      </div>
+      <table class="config-table reveal">
+        <thead>
+          <tr><th>命令</th><th>作用</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>TimeLens: Open Sidebar</code></td><td>打开 TimeLens 侧边栏视图。</td></tr>
+          <tr><td><code>TimeLens: Enable Tracking</code></td><td>启用编码追踪。</td></tr>
+          <tr><td><code>TimeLens: Disable Tracking</code></td><td>禁用编码追踪。</td></tr>
+          <tr><td><code>TimeLens: Show Tracking Status</code></td><td>显示当前状态与待同步队列大小。</td></tr>
+          <tr><td><code>TimeLens: Set Detail Level</code></td><td>切换 basic / standard / detailed 追踪粒度。</td></tr>
+          <tr><td><code>TimeLens: Set/Update Extension Bridge Key</code></td><td>输入或更新桥接密钥。</td></tr>
+          <tr><td><code>TimeLens: Open Dashboard</code></td><td>打开桌面端 Dashboard（编辑器标题栏图标）。</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Troubleshooting -->
+  <section class="page-section alt">
+    <div class="section-container">
+      <div class="page-section-header reveal">
+        <span class="section-tag">故障排查</span>
+        <h2>常见问题</h2>
+      </div>
+      <div class="trouble-grid">
+        <div class="trouble-card reveal">
+          <h3>提示 “Extension bridge key authentication failed”</h3>
+          <ol>
+            <li>从 TimeLens 桌面端 Settings 重新复制 Extension Bridge Key。</li>
+            <li>运行 <code>TimeLens: Set/Update Extension Bridge Key</code> 粘贴保存。</li>
+            <li>确认桌面端 Local API 已启用并正在运行。</li>
+            <li>重启 VS Code。</li>
+          </ol>
+        </div>
+        <div class="trouble-card reveal">
+          <h3>提示 “未连接到 TimeLens 桌面端”</h3>
+          <ol>
+            <li>启动 TimeLens 桌面应用。</li>
+            <li>检查 <code>timelens.apiBaseUrl</code> 是否与桌面端实际端口一致。</li>
+            <li>如果 49152 被占用，可清空地址让扩展自动扫描备用端口，或查看桌面端显示的实际端口。</li>
+          </ol>
+        </div>
+        <div class="trouble-card reveal">
+          <h3>数据未同步</h3>
+          <ol>
+            <li>确认已配置桥接密钥。</li>
+            <li>确认侧边栏中 Tracking 处于启用状态。</li>
+            <li>打开 VS Code Output 面板，选择 TimeLens 通道查看日志。</li>
+            <li>尝试运行 <code>TimeLens: Open Dashboard</code> 强制刷新快照。</li>
+          </ol>
+        </div>
+        <div class="trouble-card reveal">
+          <h3>端口 49152 被占用</h3>
+          <p>TimeLens v2.0.1 桌面端会在 49152 不可用时自动扫描 <code>49152–50151</code> 并绑定到第一个可用端口。扩展也支持自动回退扫描；如未触发，请检查 <code>timelens.apiBaseUrl</code> 是否留空或正确。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Related links -->
+  <section class="page-section">
+    <div class="section-container">
+      <div class="page-section-header reveal">
+        <span class="section-tag">相关文档</span>
+        <h2>继续阅读</h2>
+      </div>
+      <div class="info-cards">
+        <a href="../help/index.html" class="info-card reveal" style="color: inherit; transition: all 0.3s;">
+          <h3>帮助文档</h3>
+          <p>更多使用问题、迁移与备份恢复指南。</p>
+        </a>
+        <a href="../browser-extension/index.html" class="info-card reveal" style="color: inherit; transition: all 0.3s;">
+          <h3>浏览器扩展</h3>
+          <p>追踪网页访问时长，与桌面数据合并。</p>
+        </a>
+        <a href="../API_REFERENCE.html" class="info-card reveal" style="color: inherit; transition: all 0.3s;">
+          <h3>API 参考</h3>
+          <p>查看 VS Code 扩展调用的本地 REST API。</p>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="footer-container">
+      <div class="footer-brand">
+        <img src="../assets/icon.svg" alt="TimeLens" class="footer-icon" />
+        <span>TimeLens</span>
+      </div>
+      <p class="footer-copy">MIT License · Built with Tauri & React · 由社区驱动</p>
+      <div class="footer-links">
+        <a href="https://github.com/PythonSmall-Q/TimeLens" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/PythonSmall-Q/TimeLens/releases" target="_blank" rel="noopener">Releases</a>
+        <a href="https://github.com/PythonSmall-Q/TimeLens/blob/main/README.md" target="_blank" rel="noopener">README</a>
+        <a href="https://github.com/PythonSmall-Q/TimeLens/blob/main/CHANGELOG.md" target="_blank" rel="noopener">Changelog</a>
+        <a href="https://github.com/PythonSmall-Q/TimeLens/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener">Contributing</a>
+        <a href="https://github.com/PythonSmall-Q/TimeLens/blob/main/PRIVACY_POLICY.md" target="_blank" rel="noopener">Privacy</a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    const navToggle = document.getElementById('navToggle');
+    const navLinks = document.querySelector('.nav-links');
+    navToggle.addEventListener('click', () => navLinks.classList.toggle('open'));
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+    document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
+  </script>
+</body>
+</html>
