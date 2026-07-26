@@ -5,6 +5,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [2.0.2] - 2026-07-27
+
+### Added
+
+- **Browser extension debug logging** — the browser extension now emits detailed `[TimeLens API]`, `[TimeLens BG]`, and `[TimeLens Popup]` console logs for connection discovery, cache decisions, session lifecycle, sync attempts, and bridge-signature checks, making it easier to diagnose connection issues in Edge/Chrome DevTools.
+- **Redesigned GitHub Pages documentation site** — rewrote all GitHub Pages HTML docs and added dedicated pages for the two extensions:
+  - `docs/browser-extension/index.html` — Edge/Chrome extension overview, install steps, connection settings (manual port, cache mode, auto fallback scan), and troubleshooting.
+  - `docs/vscode-extension/index.html` — VS Code extension overview, Marketplace/VSIX install, settings, commands, and troubleshooting.
+  - `docs/help/index.html` — user help center with quick start, FAQ, and scenario-based troubleshooting.
+  - Updated `docs/index.html` with v2.0.2 branding and links to the new pages; fixed footer links to use GitHub blob URLs for static-page compatibility.
+
+### Fixed
+
+- **Browser Usage timezone mismatch** — `browser_sessions.ended_at` is stored as UTC RFC3339 from the browser extension, but the desktop Browser Usage page queried by local date. This caused the page to appear empty when local midnight had passed while the session was still recorded on the previous UTC day. Queries in `get_browser_domain_stats`, `get_browser_domain_stats_for_hour`, and `get_browser_domain_today_seconds` now convert `ended_at` to local time (`date(ended_at, 'localtime')`) before comparing with user-facing dates.
+- **Duplicate React keys in Browser Usage** — recent session list keys now use `session.id` when available, falling back to a composite including the array index, preventing the "two children with the same key" warning when the same URL was visited within the same millisecond.
+
+---
+
 ## [2.0.1] - 2026-07-18
 
 ### Changed
