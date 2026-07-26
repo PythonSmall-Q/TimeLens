@@ -1630,6 +1630,8 @@ pub fn get_vscode_project_stats_in_range(
 }
 
 /// Aggregate per-domain statistics for a date range, excluding ignored domains.
+/// `ended_at` is stored as UTC RFC3339; convert to local date before comparing
+/// with the user-facing local date range.
 pub fn get_browser_domain_stats(
     conn: &Connection,
     start_date: &str,
@@ -1641,7 +1643,8 @@ pub fn get_browser_domain_stats(
                 COUNT(1) as visit_count,
                 MAX(ended_at) as last_visited_at
          FROM browser_sessions
-         WHERE ended_at >= ?1 AND ended_at < date(?2, '+1 day')
+         WHERE date(ended_at, 'localtime') >= ?1
+           AND date(ended_at, 'localtime') <= ?2
            AND host NOT IN (SELECT host FROM browser_ignored_domains)
            AND host != ''
          GROUP BY host
@@ -1674,8 +1677,8 @@ pub fn get_browser_domain_stats_for_hour(
                 COUNT(1) as visit_count,
                 MAX(ended_at) as last_visited_at
          FROM browser_sessions
-         WHERE substr(ended_at, 1, 10) = ?1
-           AND substr(ended_at, 12, 2) = ?2
+         WHERE strftime('%Y-%m-%d', ended_at, 'localtime') = ?1
+           AND strftime('%H', ended_at, 'localtime') = ?2
            AND host NOT IN (SELECT host FROM browser_ignored_domains)
            AND host != ''
          GROUP BY host
@@ -1768,7 +1771,7 @@ pub fn get_browser_domain_today_seconds(conn: &Connection, host: &str, date: &st
     let res: i64 = conn.query_row(
         "SELECT COALESCE(SUM(duration_seconds), 0)
          FROM browser_sessions
-         WHERE host = ?1 AND ended_at >= ?2 AND ended_at < date(?2, '+1 day')",
+         WHERE host = ?1 AND date(ended_at, 'localtime') = ?2",
         params![host, date],
         |row| row.get(0),
     )?;
