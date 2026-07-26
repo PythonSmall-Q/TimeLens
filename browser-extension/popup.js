@@ -7,6 +7,10 @@ import {
   DEFAULT_CACHE_SECONDS_VALUE,
 } from "./api.js";
 
+function log(...args) {
+  console.log("[TimeLens Popup]", ...args);
+}
+
 const STORAGE_KEYS = {
   activeSession: "timelens.activeSession",
   recentSessions: "timelens.recentSessions",
@@ -41,6 +45,7 @@ if (bridgeKeyInput) {
 if (saveKeyButton) {
   saveKeyButton.addEventListener("click", async () => {
     const key = bridgeKeyInput?.value.trim() || "";
+    log("Saving bridge key, present:", Boolean(key));
     await chrome.storage.local.set({ "timelens.bridgeKey": key });
     if (key) {
       alert(t("bridgeKeySaved", {}, locale));
@@ -61,6 +66,7 @@ async function loadConnectionSettings() {
     API_STORAGE_KEYS.apiCacheMode,
     API_STORAGE_KEYS.apiCacheSeconds,
   ]);
+  log("Loaded connection settings:", { port, cacheMode, cacheSeconds });
   if (apiPortInput) {
     apiPortInput.value = port === 0 || port === "0" ? "0" : (port ? String(port) : "");
   }
@@ -77,6 +83,7 @@ async function loadConnectionSettings() {
 
 if (cacheModeSelect) {
   cacheModeSelect.addEventListener("change", () => {
+    log("Cache mode changed:", cacheModeSelect.value);
     if (cacheDurationRow) {
       cacheDurationRow.style.display = cacheModeSelect.value === "startup" ? "none" : "flex";
     }
@@ -88,6 +95,7 @@ if (saveConnectionSettingsButton) {
     const port = parseInt(apiPortInput?.value || "0", 10) || 0;
     const cacheMode = cacheModeSelect?.value === "startup" ? "startup" : "duration";
     const cacheSeconds = parseInt(cacheDurationInput?.value || String(DEFAULT_CACHE_SECONDS_VALUE), 10) || DEFAULT_CACHE_SECONDS_VALUE;
+    log("Saving connection settings:", { port, cacheMode, cacheSeconds });
     await chrome.storage.local.set({
       [API_STORAGE_KEYS.apiPort]: port,
       [API_STORAGE_KEYS.apiCacheMode]: cacheMode,
@@ -104,6 +112,7 @@ void loadConnectionSettings();
 // Load saved bridge key into input so users can modify it anytime.
 async function loadBridgeKey() {
   const { "timelens.bridgeKey": savedKey } = await chrome.storage.local.get("timelens.bridgeKey");
+  log("Loaded bridge key, present:", Boolean(savedKey));
   if (bridgeKeyInput) {
     bridgeKeyInput.value = savedKey || "";
   }
@@ -112,12 +121,17 @@ async function loadBridgeKey() {
 void loadBridgeKey();
 
 refreshButton.addEventListener("click", () => {
+  log("Refresh clicked");
   loadAll();
 });
 
-document.addEventListener("DOMContentLoaded", loadAll);
+document.addEventListener("DOMContentLoaded", () => {
+  log("Popup DOM loaded, locale:", locale);
+  loadAll();
+});
 
 async function loadAll() {
+  log("Loading popup data");
   await Promise.all([
     loadApiStatus(),
     loadTodayUsage(),
@@ -135,6 +149,7 @@ async function loadApiStatus() {
     STORAGE_KEYS.pendingSessions,
     STORAGE_KEYS.lastSyncError,
   ]);
+  log("loadApiStatus cached status ok:", cachedStatus?.ok, "pending:", pendingSessions.length);
 
   try {
     const baseUrl = await discoverApiBaseUrl();
@@ -142,8 +157,10 @@ async function loadApiStatus() {
     const response = await fetch(`${baseUrl}/api/status`);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();
+    log("loadApiStatus success, version:", data?.version);
     renderStatus({ ok: true, data, checkedAt: Date.now(), pendingCount: pendingSessions.length, lastSyncError });
   } catch (error) {
+    logError("loadApiStatus failed:", error);
     renderStatus(cachedStatus ?? {
       ok: false,
       checkedAt: Date.now(),
@@ -161,8 +178,10 @@ async function loadTodayUsage() {
     const response = await fetch(`${baseUrl}/api/screen-time/today`);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const rows = await response.json();
+    log("loadTodayUsage rows:", rows.length);
     renderTodayUsage(Array.isArray(rows) ? rows.slice(0, 5) : []);
-  } catch {
+  } catch (error) {
+    logError("loadTodayUsage failed:", error);
     renderTodayUsage([]);
   }
 }
@@ -175,12 +194,14 @@ async function loadSessions() {
     STORAGE_KEYS.activeSession,
     STORAGE_KEYS.recentSessions,
   ]);
+  log("loadSessions active:", activeSession?.url, "recent count:", recentSessions.length);
 
   renderActiveSession(activeSession);
   renderRecentSessions(recentSessions.slice(0, 6));
 }
 
 function renderStatus(status) {
+  log("renderStatus:", status.ok, status.error);
   statusBadge.textContent = status.ok ? t("connected", {}, locale) : t("offline", {}, locale);
   statusBadge.className = `badge ${status.ok ? "ok" : "error"}`;
 
@@ -202,6 +223,7 @@ function renderStatus(status) {
 }
 
 function renderTodayUsage(rows) {
+  log("renderTodayUsage rows:", rows.length);
   if (!rows.length) {
     todayList.innerHTML = `<li class="empty">${t("noUsage", {}, locale)}</li>`;
     return;
@@ -224,15 +246,13 @@ function renderTodayUsage(rows) {
 }
 
 function renderActiveSession(session) {
-  if (!session) {
-    activeTabPill.textContent = t("noActiveTab", {}, locale);
-    return;
-  }
-
-  activeTabPill.textContent = session.host || session.title || t("activeTab", {}, locale);
+  const label = session ? (session.host || session.title || t("activeTab", {}, locale)) : t("noActiveTab", {}, locale);
+  log("renderActiveSession:", label);
+  activeTabPill.textContent = label;
 }
 
 function renderRecentSessions(sessions) {
+  log("renderRecentSessions count:", sessions.length);
   if (!sessions.length) {
     recentList.innerHTML = `<li class="empty">${t("noSessions", {}, locale)}</li>`;
     return;

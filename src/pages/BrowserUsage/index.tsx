@@ -589,8 +589,8 @@ export default function BrowserUsage() {
                 <p>{t("settings:browser.recentSessions", { count: browserExtensionStatus?.recent_session_count ?? 0 })}</p>
               </div>
               <div className="space-y-2 max-h-40 overflow-y-auto">
-                {(browserExtensionStatus?.recent_sessions ?? []).map((session) => (
-                  <div key={`${session.started_at}-${session.tab_url}`} className="rounded-lg border border-surface-border px-3 py-2">
+                {(browserExtensionStatus?.recent_sessions ?? []).map((session, index) => (
+                  <div key={session.id ?? `${session.started_at}-${session.tab_url}-${index}`} className="rounded-lg border border-surface-border px-3 py-2">
                     <div className="text-xs text-text-primary truncate">{session.title || session.host}</div>
                     <div className="text-[11px] text-text-muted truncate">{session.host || session.tab_url}</div>
                     <div className="text-[11px] text-text-muted">

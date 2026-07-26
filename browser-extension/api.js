@@ -55,11 +55,14 @@ async function getConnectionSettings() {
 export async function discoverApiBaseUrl() {
   const now = Date.now();
   if (discoveredApiBaseCache && discoveredApiBaseCache.expiresAt > now) {
+    log("Using cached API base URL:", discoveredApiBaseCache.value, "expires in", discoveredApiBaseCache.expiresAt - now, "ms");
     return discoveredApiBaseCache.value;
   }
 
+  log("Discovering API base URL...");
   const { manualPort, cacheMode, cacheSeconds } = await getConnectionSettings();
   const cacheMs = cacheMode === "startup" ? Number.MAX_SAFE_INTEGER : Math.max(0, cacheSeconds) * 1000;
+  log("Cache mode:", cacheMode, "cacheMs:", cacheMs);
 
   const portsToTry = [];
   const manualPortAllowed =
@@ -67,6 +70,8 @@ export async function discoverApiBaseUrl() {
     manualPort <= 65535 &&
     now > manualPortDisabledUntil &&
     manualPortFailureCount < MANUAL_PORT_FAILURE_THRESHOLD;
+
+  log("Manual port:", manualPort, "allowed:", manualPortAllowed, "failureCount:", manualPortFailureCount, "disabledUntil:", manualPortDisabledUntil);
 
   if (manualPortAllowed) {
     portsToTry.push(manualPort);
@@ -77,6 +82,7 @@ export async function discoverApiBaseUrl() {
       portsToTry.push(port);
     }
   }
+  log("Will scan", portsToTry.length, "ports, first few:", portsToTry.slice(0, 5));
 
   let manualPortTried = false;
   for (const port of portsToTry) {
@@ -94,40 +100,50 @@ export async function discoverApiBaseUrl() {
       if (response.ok) {
         const data = await response.json();
         if (data && typeof data.version === "string") {
+          log("API found on port", port, "version:", data.version);
           if (port === manualPort) {
             manualPortFailureCount = 0;
             manualPortDisabledUntil = 0;
           }
           discoveredApiBaseCache = { value: baseUrl, expiresAt: now + cacheMs };
+          log("Cached API base URL:", baseUrl, "until:", now + cacheMs);
           return baseUrl;
         }
+        logWarn("Port", port, "responded but missing version field");
       }
-    } catch {
+    } catch (error) {
       // port not reachable — try next
+      log("Port", port, "unreachable:", error?.name || error?.message || error);
     }
   }
 
   if (manualPortTried) {
     manualPortFailureCount += 1;
+    logWarn("Manual port", manualPort, "failed; count:", manualPortFailureCount, "/", MANUAL_PORT_FAILURE_THRESHOLD);
     if (manualPortFailureCount >= MANUAL_PORT_FAILURE_THRESHOLD) {
-      // Temporarily ignore the manual port for 5 minutes so the fallback scan can work.
       manualPortDisabledUntil = now + 5 * 60 * 1000;
+      logWarn("Manual port temporarily disabled until", new Date(manualPortDisabledUntil).toISOString());
     }
   }
 
+  logWarn("No TimeLens API found after scanning", portsToTry.length, "ports");
   discoveredApiBaseCache = { value: "", expiresAt: now + FALLBACK_CACHE_MS };
   return null;
 }
 
 export function getApiBaseUrl() {
-  return discoveredApiBaseCache?.value || `http://127.0.0.1:${DEFAULT_API_PORT}`;
+  const url = discoveredApiBaseCache?.value || `http://127.0.0.1:${DEFAULT_API_PORT}`;
+  log("getApiBaseUrl returning:", url);
+  return url;
 }
 
 export function clearApiBaseUrlCache() {
+  log("Clearing API base URL cache");
   discoveredApiBaseCache = null;
 }
 
 export function resetManualPortFailureTracking() {
+  log("Resetting manual port failure tracking");
   manualPortFailureCount = 0;
   manualPortDisabledUntil = 0;
 }
