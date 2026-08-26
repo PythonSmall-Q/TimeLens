@@ -7,6 +7,11 @@ import TimerWidget from "./TimerWidget";
 import NoteWidget from "./NoteWidget";
 import StatusWidget from "./StatusWidget";
 import PetWidget from "./PetWidget";
+import FocusCoachWidget from "./FocusCoachWidget";
+import QuickCaptureWidget from "./QuickCaptureWidget";
+import SessionPulseWidget from "./SessionPulseWidget";
+import GoalProgressWidget from "./GoalProgressWidget";
+import BrowserActivityWidget from "./BrowserActivityWidget";
 import ExternalWidgetHost from "./ExternalWidgetHost";
 import * as api from "@/services/tauriApi";
 
@@ -152,12 +157,22 @@ export default function WidgetWindow({ widgetId }: Props) {
       {widgetType === "note" && <NoteWidget widgetId={widgetId} />}
       {widgetType === "status" && <StatusWidget widgetId={widgetId} />}
       {widgetType === "pet" && <PetWidget widgetId={widgetId} />}
+      {widgetType === "focus-coach" && <FocusCoachWidget widgetId={widgetId} />}
+      {widgetType === "quick-capture" && <QuickCaptureWidget widgetId={widgetId} />}
+      {widgetType === "session-pulse" && <SessionPulseWidget widgetId={widgetId} />}
+      {widgetType === "goal-progress" && <GoalProgressWidget widgetId={widgetId} />}
+      {widgetType === "browser-activity" && <BrowserActivityWidget widgetId={widgetId} />}
       {widgetType !== "clock"
         && widgetType !== "todo"
         && widgetType !== "timer"
         && widgetType !== "note"
         && widgetType !== "status"
         && widgetType !== "pet"
+        && widgetType !== "focus-coach"
+        && widgetType !== "quick-capture"
+        && widgetType !== "session-pulse"
+        && widgetType !== "goal-progress"
+        && widgetType !== "browser-activity"
         && <ExternalWidgetHost widgetId={widgetId} widgetType={widgetType} />}
     </div>
   );

@@ -1,7 +1,11 @@
-use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
+use std::path::Path;
+
+use serde::Deserialize;
+use tauri::{AppHandle, Manager, State, WebviewUrl, WebviewWindowBuilder};
 use uuid::Uuid;
 
 use crate::commands::storage_cmd::DbState;
+use crate::db;
 use crate::models::WidgetConfig;
 use crate::widget_registry::{get_widget_by_type, load_widget_registry, WidgetRegistryResponse};
 
@@ -110,6 +114,52 @@ pub async fn get_widget_registry(app: AppHandle) -> Result<WidgetRegistryRespons
     Ok(load_widget_registry(&app))
 }
 
+#[derive(Debug, Deserialize)]
+#[allow(dead_code)]
+struct PetPackManifest {
+    manifest_version: String,
+    pack_id: String,
+    name: String,
+    #[serde(default)]
+    description: String,
+    character_name: String,
+    default_avatar_emoji: String,
+    #[serde(default)]
+    states: serde_json::Value,
+    #[serde(default)]
+    interactions: Option<serde_json::Value>,
+}
+
+/// Import a Codex-style pet pack folder (containing `pet.json`) into a pet widget.
+#[tauri::command]
+pub fn import_pet_pack(
+    widget_id: String,
+    src_dir: String,
+    db: State<'_, DbState>,
+) -> Result<WidgetConfig, String> {
+    let manifest_path = Path::new(&src_dir).join("pet.json");
+    let raw = std::fs::read_to_string(&manifest_path)
+        .map_err(|e| format!("failed to read pet.json in {}: {}", src_dir, e))?;
+    let manifest: PetPackManifest =
+        serde_json::from_str(&raw).map_err(|e| format!("invalid pet.json: {}", e))?;
+    if manifest.manifest_version.is_empty()
+        || manifest.pack_id.is_empty()
+        || manifest.character_name.is_empty()
+        || manifest.default_avatar_emoji.is_empty()
+    {
+        return Err("pet.json is missing required fields".to_string());
+    }
+
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    let mut cfg = db::get_widget_config(&conn, &widget_id)
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "widget not found".to_string())?;
+    cfg.data_json = Some(raw);
+    db::upsert_widget_config(&conn, &cfg).map_err(|e| e.to_string())?;
+    db::set_widget_state(&conn, &widget_id, "pack_dir", &src_dir).map_err(|e| e.to_string())?;
+    Ok(cfg)
+}
+
 fn infer_monitor_bounds(app: &AppHandle) -> Option<Rect> {
     let main = app.get_webview_window("main")?;
     let monitor = main.current_monitor().ok()??;
@@ -215,9 +265,6 @@ pub async fn create_widget(
     app: AppHandle,
     db: tauri::State<'_, DbState>,
 ) -> Result<WidgetConfig, String> {
-    if widget_type == "pet" {
-        return Err("Desktop pet widget is under development. Stay tuned.".to_string());
-    }
     let id = format!("{}-{}", widget_type, short_id());
     let (width, height) = default_size(&app, &widget_type)?;
 
@@ -249,6 +296,9 @@ pub async fn create_widget(
         pinned: false,
         start_on_launch: true,
         data_json: default_widget_data_json(&widget_type),
+        paused: false,
+        consecutive_failures: 0,
+        suspended_until: None,
     };
 
     build_widget_window(&app, &config)?;
@@ -307,6 +357,11 @@ pub fn build_widget_window_sync(app: &AppHandle, config: &WidgetConfig) -> Resul
     let is_note = config.widget_type == "note";
     let is_status = config.widget_type == "status";
     let is_pet = config.widget_type == "pet";
+    let is_focus_coach = config.widget_type == "focus-coach";
+    let is_quick_capture = config.widget_type == "quick-capture";
+    let is_session_pulse = config.widget_type == "session-pulse";
+    let is_goal_progress = config.widget_type == "goal-progress";
+    let is_browser_activity = config.widget_type == "browser-activity";
     let (width, height) = if is_timer {
         (config.width.max(360.0), config.height.max(320.0))
     } else if is_note {
@@ -315,6 +370,16 @@ pub fn build_widget_window_sync(app: &AppHandle, config: &WidgetConfig) -> Resul
         (config.width.max(520.0), config.height.max(330.0))
     } else if is_pet {
         (config.width.max(340.0), config.height.max(260.0))
+    } else if is_focus_coach {
+        (config.width.max(300.0), config.height.max(320.0))
+    } else if is_quick_capture {
+        (config.width.max(320.0), config.height.max(220.0))
+    } else if is_session_pulse {
+        (config.width.max(360.0), config.height.max(340.0))
+    } else if is_goal_progress {
+        (config.width.max(340.0), config.height.max(360.0))
+    } else if is_browser_activity {
+        (config.width.max(320.0), config.height.max(340.0))
     } else {
         (config.width, config.height)
     };
@@ -326,6 +391,16 @@ pub fn build_widget_window_sync(app: &AppHandle, config: &WidgetConfig) -> Resul
         (460.0, 300.0)
     } else if is_pet {
         (300.0, 220.0)
+    } else if is_focus_coach {
+        (260.0, 260.0)
+    } else if is_quick_capture {
+        (280.0, 180.0)
+    } else if is_session_pulse {
+        (320.0, 300.0)
+    } else if is_goal_progress {
+        (300.0, 300.0)
+    } else if is_browser_activity {
+        (280.0, 300.0)
     } else {
         (200.0, 120.0)
     };

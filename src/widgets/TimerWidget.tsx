@@ -12,6 +12,8 @@ type Phase = "work" | "break";
 const POMODORO_WORK = 25 * 60;
 const POMODORO_BREAK = 5 * 60;
 
+const PRESETS = [15, 25, 45, 60];
+
 interface Props {
   widgetId: string;
 }
@@ -23,7 +25,11 @@ export default function TimerWidget({ widgetId: _widgetId }: Props) {
   const [running, setRunning] = useState(false);
   const [elapsed, setElapsed] = useState(0);       // for stopwatch
   const [remaining, setRemaining] = useState(POMODORO_WORK); // for countdown/pomodoro
-  const [customMin, setCustomMin] = useState(10);
+  const [customMin, setCustomMin] = useState(() => {
+    const saved = localStorage.getItem("timelens-timer-last-preset");
+    const parsed = saved ? Number(saved) : 0;
+    return PRESETS.includes(parsed) ? parsed : 25;
+  });
   const [notification, setNotification] = useState("");
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -106,6 +112,12 @@ export default function TimerWidget({ widgetId: _widgetId }: Props) {
 
   const toggle = () => setRunning((r) => !r);
 
+  const applyPreset = (minutes: number) => {
+    setCustomMin(minutes);
+    setRemaining(minutes * 60);
+    localStorage.setItem("timelens-timer-last-preset", String(minutes));
+  };
+
   const displaySeconds = mode === "stopwatch" ? elapsed : remaining;
   const h = Math.floor(displaySeconds / 3600);
   const m = Math.floor((displaySeconds % 3600) / 60);
@@ -183,23 +195,45 @@ export default function TimerWidget({ widgetId: _widgetId }: Props) {
         </div>
       )}
 
-      {/* Custom duration for countdown */}
-      {mode === "countdown" && !running && remaining === customMin * 60 && (
-        <div className="flex items-center gap-2 mb-2 justify-center">
-          <input
-            type="number"
-            min={1}
-            max={999}
-            value={customMin}
-            onChange={(e) => {
-              setCustomMin(Number(e.target.value));
-              setRemaining(Number(e.target.value) * 60);
-            }}
-            className="ui-field w-20 text-center"
-            title={t("timer.minutes")}
-            aria-label={t("timer.minutes")}
-          />
-          <span className="text-text-muted text-xs">{t("timer.minutes")}</span>
+      {/* Presets + custom duration for countdown */}
+      {mode === "countdown" && !running && (
+        <div className="flex flex-col gap-2 mb-2">
+          <div className="flex gap-1.5 justify-center">
+            {PRESETS.map((min) => (
+              <button
+                key={min}
+                onClick={() => applyPreset(min)}
+                className={clsx(
+                  "text-xs px-2.5 py-1 rounded-full border transition-colors",
+                  customMin === min && remaining === min * 60
+                    ? "border-accent-blue text-accent-blue bg-accent-blue/10"
+                    : "border-surface-border text-text-muted hover:text-text-secondary"
+                )}
+              >
+                {min}m
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-2 justify-center">
+            <input
+              type="number"
+              min={1}
+              max={999}
+              value={customMin}
+              onChange={(e) => {
+                const min = Number(e.target.value);
+                setCustomMin(min);
+                setRemaining(min * 60);
+                if (PRESETS.includes(min)) {
+                  localStorage.setItem("timelens-timer-last-preset", String(min));
+                }
+              }}
+              className="ui-field w-20 text-center"
+              title={t("timer.minutes")}
+              aria-label={t("timer.minutes")}
+            />
+            <span className="text-text-muted text-xs">{t("timer.minutes")}</span>
+          </div>
         </div>
       )}
 

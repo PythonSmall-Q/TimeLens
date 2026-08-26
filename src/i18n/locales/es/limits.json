@@ -21,5 +21,7 @@
   "limitReached100Title": "Límite diario alcanzado",
   "limitReached100Body": "Has usado {{app}} durante {{used}} hoy, alcanzando tu límite diario de {{limit}}. Considera tomar un descanso.",
   "dismiss": "Descartar",
-  "noAppsFound": "No se encontraron apps"
+  "noAppsFound": "No se encontraron apps",
+  "hoursShort": "h",
+  "minutesShort": "m"
 }

@@ -51,5 +51,11 @@
   "skipToMainContent": "跳轉到主內容",
   "mainNavigation": "主導航",
   "clearSearch": "清除搜尋",
-  "openGlobalSearch": "開啟全域搜尋"
+  "openGlobalSearch": "開啟全域搜尋",
+  "browseExecutable": "瀏覽可執行檔",
+  "searchAppPlaceholder": "搜尋應用程式…",
+  "noAppsFoundBrowse": "找不到應用程式，請點選資料夾按鈕瀏覽",
+  "executableFilter": "可執行檔",
+  "unknownError": "未知錯誤",
+  "unhandledRejection": "未處理的 Promise 拒絕"
 }

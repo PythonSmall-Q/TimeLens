@@ -183,5 +183,6 @@
     "month": "Preajuste de mes",
     "backToToday": "Volver a hoy"
   },
-  "refresh": "Actualizar"
+  "refresh": "Actualizar",
+  "drag": "Arrastrar"
 }

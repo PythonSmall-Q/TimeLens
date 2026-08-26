@@ -127,14 +127,41 @@ export const useSettingsStore = create<SettingsState>()(
 
       setExcludeTimelens: (excludeTimelens) => set({ excludeTimelens }),
 
-      setNotificationQuietHoursEnabled: (notificationQuietHoursEnabled) =>
-        set({ notificationQuietHoursEnabled }),
+      setNotificationQuietHoursEnabled: (notificationQuietHoursEnabled) => {
+        set({ notificationQuietHoursEnabled });
+        const { notificationQuietStart, notificationQuietEnd } = useSettingsStore.getState();
+        api.setQuietHours({
+          enabled: notificationQuietHoursEnabled,
+          start: notificationQuietStart,
+          end: notificationQuietEnd,
+        }).catch((e) => {
+          console.error("setQuietHours failed", e);
+        });
+      },
 
-      setNotificationQuietStart: (notificationQuietStart) =>
-        set({ notificationQuietStart }),
+      setNotificationQuietStart: (notificationQuietStart) => {
+        set({ notificationQuietStart });
+        const { notificationQuietHoursEnabled, notificationQuietEnd } = useSettingsStore.getState();
+        api.setQuietHours({
+          enabled: notificationQuietHoursEnabled,
+          start: notificationQuietStart,
+          end: notificationQuietEnd,
+        }).catch((e) => {
+          console.error("setQuietHours failed", e);
+        });
+      },
 
-      setNotificationQuietEnd: (notificationQuietEnd) =>
-        set({ notificationQuietEnd }),
+      setNotificationQuietEnd: (notificationQuietEnd) => {
+        set({ notificationQuietEnd });
+        const { notificationQuietHoursEnabled, notificationQuietStart } = useSettingsStore.getState();
+        api.setQuietHours({
+          enabled: notificationQuietHoursEnabled,
+          start: notificationQuietStart,
+          end: notificationQuietEnd,
+        }).catch((e) => {
+          console.error("setQuietHours failed", e);
+        });
+      },
 
       setNotificationCooldownMin: (notificationCooldownMin) =>
         set({ notificationCooldownMin: Math.max(0, Math.min(240, notificationCooldownMin)) }),

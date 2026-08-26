@@ -92,6 +92,7 @@ export default function FocusModePage() {
   const [tick, setTick] = useState(0);
   const [rules, setRules] = useState<FocusRule[]>([]);
   const [rulesLoading, setRulesLoading] = useState(true);
+  const [ruleError, setRuleError] = useState<string | null>(null);
 
   const [draftName, setDraftName] = useState("");
   const [draftRuleType, setDraftRuleType] = useState<RuleType>("time_window");
@@ -105,6 +106,8 @@ export default function FocusModePage() {
   const [draftAppName, setDraftAppName] = useState("");
 
   const [simulationByRule, setSimulationByRule] = useState<Record<number, FocusRuleMatch>>({});
+  const [savingRule, setSavingRule] = useState(false);
+  const [ruleSuccess, setRuleSuccess] = useState<string | null>(null);
 
   const loadState = useCallback(async () => {
     setLoading(true);
@@ -191,25 +194,50 @@ export default function FocusModePage() {
 
   const addRule = async () => {
     const name = draftName.trim();
-    if (!name) return;
+    if (!name) {
+      setRuleError(t("focus:automation.nameRequired"));
+      return;
+    }
+
+    const conditionJson = buildDraftConditionJson();
+    if (draftRuleType === "keyword" && !draftKeyword.trim()) {
+      setRuleError(t("focus:automation.keywordRequired"));
+      return;
+    }
+    if (draftRuleType === "app" && !draftAppName.trim()) {
+      setRuleError(t("focus:automation.appRequired"));
+      return;
+    }
+    if (draftRuleType === "time_window" && (!draftStart || !draftEnd)) {
+      setRuleError(t("focus:automation.timeWindowRequired"));
+      return;
+    }
 
     const rule: FocusRule = {
       name,
       enabled: true,
       rule_type: draftRuleType,
-      condition_json: buildDraftConditionJson(),
+      condition_json: conditionJson,
       action: draftAction,
       auto_start: draftAutoStart,
       quiet_hours_respect: draftQuietHoursRespect,
     };
 
+    setSavingRule(true);
+    setRuleError(null);
+    setRuleSuccess(null);
     try {
       await api.saveFocusRule(rule);
       await loadRules();
       setDraftName("");
       resetDraft("time_window");
-    } catch {
-      // ignore save failures
+      setRuleSuccess(t("focus:automation.saveSuccess"));
+      setTimeout(() => setRuleSuccess(null), 3000);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setRuleError(message || t("focus:automation.saveFailed"));
+    } finally {
+      setSavingRule(false);
     }
   };
 
@@ -466,11 +494,31 @@ export default function FocusModePage() {
             </label>
           </div>
 
-          <div>
-            <button onClick={() => void addRule()} className="btn-primary !px-3">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => void addRule()}
+              disabled={savingRule}
+              className={clsx(
+                "btn-primary !px-3 flex items-center gap-1.5",
+                savingRule && "opacity-70 cursor-wait"
+              )}
+            >
+              {savingRule && (
+                <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              )}
               {t("focus:automation.addRule")}
             </button>
           </div>
+          {ruleError && (
+            <p className="text-xs text-accent-red bg-accent-red/10 px-3 py-2 rounded-lg">
+              {ruleError}
+            </p>
+          )}
+          {ruleSuccess && (
+            <p className="text-xs text-accent-green bg-accent-green/10 px-3 py-2 rounded-lg">
+              {ruleSuccess}
+            </p>
+          )}
         </div>
 
         <div className="glass-card divide-y divide-surface-border">

@@ -19,6 +19,15 @@ const PERMISSION_KEYS: Record<string, string> = {
   "local-api:call": "permissionLocalApi",
 };
 
+const PERMISSION_RATIONALE_KEYS: Record<string, string> = {
+  "screen-time:read": "permissionRationale.screen-time",
+  "active-window:subscribe": "permissionRationale.active-window",
+  "todo:read": "permissionRationale.todo-read",
+  "todo:write": "permissionRationale.todo-write",
+  "settings:write": "permissionRationale.settings-write",
+  "local-api:call": "permissionRationale.local-api",
+};
+
 export default function WidgetPermissionDialog({
   open,
   onClose,
@@ -72,21 +81,24 @@ export default function WidgetPermissionDialog({
         </p>
 
         {/* Permission list */}
-        <ul className="mb-6 space-y-2">
+        <ul className="mb-6 space-y-3">
           {requestedPermissions.map((perm) => (
-            <li key={perm} className="flex items-center gap-3">
+            <li key={perm} className="flex items-start gap-3">
               <input
                 type="checkbox"
                 id={`perm-${perm}`}
                 checked={checked.has(perm)}
                 onChange={() => toggle(perm)}
-                className="h-4 w-4 rounded border-gray-400 accent-blue-500"
+                className="mt-1 h-4 w-4 rounded border-gray-400 accent-blue-500 flex-shrink-0"
               />
               <label
                 htmlFor={`perm-${perm}`}
-                className="cursor-pointer text-sm select-none"
+                className="cursor-pointer select-none leading-tight"
               >
-                {t(PERMISSION_KEYS[perm] ?? perm)}
+                <span className="block text-sm">{t(PERMISSION_KEYS[perm] ?? perm)}</span>
+                <span className="block text-[11px] text-[var(--text-muted)] mt-0.5">
+                  {t(PERMISSION_RATIONALE_KEYS[perm] ?? "")}
+                </span>
               </label>
             </li>
           ))}

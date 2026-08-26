@@ -21,5 +21,7 @@
   "limitReached100Title": "Limite quotidienne atteinte",
   "limitReached100Body": "Vous avez utilisé {{app}} pendant {{used}} aujourd'hui, ce qui atteint votre limite quotidienne de {{limit}}. Envisagez de faire une pause.",
   "dismiss": "Ignorer",
-  "noAppsFound": "Aucune app trouvée"
+  "noAppsFound": "Aucune app trouvée",
+  "hoursShort": "h",
+  "minutesShort": "m"
 }

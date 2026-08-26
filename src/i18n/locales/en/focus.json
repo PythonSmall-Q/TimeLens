@@ -44,6 +44,12 @@
     "ruleMetaTimeWindow": "Window: {{start}} - {{end}}",
     "ruleMetaApp": "App: {{app}}",
     "noMatch": "Rule did not match current conditions.",
-    "simulationError": "Could not evaluate rule right now."
+    "simulationError": "Could not evaluate rule right now.",
+    "saveSuccess": "Rule saved.",
+    "saveFailed": "Could not save rule.",
+    "nameRequired": "Please enter a rule name.",
+    "keywordRequired": "Please enter a keyword.",
+    "appRequired": "Please enter an app name.",
+    "timeWindowRequired": "Please select a start and end time."
   }
 }

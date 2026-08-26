@@ -167,6 +167,8 @@ Please read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting pull requests.
 ## 🗺 Roadmap
 
 - [Unified Roadmap](docs/ROADMAP.md)
+- [Widget Runtime Rewrite Roadmap (Proposed)](docs/ROADMAP_WIDGET_RUNTIME_REWRITE.md)
+- [Widget Runtime Rewrite Implementation Plan (Draft)](docs/WIDGET_RUNTIME_REWRITE_IMPLEMENTATION_PLAN.md)
 
 ---
 

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { FolderOpen } from "lucide-react";
 import type { ExecutableOption } from "@/types";
 import clsx from "clsx";
@@ -20,12 +21,14 @@ interface ExePickerInputProps {
 
 export default function ExePickerInput({
   options,
-  placeholder = "Search app…",
+  placeholder,
   value,
   onChange,
   className,
   excludePaths,
 }: ExePickerInputProps) {
+  const { t } = useTranslation("common");
+  const resolvedPlaceholder = placeholder || t("searchAppPlaceholder");
   const [query, setQuery] = useState(value);
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -61,7 +64,7 @@ export default function ExePickerInput({
     try {
       const { open: dialogOpen } = await import("@tauri-apps/plugin-dialog");
       const selected = await dialogOpen({
-        filters: [{ name: "Executable", extensions: ["exe", "app", ""] }],
+        filters: [{ name: t("executableFilter"), extensions: ["exe", "app", ""] }],
         multiple: false,
       });
       if (typeof selected === "string" && selected) {
@@ -74,24 +77,24 @@ export default function ExePickerInput({
   };
 
   return (
-    <div ref={wrapRef} className={clsx("relative", className)}>
+    <div ref={wrapRef} className={clsx("relative z-[100]", className)}>
       <div className="flex gap-1">
         <input
           type="text"
           className="ui-field flex-1"
-          placeholder={placeholder}
+          placeholder={resolvedPlaceholder}
           value={query}
           onChange={(e) => { setQuery(e.target.value); setOpen(true); onChange("", ""); }}
           onFocus={() => setOpen(true)}
-          title={placeholder}
-          aria-label={placeholder}
+          title={resolvedPlaceholder}
+          aria-label={resolvedPlaceholder}
           autoComplete="off"
         />
         <button
           type="button"
           onClick={browseFile}
-          title="Browse for executable"
-          aria-label="Browse for executable"
+          title={t("browseExecutable")}
+          aria-label={t("browseExecutable")}
           className="px-2.5 rounded-lg border border-surface-border text-text-muted hover:text-text-primary hover:bg-surface-hover transition-colors flex-shrink-0"
         >
           <FolderOpen size={15} />
@@ -99,7 +102,7 @@ export default function ExePickerInput({
       </div>
 
       {open && query && filtered.length > 0 && (
-        <div className="absolute z-30 left-0 right-0 mt-1 max-h-48 overflow-y-auto rounded-xl border border-surface-border bg-surface-card shadow-lg divide-y divide-surface-border">
+        <div className="absolute z-[110] left-0 right-0 mt-1 max-h-60 overflow-y-auto rounded-xl border border-surface-border bg-surface-card shadow-xl divide-y divide-surface-border">
           {filtered.slice(0, 25).map((row) => (
             <button
               key={row.exe_path}
@@ -118,8 +121,8 @@ export default function ExePickerInput({
         </div>
       )}
       {open && query && filtered.length === 0 && (
-        <div className="absolute z-30 left-0 right-0 mt-1 rounded-xl border border-surface-border bg-surface-card shadow-lg">
-          <p className="px-3 py-3 text-xs text-text-muted">No apps found — use the folder button to browse</p>
+        <div className="absolute z-[110] left-0 right-0 mt-1 rounded-xl border border-surface-border bg-surface-card shadow-xl">
+          <p className="px-3 py-3 text-xs text-text-muted">{t("noAppsFoundBrowse")}</p>
         </div>
       )}
     </div>

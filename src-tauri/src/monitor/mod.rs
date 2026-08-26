@@ -429,6 +429,12 @@ pub fn start_monitor_task(
         let mut track_window_titles: bool = true;
         let mut idle_time_policy: String = "count".to_string();
         let idle_threshold_secs: u64 = 300; // 5-minute idle threshold
+        let mut was_idle: bool = false;
+
+        // ── Interruption detection (last 60 seconds) ───────
+        let mut recent_switches: Vec<std::time::Instant> = Vec::new();
+        let interruption_window = Duration::from_secs(60);
+        let interruption_threshold: usize = 5;
 
         loop {
             ticker.tick().await;
@@ -440,6 +446,8 @@ pub fn start_monitor_task(
             };
             if !active {
                 current = None;
+                was_idle = false;
+                recent_switches.clear();
                 continue;
             }
 
@@ -484,7 +492,19 @@ pub fn start_monitor_task(
                         }
                     }
                 }
+                was_idle = true;
+                recent_switches.clear();
                 continue;
+            }
+
+            // Detect return from idle
+            if was_idle && !is_idle {
+                was_idle = false;
+                crate::commands::widget_runtime_cmd::broadcast_widget_event(
+                    &app_handle,
+                    "idle-return",
+                    serde_json::json!({ "idle_seconds": idle_secs }),
+                );
             }
 
             let now_ts = Local::now().format("%Y-%m-%dT%H:%M:%S").to_string();
@@ -561,6 +581,24 @@ pub fn start_monitor_task(
                                     );
                                 }
                             }
+
+                            // Track recent switches for interruption signal
+                            let now_instant = std::time::Instant::now();
+                            recent_switches.retain(|&t| now_instant.duration_since(t) <= interruption_window);
+                            recent_switches.push(now_instant);
+                            if recent_switches.len() >= interruption_threshold {
+                                recent_switches.clear();
+                                crate::commands::widget_runtime_cmd::broadcast_widget_event(
+                                    &app_handle,
+                                    "interruption-signal",
+                                    serde_json::json!({
+                                        "previous_app": seg.app_name,
+                                        "current_app": app_name,
+                                        "switches_in_window": interruption_threshold,
+                                    }),
+                                );
+                            }
+
                             // Start fresh segment
                             current = Some(Segment {
                                 app_name,

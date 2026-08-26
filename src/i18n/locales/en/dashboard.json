@@ -183,5 +183,6 @@
     "month": "Month preset",
     "backToToday": "Back to today"
   },
-  "refresh": "Refresh"
+  "refresh": "Refresh",
+  "drag": "Drag"
 }

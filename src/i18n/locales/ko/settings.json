@@ -71,7 +71,14 @@
   "widgets": {
     "title": "위젯",
     "fadeOnBlur": "포커스 잃을 때 흐릿하게",
-    "fadeHint": "위젯이 가려지면 거의 투명해지고 클릭하면 복원"
+    "fadeHint": "위젯이 가려지면 거의 투명해지고 클릭하면 복원",
+    "permissionsTitle": "Widget permissions",
+    "noWidgetsForPermissions": "No widgets installed.",
+    "noPermissions": "No permissions granted.",
+    "neverAccessed": "Never accessed",
+    "autoBlurTitle": "Auto-blur per widget",
+    "autoBlurDesc": "Choose which widgets blur when unfocused.",
+    "autoBlurEnabledCount": "widgets auto-blur"
   },
   "browser": {
     "title": "브라우저 확장 프로그램",

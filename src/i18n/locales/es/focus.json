@@ -44,6 +44,12 @@
     "ruleMetaTimeWindow": "Ventana: {{start}} - {{end}}",
     "ruleMetaApp": "App: {{app}}",
     "noMatch": "La regla no coincide con las condiciones actuales.",
-    "simulationError": "No se pudo evaluar la regla en este momento."
+    "simulationError": "No se pudo evaluar la regla en este momento.",
+    "saveSuccess": "Rule saved.",
+    "saveFailed": "Could not save rule.",
+    "nameRequired": "Please enter a rule name.",
+    "keywordRequired": "Please enter a keyword.",
+    "appRequired": "Please enter an app name.",
+    "timeWindowRequired": "Please select a start and end time."
   }
 }

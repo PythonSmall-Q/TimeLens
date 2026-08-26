@@ -609,6 +609,10 @@ pub fn run() {
             // Widget/main windows can start invoking commands immediately.
             app.manage(db_state.clone());
 
+            // Widget runtime v2.2.0 rate limiters
+            app.manage(commands::WidgetCallRateLimiter::new());
+            app.manage(commands::WidgetEventRateLimiter::new());
+
             // Initialize extension bridge key on first run
             {
                 let conn = db_state.lock().unwrap();
@@ -944,6 +948,7 @@ pub fn run() {
                     Arc::new(Mutex::new(conn))
                 };
                 let focus_status = monitor_status.clone();
+                let focus_app = app.handle().clone();
                 tauri::async_runtime::spawn(async move {
                     loop {
                         tokio::time::sleep(std::time::Duration::from_secs(60)).await;
@@ -955,9 +960,40 @@ pub fn run() {
                             continue;
                         }
                         let Ok(conn) = focus_db.lock() else { continue };
-                        if let Err(e) = crate::commands::storage_cmd::evaluate_focus_rules_inner(&conn, &status) {
-                            log::warn!("Focus rule evaluation failed: {}", e);
+                        match crate::commands::storage_cmd::evaluate_focus_rules_inner(&conn, &status) {
+                            Ok(matches) => {
+                                for m in matches.into_iter().filter(|m| m.matched) {
+                                    crate::commands::widget_runtime_cmd::broadcast_widget_event(
+                                        &focus_app,
+                                        "rule-triggered",
+                                        serde_json::json!({
+                                            "rule_id": m.rule_id,
+                                            "rule_name": m.rule_name,
+                                            "action": m.action,
+                                            "reason": m.reason,
+                                        }),
+                                    );
+                                }
+                            }
+                            Err(e) => {
+                                log::warn!("Focus rule evaluation failed: {}", e);
+                            }
                         }
+                    }
+                });
+            }
+
+            // ── Widget goal-tick emitter ──────────────────────
+            {
+                let goal_tick_app = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    loop {
+                        tokio::time::sleep(std::time::Duration::from_secs(900)).await;
+                        crate::commands::widget_runtime_cmd::broadcast_widget_event(
+                            &goal_tick_app,
+                            "goal-tick",
+                            serde_json::json!({ "reason": "periodic goal progress refresh" }),
+                        );
                     }
                 });
             }
@@ -1052,6 +1088,8 @@ pub fn run() {
             commands::get_goal_progress,
             commands::set_focus_mode_active,
             commands::get_focus_mode_active,
+            commands::get_quiet_hours,
+            commands::set_quiet_hours,
             commands::start_focus_session,
             commands::stop_focus_session,
             commands::list_focus_sessions,
@@ -1079,6 +1117,7 @@ pub fn run() {
             commands::close_widget,
             commands::set_widget_always_on_top,
             commands::get_widget_registry,
+            commands::import_pet_pack,
             // App settings / startup / shortcuts
             commands::get_app_settings,
             commands::get_browser_extension_status,
@@ -1146,6 +1185,19 @@ pub fn run() {
             commands::record_widget_permission_access,
             commands::import_local_widget,
             commands::issue_widget_api_token,
+            // Widget runtime v2.2.0
+            commands::widget_query,
+            commands::widget_subscribe,
+            commands::widget_unsubscribe,
+            commands::get_widget_state,
+            commands::set_widget_state,
+            commands::delete_widget_state,
+            commands::emit_widget_lifecycle,
+            commands::record_widget_error,
+            commands::get_widget_error_log,
+            commands::clear_widget_error_log,
+            commands::set_widget_paused,
+            commands::reset_widget_permissions_and_state,
         ])
         .build(tauri::generate_context!())
         .expect("error while building TimeLens");
@@ -1326,7 +1378,14 @@ fn spawn_widget(app: &AppHandle, widget_type: &str) {
         "clock" => (300.0_f64, 180.0_f64),
         "todo" => (320.0, 420.0),
         "timer" => (360.0, 320.0),
+        "note" => (560.0, 340.0),
+        "status" => (520.0, 330.0),
         "pet" => (420.0, 300.0),
+        "focus-coach" => (320.0, 360.0),
+        "quick-capture" => (320.0, 240.0),
+        "session-pulse" => (360.0, 420.0),
+        "goal-progress" => (320.0, 400.0),
+        "browser-activity" => (360.0, 380.0),
         _ => (320.0, 240.0),
     };
     let cfg = models::WidgetConfig {
@@ -1342,6 +1401,9 @@ fn spawn_widget(app: &AppHandle, widget_type: &str) {
         pinned: false,
         start_on_launch: true,
         data_json: commands::widget_cmd::default_widget_data_json(widget_type),
+        paused: false,
+        consecutive_failures: 0,
+        suspended_until: None,
     };
     let _ = commands::widget_cmd::build_widget_window_sync(app, &cfg);
 }

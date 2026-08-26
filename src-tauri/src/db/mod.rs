@@ -945,7 +945,7 @@ pub fn get_focus_rules(conn: &Connection) -> Result<Vec<crate::models::FocusRule
             action: row.get(5)?,
             auto_start: row.get::<_, i32>(6)? != 0,
             quiet_hours_respect: row.get::<_, i32>(7)? != 0,
-            created_at: row.get(8)?,
+            created_at: row.get(8).ok(),
         })
     })?;
     rows.collect()
@@ -1056,7 +1056,8 @@ pub fn get_widget_config(
     id: &str,
 ) -> Result<Option<crate::models::WidgetConfig>> {
     let mut stmt = conn.prepare(
-        "SELECT id, widget_type, monitor_index, x, y, width, height, opacity, always_on_top_mode, pinned, start_on_launch, data_json
+        "SELECT id, widget_type, monitor_index, x, y, width, height, opacity, always_on_top_mode, pinned, start_on_launch, data_json,
+                paused, consecutive_failures, suspended_until
          FROM widget_configs WHERE id = ?1",
     )?;
     let mut rows = stmt.query_map(params![id], |row| {
@@ -1073,6 +1074,9 @@ pub fn get_widget_config(
             pinned: row.get::<_, i32>(9)? != 0,
             start_on_launch: row.get::<_, i32>(10)? != 0,
             data_json: row.get(11)?,
+            paused: row.get::<_, i32>(12)? != 0,
+            consecutive_failures: row.get(13)?,
+            suspended_until: row.get(14)?,
         })
     })?;
     match rows.next() {
@@ -1083,7 +1087,8 @@ pub fn get_widget_config(
 
 pub fn get_all_widget_configs(conn: &Connection) -> Result<Vec<crate::models::WidgetConfig>> {
     let mut stmt = conn.prepare(
-        "SELECT id, widget_type, monitor_index, x, y, width, height, opacity, always_on_top_mode, pinned, start_on_launch, data_json
+        "SELECT id, widget_type, monitor_index, x, y, width, height, opacity, always_on_top_mode, pinned, start_on_launch, data_json,
+                paused, consecutive_failures, suspended_until
          FROM widget_configs",
     )?;
     let rows = stmt.query_map([], |row| {
@@ -1100,6 +1105,9 @@ pub fn get_all_widget_configs(conn: &Connection) -> Result<Vec<crate::models::Wi
             pinned: row.get::<_, i32>(9)? != 0,
             start_on_launch: row.get::<_, i32>(10)? != 0,
             data_json: row.get(11)?,
+            paused: row.get::<_, i32>(12)? != 0,
+            consecutive_failures: row.get(13)?,
+            suspended_until: row.get(14)?,
         })
     })?;
     rows.collect()
@@ -1108,8 +1116,9 @@ pub fn get_all_widget_configs(conn: &Connection) -> Result<Vec<crate::models::Wi
 pub fn upsert_widget_config(conn: &Connection, cfg: &crate::models::WidgetConfig) -> Result<()> {
     conn.execute(
         "INSERT INTO widget_configs
-            (id, widget_type, monitor_index, x, y, width, height, opacity, always_on_top_mode, pinned, start_on_launch, data_json)
-         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12)
+            (id, widget_type, monitor_index, x, y, width, height, opacity, always_on_top_mode, pinned, start_on_launch, data_json,
+             paused, consecutive_failures, suspended_until)
+         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15)
          ON CONFLICT(id) DO UPDATE SET
             monitor_index=excluded.monitor_index,
             x=excluded.x, y=excluded.y,
@@ -1118,7 +1127,10 @@ pub fn upsert_widget_config(conn: &Connection, cfg: &crate::models::WidgetConfig
             always_on_top_mode=excluded.always_on_top_mode,
             pinned=excluded.pinned,
             start_on_launch=excluded.start_on_launch,
-            data_json=excluded.data_json",
+            data_json=excluded.data_json,
+            paused=excluded.paused,
+            consecutive_failures=excluded.consecutive_failures,
+            suspended_until=excluded.suspended_until",
         params![
             cfg.id,
             cfg.widget_type,
@@ -1132,6 +1144,9 @@ pub fn upsert_widget_config(conn: &Connection, cfg: &crate::models::WidgetConfig
             cfg.pinned as i32,
             cfg.start_on_launch as i32,
             cfg.data_json,
+            cfg.paused as i32,
+            cfg.consecutive_failures,
+            cfg.suspended_until,
         ],
     )?;
     Ok(())
@@ -1966,4 +1981,245 @@ pub fn get_widget_permission_audit_log(
         })
     })?;
     rows.collect()
+}
+
+// ── Widget scoped state ───────────────────────────────────────
+
+pub fn get_widget_state(conn: &Connection, widget_id: &str, key: &str) -> Result<Option<String>> {
+    let mut stmt = conn.prepare(
+        "SELECT value FROM widget_state WHERE widget_id = ?1 AND key = ?2",
+    )?;
+    let mut rows = stmt.query_map(params![widget_id, key], |row| row.get::<_, String>(0))?;
+    rows.next().transpose()
+}
+
+pub fn set_widget_state(conn: &Connection, widget_id: &str, key: &str, value: &str) -> Result<()> {
+    let now = chrono::Local::now().format("%Y-%m-%dT%H:%M:%S").to_string();
+    conn.execute(
+        "INSERT INTO widget_state (widget_id, key, value, updated_at)
+         VALUES (?1, ?2, ?3, ?4)
+         ON CONFLICT(widget_id, key) DO UPDATE SET
+            value = excluded.value,
+            updated_at = excluded.updated_at",
+        params![widget_id, key, value, now],
+    )?;
+    Ok(())
+}
+
+pub fn delete_widget_state(conn: &Connection, widget_id: &str, key: &str) -> Result<()> {
+    conn.execute(
+        "DELETE FROM widget_state WHERE widget_id = ?1 AND key = ?2",
+        params![widget_id, key],
+    )?;
+    Ok(())
+}
+
+pub fn clear_widget_state(conn: &Connection, widget_id: &str) -> Result<()> {
+    conn.execute(
+        "DELETE FROM widget_state WHERE widget_id = ?1",
+        params![widget_id],
+    )?;
+    Ok(())
+}
+
+pub fn count_widget_state_entries(conn: &Connection, widget_id: &str) -> Result<i64> {
+    conn.query_row(
+        "SELECT COUNT(1) FROM widget_state WHERE widget_id = ?1",
+        params![widget_id],
+        |row| row.get(0),
+    )
+}
+
+// ── Widget subscriptions ──────────────────────────────────────
+
+pub fn get_widget_subscriptions(conn: &Connection, widget_id: &str) -> Result<Vec<String>> {
+    let events_json: Option<String> = conn
+        .query_row(
+            "SELECT events_json FROM widget_subscriptions WHERE widget_id = ?1",
+            params![widget_id],
+            |row| row.get(0),
+        )
+        .optional()?;
+    match events_json {
+        Some(json) => Ok(serde_json::from_str(&json).unwrap_or_default()),
+        None => Ok(Vec::new()),
+    }
+}
+
+pub fn set_widget_subscriptions(
+    conn: &Connection,
+    widget_id: &str,
+    events: &[String],
+) -> Result<()> {
+    let events_json = serde_json::to_string(events).unwrap_or_else(|_| "[]".to_string());
+    conn.execute(
+        "INSERT INTO widget_subscriptions (widget_id, events_json)
+         VALUES (?1, ?2)
+         ON CONFLICT(widget_id) DO UPDATE SET events_json = excluded.events_json",
+        params![widget_id, events_json],
+    )?;
+    Ok(())
+}
+
+pub fn clear_widget_subscriptions(conn: &Connection, widget_id: &str) -> Result<()> {
+    conn.execute(
+        "DELETE FROM widget_subscriptions WHERE widget_id = ?1",
+        params![widget_id],
+    )?;
+    Ok(())
+}
+
+/// Return all widget subscriptions as (widget_id, event_name) pairs.
+pub fn get_all_widget_subscriptions(conn: &Connection) -> Result<Vec<(String, String)>> {
+    let mut stmt = conn.prepare(
+        "SELECT widget_id, events_json FROM widget_subscriptions",
+    )?;
+    let rows = stmt.query_map([], |row| {
+        let widget_id: String = row.get(0)?;
+        let events_json: String = row.get(1)?;
+        let events: Vec<String> = serde_json::from_str(&events_json).unwrap_or_default();
+        Ok((widget_id, events))
+    })?;
+    let mut out = Vec::new();
+    for row in rows {
+        let (widget_id, events) = row?;
+        for event in events {
+            out.push((widget_id.clone(), event));
+        }
+    }
+    Ok(out)
+}
+
+// ── Widget error log ──────────────────────────────────────────
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct WidgetErrorLogEntry {
+    pub id: i64,
+    pub widget_id: String,
+    pub occurred_at: String,
+    pub error: String,
+    pub recovery_hint: String,
+}
+
+pub fn insert_widget_error_log(
+    conn: &Connection,
+    widget_id: &str,
+    error: &str,
+    recovery_hint: &str,
+) -> Result<i64> {
+    let now = chrono::Local::now().format("%Y-%m-%dT%H:%M:%S").to_string();
+    conn.execute(
+        "INSERT INTO widget_error_log (widget_id, occurred_at, error, recovery_hint)
+         VALUES (?1, ?2, ?3, ?4)",
+        params![widget_id, now, error, recovery_hint],
+    )?;
+    Ok(conn.last_insert_rowid())
+}
+
+pub fn get_widget_error_log(
+    conn: &Connection,
+    widget_id: &str,
+    limit: i64,
+) -> Result<Vec<WidgetErrorLogEntry>> {
+    let safe_limit = limit.clamp(1, 200);
+    let mut stmt = conn.prepare(
+        "SELECT id, widget_id, occurred_at, error, recovery_hint
+         FROM widget_error_log
+         WHERE widget_id = ?1
+         ORDER BY occurred_at DESC, id DESC
+         LIMIT ?2",
+    )?;
+    let rows = stmt.query_map(params![widget_id, safe_limit], |row| {
+        Ok(WidgetErrorLogEntry {
+            id: row.get(0)?,
+            widget_id: row.get(1)?,
+            occurred_at: row.get(2)?,
+            error: row.get(3)?,
+            recovery_hint: row.get(4)?,
+        })
+    })?;
+    rows.collect()
+}
+
+pub fn clear_widget_error_log(conn: &Connection, widget_id: &str) -> Result<()> {
+    conn.execute(
+        "DELETE FROM widget_error_log WHERE widget_id = ?1",
+        params![widget_id],
+    )?;
+    Ok(())
+}
+
+// ── Widget runtime config helpers ─────────────────────────────
+
+pub fn set_widget_paused(conn: &Connection, widget_id: &str, paused: bool) -> Result<()> {
+    conn.execute(
+        "UPDATE widget_configs SET paused = ?1 WHERE id = ?2",
+        params![paused as i32, widget_id],
+    )?;
+    Ok(())
+}
+
+pub fn increment_widget_consecutive_failures(conn: &Connection, widget_id: &str) -> Result<i64> {
+    conn.execute(
+        "UPDATE widget_configs
+         SET consecutive_failures = consecutive_failures + 1
+         WHERE id = ?1",
+        params![widget_id],
+    )?;
+    let count: i64 = conn.query_row(
+        "SELECT consecutive_failures FROM widget_configs WHERE id = ?1",
+        params![widget_id],
+        |row| row.get(0),
+    )?;
+    Ok(count)
+}
+
+pub fn reset_widget_consecutive_failures(conn: &Connection, widget_id: &str) -> Result<()> {
+    conn.execute(
+        "UPDATE widget_configs SET consecutive_failures = 0, suspended_until = NULL WHERE id = ?1",
+        params![widget_id],
+    )?;
+    Ok(())
+}
+
+pub fn suspend_widget_until(conn: &Connection, widget_id: &str, until: &str) -> Result<()> {
+    conn.execute(
+        "UPDATE widget_configs SET suspended_until = ?1 WHERE id = ?2",
+        params![until, widget_id],
+    )?;
+    Ok(())
+}
+
+pub fn is_widget_suspended(conn: &Connection, widget_id: &str) -> Result<bool> {
+    let suspended_until: Option<String> = conn
+        .query_row(
+            "SELECT suspended_until FROM widget_configs WHERE id = ?1",
+            params![widget_id],
+            |row| row.get(0),
+        )
+        .optional()?;
+    match suspended_until {
+        Some(until) => {
+            let now = chrono::Local::now().format("%Y-%m-%dT%H:%M:%S").to_string();
+            Ok(until > now)
+        }
+        None => Ok(false),
+    }
+}
+
+/// Remove all runtime data for a widget (state, subscriptions, error log).
+pub fn clear_widget_runtime_data(conn: &Connection, widget_id: &str) -> Result<()> {
+    conn.execute(
+        "DELETE FROM widget_state WHERE widget_id = ?1",
+        params![widget_id],
+    )?;
+    conn.execute(
+        "DELETE FROM widget_subscriptions WHERE widget_id = ?1",
+        params![widget_id],
+    )?;
+    conn.execute(
+        "DELETE FROM widget_error_log WHERE widget_id = ?1",
+        params![widget_id],
+    )?;
+    Ok(())
 }

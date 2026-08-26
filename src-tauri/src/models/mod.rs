@@ -121,7 +121,7 @@ pub struct FocusRule {
     pub action: String, // "enter_focus" | "leave_focus"
     pub auto_start: bool,
     pub quiet_hours_respect: bool,
-    pub created_at: String,
+    pub created_at: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -262,6 +262,12 @@ pub struct WidgetConfig {
     pub start_on_launch: bool,
     #[serde(default)]
     pub data_json: Option<String>,
+    #[serde(default)]
+    pub paused: bool,
+    #[serde(default)]
+    pub consecutive_failures: i32,
+    #[serde(default)]
+    pub suspended_until: Option<String>,
 }
 
 impl Default for WidgetConfig {
@@ -279,6 +285,9 @@ impl Default for WidgetConfig {
             pinned: false,
             start_on_launch: true,
             data_json: None,
+            paused: false,
+            consecutive_failures: 0,
+            suspended_until: None,
         }
     }
 }

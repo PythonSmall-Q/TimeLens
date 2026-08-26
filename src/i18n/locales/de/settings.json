@@ -71,7 +71,14 @@
   "widgets": {
     "title": "Widgets",
     "fadeOnBlur": "Bei Fokusverlust ausblenden",
-    "fadeHint": "Widget wird bei Überdeckung fast transparent; zum Wiederherstellen klicken"
+    "fadeHint": "Widget wird bei Überdeckung fast transparent; zum Wiederherstellen klicken",
+    "permissionsTitle": "Widget permissions",
+    "noWidgetsForPermissions": "No widgets installed.",
+    "noPermissions": "No permissions granted.",
+    "neverAccessed": "Never accessed",
+    "autoBlurTitle": "Auto-blur per widget",
+    "autoBlurDesc": "Choose which widgets blur when unfocused.",
+    "autoBlurEnabledCount": "widgets auto-blur"
   },
   "browser": {
     "title": "Browser-Erweiterung",

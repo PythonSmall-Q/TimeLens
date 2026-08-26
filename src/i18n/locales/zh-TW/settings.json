@@ -71,7 +71,14 @@
   "widgets": {
     "title": "小元件",
     "fadeOnBlur": "失焦時透明化",
-    "fadeHint": "小元件被覆蓋時近透明顯示，點選後恢復"
+    "fadeHint": "小元件被覆蓋時近透明顯示，點選後恢復",
+    "permissionsTitle": "Widget permissions",
+    "noWidgetsForPermissions": "No widgets installed.",
+    "noPermissions": "No permissions granted.",
+    "neverAccessed": "Never accessed",
+    "autoBlurTitle": "Auto-blur per widget",
+    "autoBlurDesc": "Choose which widgets blur when unfocused.",
+    "autoBlurEnabledCount": "widgets auto-blur"
   },
   "browser": {
     "title": "瀏覽器擴充功能",

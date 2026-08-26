@@ -183,5 +183,6 @@
     "month": "月预设",
     "backToToday": "一键回到今天"
   },
-  "refresh": "刷新"
+  "refresh": "刷新",
+  "drag": "拖动"
 }

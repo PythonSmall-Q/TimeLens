@@ -164,7 +164,7 @@ export default function Limits() {
                 setLimitHours(Math.max(0, Math.min(23, Number(e.target.value))))
               }
               className="ui-field !w-16 text-center"
-              aria-label="hours"
+              aria-label={t("limits:hoursShort")}
             />
             <span className="text-text-muted text-sm">{t("common:hours")}</span>
             <input
@@ -176,7 +176,7 @@ export default function Limits() {
                 setLimitMinutes(Math.max(0, Math.min(59, Number(e.target.value))))
               }
               className="ui-field !w-16 text-center"
-              aria-label="minutes"
+              aria-label={t("limits:minutesShort")}
             />
             <span className="text-text-muted text-sm">{t("common:minutes")}</span>
           </div>
@@ -257,9 +257,9 @@ export default function Limits() {
                         updateLimitSeconds(limit.exePath, newH * 3600 + m * 60);
                       }}
                       className="ui-field !w-12 !py-1 !px-1.5 text-center !text-xs"
-                      aria-label="hours"
+                      aria-label={t("limits:hoursShort")}
                     />
-                    <span className="text-text-muted text-xs">h</span>
+                    <span className="text-text-muted text-xs">{t("limits:hoursShort")}</span>
                     <input
                       type="number"
                       min={0}
@@ -270,9 +270,9 @@ export default function Limits() {
                         updateLimitSeconds(limit.exePath, h * 3600 + newM * 60);
                       }}
                       className="ui-field !w-12 !py-1 !px-1.5 text-center !text-xs"
-                      aria-label="minutes"
+                      aria-label={t("limits:minutesShort")}
                     />
-                    <span className="text-text-muted text-xs">m</span>
+                    <span className="text-text-muted text-xs">{t("limits:minutesShort")}</span>
                   </div>
 
                   {/* Usage progress */}

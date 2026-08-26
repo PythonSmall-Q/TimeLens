@@ -71,7 +71,14 @@
   "widgets": {
     "title": "Widgets",
     "fadeOnBlur": "Estomper lorsque non focus",
-    "fadeHint": "Le widget devient presque transparent quand recouvert ; cliquez pour le restaurer"
+    "fadeHint": "Le widget devient presque transparent quand recouvert ; cliquez pour le restaurer",
+    "permissionsTitle": "Widget permissions",
+    "noWidgetsForPermissions": "No widgets installed.",
+    "noPermissions": "No permissions granted.",
+    "neverAccessed": "Never accessed",
+    "autoBlurTitle": "Auto-blur per widget",
+    "autoBlurDesc": "Choose which widgets blur when unfocused.",
+    "autoBlurEnabledCount": "widgets auto-blur"
   },
   "browser": {
     "title": "Extension de navigateur",

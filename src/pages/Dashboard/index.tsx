@@ -479,6 +479,7 @@ function SortableDashboardCard({
   colSpanClass: "col-span-1" | "col-span-2";
   children: React.ReactNode;
 }) {
+  const { t } = useTranslation("dashboard");
   const { attributes, listeners, setNodeRef, isDragging, isOver } = useSortable({ id });
 
   const cardStateClass = isDragging
@@ -499,7 +500,7 @@ function SortableDashboardCard({
       <div className="relative rounded-2xl transition-all duration-150">
         <button
           className="absolute right-2 top-2 z-10 ui-btn-ghost !text-xs !px-2 !py-1 cursor-grab active:cursor-grabbing hover:bg-accent-blue/20"
-          title="Drag"
+          title={t("drag")}
           {...attributes}
           {...listeners}
         >

@@ -117,6 +117,9 @@ export interface WidgetConfig {
   pinned: boolean;
   start_on_launch: boolean;
   data_json?: string | null;
+  paused?: boolean;
+  consecutive_failures?: number;
+  suspended_until?: string | null;
 }
 
 export interface WidgetRegistryItem {
@@ -163,13 +166,44 @@ export interface WidgetPermissionAuditEntry {
   detail: string;
 }
 
+export type WidgetQueryNamespace =
+  | "metrics"
+  | "sessions"
+  | "categories"
+  | "projects"
+  | "tags"
+  | "goals"
+  | "rules";
+
+export interface WidgetQueryRequest {
+  widget_id: string;
+  namespace: WidgetQueryNamespace;
+  payload?: Record<string, unknown>;
+}
+
+export interface WidgetErrorLogEntry {
+  id: number;
+  widget_id: string;
+  occurred_at: string;
+  error: string;
+  recovery_hint: string;
+}
+
+export interface WidgetLifecycleEvent {
+  widget_id: string;
+  event: "mount" | "foreground" | "background" | "suspend" | "resume" | "uninstall";
+}
+
 export type DesktopPetStateKey = "idle" | "focus" | "rest";
+
+export type WidgetType = string;
 
 export interface DesktopPetPackState {
   label: string;
   messages: string[];
   accent_color?: string;
   avatar_emoji?: string;
+  avatar_image?: string;
 }
 
 export interface DesktopPetPackManifest {
@@ -198,8 +232,6 @@ export interface ActiveWindowInfo {
   window_title: string;
   timestamp: string;
 }
-
-export type WidgetType = string;
 
 export interface ShortcutSettings {
   open_widget_center: string;

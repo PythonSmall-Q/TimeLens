@@ -1,11 +1,11 @@
-use chrono::{Datelike, Local};
+use chrono::{Datelike, Local, Timelike};
 use rusqlite::params;
 #[cfg(target_os = "windows")]
 use std::sync::OnceLock;
 use std::sync::{Arc, Mutex};
 #[cfg(target_os = "windows")]
 use std::time::{Duration, Instant};
-use tauri::State;
+use tauri::{AppHandle, State};
 
 use crate::db;
 use crate::models::{
@@ -386,25 +386,79 @@ pub fn get_focus_mode_active(db: State<DbState>) -> Result<bool, String> {
     db::get_bool_setting(&conn, "focus_mode_active", false).map_err(|e| e.to_string())
 }
 
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct QuietHoursSettings {
+    pub enabled: bool,
+    pub start: String,
+    pub end: String,
+}
+
+#[tauri::command]
+pub fn get_quiet_hours(db: State<DbState>) -> Result<QuietHoursSettings, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    Ok(QuietHoursSettings {
+        enabled: db::get_bool_setting(&conn, "notification_quiet_hours_enabled", false)
+            .map_err(|e| e.to_string())?,
+        start: db::get_setting(&conn, "notification_quiet_start")
+            .map_err(|e| e.to_string())?
+            .unwrap_or_else(|| "22:00".to_string()),
+        end: db::get_setting(&conn, "notification_quiet_end")
+            .map_err(|e| e.to_string())?
+            .unwrap_or_else(|| "07:00".to_string()),
+    })
+}
+
+#[tauri::command]
+pub fn set_quiet_hours(
+    settings: QuietHoursSettings,
+    db: State<DbState>,
+) -> Result<(), String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    db::set_bool_setting(&conn, "notification_quiet_hours_enabled", settings.enabled)
+        .map_err(|e| e.to_string())?;
+    db::set_setting(&conn, "notification_quiet_start", &settings.start)
+        .map_err(|e| e.to_string())?;
+    db::set_setting(&conn, "notification_quiet_end", &settings.end)
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 #[tauri::command]
 pub fn start_focus_session(
     reason: Option<String>,
     trigger_type: Option<String>,
     db: State<DbState>,
+    app: AppHandle,
 ) -> Result<i64, String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
-    db::start_focus_session(
+    let id = db::start_focus_session(
         &conn,
         trigger_type.as_deref().unwrap_or("manual"),
         reason.as_deref().unwrap_or(""),
     )
-    .map_err(|e| e.to_string())
+    .map_err(|e| e.to_string())?;
+    db::set_bool_setting(&conn, "focus_mode_active", true).map_err(|e| e.to_string())?;
+    drop(conn);
+    crate::commands::widget_runtime_cmd::broadcast_widget_event(
+        &app,
+        "focus-session-changed",
+        serde_json::json!({ "session_id": id, "active": true }),
+    );
+    Ok(id)
 }
 
 #[tauri::command]
-pub fn stop_focus_session(id: i64, db: State<DbState>) -> Result<(), String> {
+pub fn stop_focus_session(id: i64, db: State<DbState>, app: AppHandle) -> Result<(), String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
-    db::stop_focus_session(&conn, id).map_err(|e| e.to_string())
+    db::stop_focus_session(&conn, id).map_err(|e| e.to_string())?;
+    db::set_bool_setting(&conn, "focus_mode_active", false).map_err(|e| e.to_string())?;
+    drop(conn);
+    crate::commands::widget_runtime_cmd::broadcast_widget_event(
+        &app,
+        "focus-session-changed",
+        serde_json::json!({ "session_id": id, "active": false }),
+    );
+    Ok(())
 }
 
 #[tauri::command]
@@ -442,14 +496,54 @@ pub fn delete_focus_rule(id: i64, db: State<DbState>) -> Result<(), String> {
     db::delete_focus_rule(&conn, id).map_err(|e| e.to_string())
 }
 
+fn parse_hm_to_minutes(hm: &str) -> Option<i32> {
+    let parts: Vec<&str> = hm.split(':').collect();
+    if parts.len() != 2 {
+        return None;
+    }
+    let h: i32 = parts[0].parse().ok()?;
+    let m: i32 = parts[1].parse().ok()?;
+    if !(0..=23).contains(&h) || !(0..=59).contains(&m) {
+        return None;
+    }
+    Some(h * 60 + m)
+}
+
+fn is_within_quiet_hours(conn: &rusqlite::Connection) -> Result<bool, String> {
+    let enabled = db::get_bool_setting(conn, "notification_quiet_hours_enabled", false)
+        .map_err(|e| e.to_string())?;
+    if !enabled {
+        return Ok(false);
+    }
+    let start = db::get_setting(conn, "notification_quiet_start")
+        .map_err(|e| e.to_string())?
+        .unwrap_or_else(|| "22:00".to_string());
+    let end = db::get_setting(conn, "notification_quiet_end")
+        .map_err(|e| e.to_string())?
+        .unwrap_or_else(|| "07:00".to_string());
+
+    let now_min = chrono::Local::now().hour() as i32 * 60 + chrono::Local::now().minute() as i32;
+    let start_min = parse_hm_to_minutes(&start).unwrap_or(22 * 60);
+    let end_min = parse_hm_to_minutes(&end).unwrap_or(7 * 60);
+
+    Ok(if start_min == end_min {
+        true
+    } else if start_min < end_min {
+        now_min >= start_min && now_min < end_min
+    } else {
+        now_min >= start_min || now_min < end_min
+    })
+}
+
 pub fn evaluate_focus_rules_inner(
     conn: &rusqlite::Connection,
     status: &crate::monitor::MonitorStatus,
 ) -> Result<Vec<FocusRuleMatch>, String> {
     let rules = db::get_focus_rules(conn).map_err(|e| e.to_string())?;
-    let active_session_id = db::get_active_focus_session_id(conn).map_err(|e| e.to_string())?;
+    let mut active_session_id = db::get_active_focus_session_id(conn).map_err(|e| e.to_string())?;
     let now = chrono::Local::now();
     let current_time = now.format("%H:%M").to_string();
+    let in_quiet_hours = is_within_quiet_hours(conn).unwrap_or(false);
 
     let mut matches = Vec::new();
     for rule in rules.into_iter().filter(|r| r.enabled) {
@@ -508,12 +602,20 @@ pub fn evaluate_focus_rules_inner(
             _ => {}
         }
 
-        // Apply the action if matched.
-        if matched {
-            if rule.action == "enter_focus" && active_session_id.is_none() {
+        // Apply the action if matched and the rule is configured to auto-start.
+        // Quiet hours are respected when requested.
+        if matched && rule.auto_start {
+            if rule.quiet_hours_respect && in_quiet_hours {
+                match_reason.push_str(" (quiet hours, action skipped)");
+            } else if rule.action == "enter_focus" && active_session_id.is_none() {
                 let _ = db::start_focus_session(conn, "rule", &rule.name);
+                let _ = db::set_bool_setting(conn, "focus_mode_active", true);
+                active_session_id = db::get_active_focus_session_id(conn).ok().flatten();
             } else if rule.action == "leave_focus" && active_session_id.is_some() {
-                let _ = db::stop_focus_session(conn, active_session_id.unwrap_or(0));
+                let id = active_session_id.unwrap_or(0);
+                let _ = db::stop_focus_session(conn, id);
+                let _ = db::set_bool_setting(conn, "focus_mode_active", false);
+                active_session_id = db::get_active_focus_session_id(conn).ok().flatten();
             }
         }
 
@@ -1165,4 +1267,186 @@ pub fn get_app_category_map(
         .map(|r| (r.exe_path, r.category))
         .collect();
     Ok(map)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::{Arc, Mutex};
+
+    use super::*;
+    use crate::db;
+    use crate::monitor::MonitorStatus;
+
+    fn test_db() -> DbState {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        db::initialize(&conn).unwrap();
+        Arc::new(Mutex::new(conn))
+    }
+
+    fn sample_rule(rule_type: &str, condition_json: &str, action: &str) -> FocusRule {
+        FocusRule {
+            id: None,
+            name: "Test rule".to_string(),
+            enabled: true,
+            rule_type: rule_type.to_string(),
+            condition_json: condition_json.to_string(),
+            action: action.to_string(),
+            auto_start: true,
+            quiet_hours_respect: false,
+            created_at: Some(chrono::Local::now().format("%Y-%m-%dT%H:%M:%S").to_string()),
+        }
+    }
+
+    fn insert_rule(conn: &rusqlite::Connection, rule: &FocusRule) -> i64 {
+        db::upsert_focus_rule(conn, rule).unwrap()
+    }
+
+    #[test]
+    fn focus_rule_time_window_starts_session() {
+        let db = test_db();
+        let conn = db.lock().unwrap();
+        let now = chrono::Local::now();
+        let start = (now - chrono::Duration::minutes(2)).format("%H:%M").to_string();
+        let end = (now + chrono::Duration::minutes(2)).format("%H:%M").to_string();
+        let condition = serde_json::json!({ "start": start, "end": end });
+        let rule = sample_rule("time_window", &condition.to_string(), "enter_focus");
+        insert_rule(&conn, &rule);
+
+        let status = MonitorStatus {
+            active: true,
+            current_app: "SomeApp".to_string(),
+            current_exe_path: "some.exe".to_string(),
+            current_title: "Title".to_string(),
+        };
+
+        let matches = evaluate_focus_rules_inner(&conn, &status).unwrap();
+        assert_eq!(matches.len(), 1);
+        assert!(matches[0].matched);
+
+        let active = db::get_active_focus_session_id(&conn).unwrap();
+        assert!(active.is_some());
+        assert!(db::get_bool_setting(&conn, "focus_mode_active", false).unwrap());
+    }
+
+    #[test]
+    fn focus_rule_keyword_matches_window_title() {
+        let db = test_db();
+        let conn = db.lock().unwrap();
+        let condition = serde_json::json!({ "match_type": "window_title", "keyword": "Focus" });
+        let rule = sample_rule("keyword", &condition.to_string(), "enter_focus");
+        insert_rule(&conn, &rule);
+
+        let status = MonitorStatus {
+            active: true,
+            current_app: "App".to_string(),
+            current_exe_path: "app.exe".to_string(),
+            current_title: "Deep Focus Mode".to_string(),
+        };
+
+        let matches = evaluate_focus_rules_inner(&conn, &status).unwrap();
+        assert!(matches[0].matched);
+        assert!(matches[0].reason.to_ascii_lowercase().contains("focus"));
+    }
+
+    #[test]
+    fn focus_rule_app_match_by_name() {
+        let db = test_db();
+        let conn = db.lock().unwrap();
+        let condition = serde_json::json!({ "app_name": "Code" });
+        let rule = sample_rule("app", &condition.to_string(), "enter_focus");
+        insert_rule(&conn, &rule);
+
+        let status = MonitorStatus {
+            active: true,
+            current_app: "Visual Studio Code".to_string(),
+            current_exe_path: "code.exe".to_string(),
+            current_title: "src".to_string(),
+        };
+
+        let matches = evaluate_focus_rules_inner(&conn, &status).unwrap();
+        assert!(matches[0].matched);
+    }
+
+    #[test]
+    fn focus_rule_auto_start_false_does_not_start_session() {
+        let db = test_db();
+        let conn = db.lock().unwrap();
+        let now = chrono::Local::now();
+        let start = (now - chrono::Duration::minutes(2)).format("%H:%M").to_string();
+        let end = (now + chrono::Duration::minutes(2)).format("%H:%M").to_string();
+        let condition = serde_json::json!({ "start": start, "end": end });
+        let mut rule = sample_rule("time_window", &condition.to_string(), "enter_focus");
+        rule.auto_start = false;
+        insert_rule(&conn, &rule);
+
+        let status = MonitorStatus {
+            active: true,
+            current_app: "App".to_string(),
+            current_exe_path: "app.exe".to_string(),
+            current_title: "Title".to_string(),
+        };
+
+        let matches = evaluate_focus_rules_inner(&conn, &status).unwrap();
+        assert!(matches[0].matched);
+        assert!(db::get_active_focus_session_id(&conn).unwrap().is_none());
+    }
+
+    #[test]
+    fn focus_rule_leave_focus_stops_session() {
+        let db = test_db();
+        let conn = db.lock().unwrap();
+        let session_id = db::start_focus_session(&conn, "manual", "test").unwrap();
+        db::set_bool_setting(&conn, "focus_mode_active", true).unwrap();
+
+        let condition = serde_json::json!({ "app_name": "Slack" });
+        let rule = sample_rule("app", &condition.to_string(), "leave_focus");
+        insert_rule(&conn, &rule);
+
+        let status = MonitorStatus {
+            active: true,
+            current_app: "Slack".to_string(),
+            current_exe_path: "slack.exe".to_string(),
+            current_title: "chat".to_string(),
+        };
+
+        let matches = evaluate_focus_rules_inner(&conn, &status).unwrap();
+        assert!(matches[0].matched);
+
+        let session = db::list_focus_sessions(&conn, None, None)
+            .unwrap()
+            .into_iter()
+            .find(|s| s.id == Some(session_id))
+            .unwrap();
+        assert!(session.ended_at.is_some());
+        assert!(!db::get_bool_setting(&conn, "focus_mode_active", true).unwrap());
+    }
+
+    #[test]
+    fn focus_rule_respects_quiet_hours() {
+        let db = test_db();
+        let conn = db.lock().unwrap();
+        let now = chrono::Local::now();
+        let start = (now - chrono::Duration::minutes(2)).format("%H:%M").to_string();
+        let end = (now + chrono::Duration::minutes(2)).format("%H:%M").to_string();
+        let condition = serde_json::json!({ "start": start, "end": end });
+        let mut rule = sample_rule("time_window", &condition.to_string(), "enter_focus");
+        rule.quiet_hours_respect = true;
+        insert_rule(&conn, &rule);
+
+        db::set_bool_setting(&conn, "notification_quiet_hours_enabled", true).unwrap();
+        db::set_setting(&conn, "notification_quiet_start", &start).unwrap();
+        db::set_setting(&conn, "notification_quiet_end", &end).unwrap();
+
+        let status = MonitorStatus {
+            active: true,
+            current_app: "App".to_string(),
+            current_exe_path: "app.exe".to_string(),
+            current_title: "Title".to_string(),
+        };
+
+        let matches = evaluate_focus_rules_inner(&conn, &status).unwrap();
+        assert!(matches[0].matched);
+        assert!(matches[0].reason.contains("quiet hours"));
+        assert!(db::get_active_focus_session_id(&conn).unwrap().is_none());
+    }
 }

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { listen } from "@tauri-apps/api/event";
 import {
   DndContext,
   closestCenter,
@@ -18,18 +19,37 @@ import {
   arrayMove,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { X, Plus, GripVertical, Trash2 } from "lucide-react";
+import { X, Plus, GripVertical, Trash2, Target, Droplet } from "lucide-react";
 import * as api from "@/services/tauriApi";
-import type { TodoItem } from "@/types";
+import type { GoalProgress, TodoItem, UsageGoal } from "@/types";
+import { formatDuration } from "@/utils/format";
+import { useWidgetErrorReporter } from "@/hooks/useWidgetErrorReporter";
 import clsx from "clsx";
+
+const GOAL_PREFIX_RE = /^\[goal:([^\]]+)\]\s*/;
+
+function goalKey(goal: UsageGoal): string {
+  return `${goal.scope_type}:${goal.scope_value}:${goal.period}`;
+}
+
+function parseGoalLink(content: string): { key: string | null; text: string } {
+  const match = GOAL_PREFIX_RE.exec(content);
+  if (!match) return { key: null, text: content };
+  return { key: match[1], text: content.slice(match[0].length) };
+}
+
+function buildGoalLink(goal: UsageGoal, text: string): string {
+  return `[goal:${goalKey(goal)}] ${text}`;
+}
 
 interface SortableRowProps {
   item: TodoItem;
+  progress: GoalProgress | null;
   onToggle: (id: number) => void;
   onDelete: (id: number) => void;
 }
 
-function SortableRow({ item, onToggle, onDelete }: SortableRowProps) {
+function SortableRow({ item, progress, onToggle, onDelete }: SortableRowProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: item.id });
 
@@ -38,6 +58,8 @@ function SortableRow({ item, onToggle, onDelete }: SortableRowProps) {
     transition,
     opacity: isDragging ? 0.5 : 1,
   };
+
+  const { key: goalKeyVal, text } = parseGoalLink(item.content);
 
   return (
     <div
@@ -57,18 +79,37 @@ function SortableRow({ item, onToggle, onDelete }: SortableRowProps) {
         checked={item.done}
         onChange={() => onToggle(item.id)}
         className="ui-checkbox cursor-pointer flex-shrink-0"
-        title={item.content}
-        aria-label={item.content}
+        title={text}
+        aria-label={text}
       />
-      <span
-        className={clsx(
-          "text-sm flex-1 leading-snug cursor-pointer",
-          item.done ? "line-through text-text-muted" : "text-text-primary"
+      <div className="flex-1 min-w-0">
+        <span
+          className={clsx(
+            "text-sm leading-snug cursor-pointer block truncate",
+            item.done ? "line-through text-text-muted" : "text-text-primary"
+          )}
+          onClick={() => onToggle(item.id)}
+        >
+          {text}
+        </span>
+        {goalKeyVal && progress && (
+          <div className="flex items-center gap-1.5 mt-0.5">
+            <Target size={10} className="text-accent-blue" />
+            <div className="flex-1 h-1 rounded-full bg-surface-border overflow-hidden">
+              <div
+                className={clsx(
+                  "h-full rounded-full transition-all",
+                  progress.is_completed ? "bg-accent-green" : "bg-accent-blue"
+                )}
+                style={{ width: `${Math.min(100, Math.round(progress.progress_ratio * 100))}%` }}
+              />
+            </div>
+            <span className="text-[10px] text-text-muted">
+              {formatDuration(progress.used_seconds)} / {formatDuration(progress.goal.target_seconds)}
+            </span>
+          </div>
         )}
-        onClick={() => onToggle(item.id)}
-      >
-        {item.content}
-      </span>
+      </div>
       <button
         onClick={() => onDelete(item.id)}
         className="text-text-muted hover:text-accent-red opacity-0 group-hover:opacity-100
@@ -84,11 +125,74 @@ interface Props {
   widgetId: string;
 }
 
-export default function TodoWidget({ widgetId: _widgetId }: Props) {
+export default function TodoWidget({ widgetId }: Props) {
   const { t } = useTranslation("widgets");
+  useWidgetErrorReporter(widgetId);
   const [todos, setTodos] = useState<TodoItem[]>([]);
   const [input, setInput] = useState("");
+  const [goals, setGoals] = useState<UsageGoal[]>([]);
+  const [progress, setProgress] = useState<GoalProgress[]>([]);
+  const [selectedGoalKey, setSelectedGoalKey] = useState<string>("");
+  const [autoBlur, setAutoBlur] = useState(() => {
+    try {
+      return localStorage.getItem(`${widgetId}-auto-blur`) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const [isFocused, setIsFocused] = useState(true);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    const win = getCurrentWebviewWindow();
+    win.isFocused()
+      .then(setIsFocused)
+      .catch(() => {});
+    win.onFocusChanged(({ payload: focused }) => {
+      setIsFocused(focused);
+    })
+      .then((fn) => {
+        unlisten = fn;
+      })
+      .catch(() => {});
+    return () => {
+      unlisten?.();
+    };
+  }, []);
+
+  useEffect(() => {
+    const onChanged = () => {
+      api.getTodos().then(setTodos).catch(console.error);
+    };
+    window.addEventListener("timelens-todos-changed", onChanged);
+
+    // Also listen for cross-window capture events from the Quick Capture widget.
+    let unlisten: (() => void) | undefined;
+    const setup = async () => {
+      try {
+        unlisten = await listen("timelens-todos-changed", onChanged);
+      } catch {
+        // ignore
+      }
+    };
+    void setup();
+
+    return () => {
+      window.removeEventListener("timelens-todos-changed", onChanged);
+      unlisten?.();
+    };
+  }, []);
+
+  const toggleAutoBlur = () => {
+    const next = !autoBlur;
+    setAutoBlur(next);
+    try {
+      localStorage.setItem(`${widgetId}-auto-blur`, next ? "1" : "0");
+    } catch {
+      // ignore
+    }
+  };
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -99,14 +203,32 @@ export default function TodoWidget({ widgetId: _widgetId }: Props) {
 
   useEffect(() => {
     api.getTodos().then(setTodos).catch(console.error);
+    const loadGoals = async () => {
+      try {
+        const [g, p] = await Promise.all([api.getUsageGoals(), api.getGoalProgress(1)]);
+        setGoals(g.filter((goal) => goal.enabled));
+        setProgress(p);
+      } catch {
+        // Ignore goal load errors.
+      }
+    };
+    void loadGoals();
   }, []);
+
+  const progressByKey = new Map<string, GoalProgress>();
+  progress.forEach((p) => {
+    progressByKey.set(goalKey(p.goal), p);
+  });
 
   const handleAdd = async () => {
     const content = input.trim();
     if (!content) return;
-    const item = await api.addTodo(content);
+    const goal = goals.find((g) => goalKey(g) === selectedGoalKey);
+    const finalContent = goal ? buildGoalLink(goal, content) : content;
+    const item = await api.addTodo(finalContent);
     setTodos((prev) => [...prev, item]);
     setInput("");
+    setSelectedGoalKey("");
     inputRef.current?.focus();
   };
 
@@ -141,11 +263,25 @@ export default function TodoWidget({ widgetId: _widgetId }: Props) {
   const remaining = todos.filter((t) => !t.done).length;
 
   return (
-    <div className="w-full h-full glass-card flex flex-col p-4 select-none overflow-hidden">
+    <div className={clsx(
+      "w-full h-full glass-card flex flex-col p-4 select-none overflow-hidden transition-all duration-200",
+      autoBlur && !isFocused && "blur-[2px] opacity-90"
+    )}>
       {/* Header / drag region */}
       <div data-tauri-drag-region className="flex items-center justify-between mb-3">
         <span className="text-text-muted text-xs">{t("todo.title")}</span>
         <div className="flex items-center gap-2">
+          <button
+            onClick={toggleAutoBlur}
+            className={clsx(
+              "text-text-muted hover:text-text-secondary transition-colors",
+              autoBlur && "text-accent-blue"
+            )}
+            title={t("autoBlur")}
+            aria-label={t("autoBlur")}
+          >
+            <Droplet size={13} />
+          </button>
           {todos.some((t) => t.done) && (
             <button
               onClick={clearCompleted}
@@ -166,22 +302,41 @@ export default function TodoWidget({ widgetId: _widgetId }: Props) {
       </div>
 
       {/* Quick input */}
-      <div className="flex items-center gap-2 mb-3">
-        <input
-          ref={inputRef}
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-          placeholder={t("todo.addPlaceholder")}
-          className="ui-field flex-1"
-        />
-        <button
-          onClick={handleAdd}
-          className="bg-accent-blue/20 hover:bg-accent-blue/30 text-accent-blue rounded-lg
-                     p-2 transition-colors flex-shrink-0"
-        >
-          <Plus size={14} />
-        </button>
+      <div className="flex flex-col gap-2 mb-3">
+        <div className="flex items-center gap-2">
+          <input
+            ref={inputRef}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+            placeholder={t("todo.addPlaceholder")}
+            className="ui-field flex-1"
+          />
+          <button
+            onClick={handleAdd}
+            className="bg-accent-blue/20 hover:bg-accent-blue/30 text-accent-blue rounded-lg
+                       p-2 transition-colors flex-shrink-0"
+          >
+            <Plus size={14} />
+          </button>
+        </div>
+        {goals.length > 0 && (
+          <div className="flex items-center gap-2">
+            <Target size={12} className="text-text-muted" />
+            <select
+              value={selectedGoalKey}
+              onChange={(e) => setSelectedGoalKey(e.target.value)}
+              className="ui-field text-xs flex-1 py-1"
+            >
+              <option value="">{t("todo.noGoal")}</option>
+              {goals.map((goal) => (
+                <option key={goalKey(goal)} value={goalKey(goal)}>
+                  {goal.scope_value} · {goal.period}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       {/* List */}
@@ -202,6 +357,7 @@ export default function TodoWidget({ widgetId: _widgetId }: Props) {
                 <SortableRow
                   key={item.id}
                   item={item}
+                  progress={progressByKey.get(parseGoalLink(item.content).key ?? "") ?? null}
                   onToggle={handleToggle}
                   onDelete={handleDelete}
                 />

@@ -44,6 +44,12 @@
     "ruleMetaTimeWindow": "Fenêtre : {{start}} - {{end}}",
     "ruleMetaApp": "App : {{app}}",
     "noMatch": "La règle ne correspond pas aux conditions actuelles.",
-    "simulationError": "Impossible d'évaluer la règle pour le moment."
+    "simulationError": "Impossible d'évaluer la règle pour le moment.",
+    "saveSuccess": "Rule saved.",
+    "saveFailed": "Could not save rule.",
+    "nameRequired": "Please enter a rule name.",
+    "keywordRequired": "Please enter a keyword.",
+    "appRequired": "Please enter an app name.",
+    "timeWindowRequired": "Please select a start and end time."
   }
 }

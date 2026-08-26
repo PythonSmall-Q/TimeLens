@@ -4,11 +4,14 @@ import { useNavigate } from "react-router-dom";
 import {
   Clock, List, Timer, ExternalLink, Trash2, Plus, StickyNote, Activity,
   Puzzle, FolderOpen, ShieldCheck, PawPrint, Ruler, Upload, Wrench,
+  Target, Lightbulb, BarChart3, TrendingUp, Globe, Pause, Play, RefreshCw,
+  Terminal, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { useWidgetStore } from "@/stores/widgetStore";
 import type {
   DesktopPetPackManifest,
   WidgetConfig,
+  WidgetErrorLogEntry,
   WidgetPermissionEntry,
   WidgetPermissionAuditEntry,
   WidgetRegistryItem,
@@ -20,6 +23,7 @@ import AsyncStateCard from "@/components/AsyncStateCard";
 import WidgetPermissionDialog from "./WidgetPermissionDialog";
 
 type InlineMessage = { kind: "ok" | "err"; text: string };
+type WidgetGroup = "utility" | "focus" | "insight" | "reflection";
 
 const ICONS = {
   clock: Clock,
@@ -28,6 +32,11 @@ const ICONS = {
   note: StickyNote,
   status: Activity,
   pet: PawPrint,
+  "focus-coach": Target,
+  "quick-capture": Lightbulb,
+  "session-pulse": BarChart3,
+  "goal-progress": TrendingUp,
+  "browser-activity": Globe,
 };
 
 const TYPE_LABELS: Record<string, string> = {
@@ -37,6 +46,11 @@ const TYPE_LABELS: Record<string, string> = {
   note: "widgets:note.title",
   status: "widgets:status.title",
   pet: "widgets:pet.title",
+  "focus-coach": "widgets:focusCoach.title",
+  "quick-capture": "widgets:quickCapture.title",
+  "session-pulse": "widgets:sessionPulse.title",
+  "goal-progress": "widgets:goalProgress.title",
+  "browser-activity": "widgets:browserActivity.title",
 };
 
 function WidgetCard({
@@ -60,11 +74,22 @@ function WidgetCard({
   const [petHeight, setPetHeight] = useState(String(Math.round(config.height)));
   const [revokingPermissions, setRevokingPermissions] = useState(false);
   const [confirmingRevoke, setConfirmingRevoke] = useState(false);
+  const [paused, setPaused] = useState(config.paused ?? false);
+  const [errorLogOpen, setErrorLogOpen] = useState(false);
+  const [errorLogs, setErrorLogs] = useState<WidgetErrorLogEntry[]>([]);
+  const [errorFilter, setErrorFilter] = useState("");
 
   useEffect(() => {
     setPetWidth(String(Math.round(config.width)));
     setPetHeight(String(Math.round(config.height)));
   }, [config.width, config.height, config.data_json]);
+
+  useEffect(() => {
+    if (!errorLogOpen) return;
+    api.getWidgetErrorLog(config.id, 20)
+      .then(setErrorLogs)
+      .catch(() => setErrorLogs([]));
+  }, [errorLogOpen, config.id]);
 
   const applyPetWindowSize = async () => {
     const width = Number(petWidth);
@@ -123,6 +148,20 @@ function WidgetCard({
     }
   };
 
+  const handleTogglePaused = async () => {
+    const next = !paused;
+    setPaused(next);
+    try {
+      await api.setWidgetPaused(config.id, next);
+    } catch {
+      // Backend command will be wired separately; local state is authoritative for the UI.
+    }
+  };
+
+  const handleRefresh = () => {
+    onPermissionsChanged();
+  };
+
   return (
     <div className="glass-card p-4 flex flex-col gap-3">
       {/* Top row */}
@@ -169,6 +208,30 @@ function WidgetCard({
         <ExternalLink size={12} />
         {t("openWidget")}
       </button>
+
+      {/* Per-widget controls */}
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          onClick={handleTogglePaused}
+          className={clsx(
+            "flex items-center justify-center gap-1.5 text-xs py-1.5 rounded-lg border transition-colors",
+            paused
+              ? "border-accent-green/30 text-accent-green hover:bg-accent-green/10"
+              : "border-surface-border text-text-secondary hover:text-text-primary"
+          )}
+        >
+          {paused ? <Play size={12} /> : <Pause size={12} />}
+          {paused ? t("resumeUpdates") : t("pauseUpdates")}
+        </button>
+        <button
+          onClick={handleRefresh}
+          className="flex items-center justify-center gap-1.5 text-xs py-1.5 rounded-lg border border-surface-border
+                     text-text-secondary hover:text-text-primary transition-colors"
+        >
+          <RefreshCw size={12} />
+          {t("refreshNow")}
+        </button>
+      </div>
 
       {config.widget_type === "pet" && (
         <div className="mt-1 rounded-xl border border-accent-blue/20 bg-accent-blue/5 p-3 space-y-3">
@@ -304,20 +367,96 @@ function WidgetCard({
           </div>
         </div>
       )}
+
+      {/* Error log */}
+      <div className="rounded-xl border border-surface-border bg-surface-hover/40 overflow-hidden">
+        <button
+          onClick={() => setErrorLogOpen((v) => !v)}
+          className="w-full flex items-center justify-between gap-2 px-3 py-2 text-[11px] font-semibold text-text-secondary uppercase tracking-wider hover:bg-surface-hover/60 transition-colors"
+        >
+          <span className="flex items-center gap-1.5">
+            <Terminal size={12} />
+            {t("errorLog.title")}
+            {errorLogs.length > 0 && (
+              <span className="ml-1 px-1.5 py-0.5 rounded-full bg-accent-red/15 text-accent-red text-[10px]">
+                {errorLogs.length}
+              </span>
+            )}
+          </span>
+          {errorLogOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+        </button>
+        {errorLogOpen && (
+          <div className="px-3 pb-3 pt-1 space-y-2">
+            {errorLogs.length === 0 ? (
+              <p className="text-[11px] text-text-muted">{t("errorLog.noErrors")}</p>
+            ) : (
+              <>
+                <input
+                  type="text"
+                  value={errorFilter}
+                  onChange={(e) => setErrorFilter(e.target.value)}
+                  placeholder={t("errorLog.filterPlaceholder")}
+                  className="w-full text-[11px] px-2 py-1.5 rounded-lg bg-surface-card border border-surface-border outline-none focus:border-accent-blue"
+                />
+                <div className="max-h-40 overflow-y-auto space-y-1.5 pr-1">
+                  {errorLogs
+                    .filter((entry) => {
+                      const q = errorFilter.trim().toLowerCase();
+                      if (!q) return true;
+                      return (
+                        entry.error.toLowerCase().includes(q) ||
+                        (entry.recovery_hint?.toLowerCase().includes(q) ?? false)
+                      );
+                    })
+                    .map((entry) => (
+                      <div
+                        key={entry.id}
+                        className="rounded-lg border border-surface-border px-2 py-1.5 text-[11px]"
+                      >
+                        <div className="text-text-muted">{new Date(entry.occurred_at).toLocaleString()}</div>
+                        <div className="text-accent-red mt-0.5">{entry.error}</div>
+                        {entry.recovery_hint && (
+                          <div className="text-text-secondary mt-0.5">{entry.recovery_hint}</div>
+                        )}
+                      </div>
+                    ))}
+                </div>
+                <button
+                  onClick={() => {
+                    api.clearWidgetErrorLog(config.id)
+                      .then(() => { setErrorLogs([]); setErrorFilter(""); })
+                      .catch(() => {});
+                  }}
+                  className="text-[10px] px-2 py-1 rounded-md border border-surface-border text-text-muted hover:text-accent-red transition-colors"
+                >
+                  {t("errorLog.clear")}
+                </button>
+              </>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
 // ── Self-add catalog (official widgets) ──────────────────────
 
-const OFFICIAL_CATALOG: { type: string; icon: typeof Clock; descKey: string; comingSoon?: boolean }[] = [
-  { type: "clock", icon: Clock, descKey: "clockDesc" },
-  { type: "todo", icon: List, descKey: "todoDesc" },
-  { type: "timer", icon: Timer, descKey: "timerDesc" },
-  { type: "note", icon: StickyNote, descKey: "noteDesc" },
-  { type: "status", icon: Activity, descKey: "statusDesc" },
-  { type: "pet", icon: PawPrint, descKey: "petDesc", comingSoon: true },
+const OFFICIAL_CATALOG: { type: string; icon: typeof Clock; descKey: string; comingSoon?: boolean; group: WidgetGroup }[] = [
+  { type: "clock", icon: Clock, descKey: "clockDesc", group: "utility" },
+  { type: "todo", icon: List, descKey: "todoDesc", group: "utility" },
+  { type: "note", icon: StickyNote, descKey: "noteDesc", group: "utility" },
+  { type: "timer", icon: Timer, descKey: "timerDesc", group: "focus" },
+  { type: "pet", icon: PawPrint, descKey: "petDesc", group: "focus" },
+  { type: "focus-coach", icon: Target, descKey: "focusCoachDesc", group: "focus", comingSoon: false },
+  { type: "quick-capture", icon: Lightbulb, descKey: "quickCaptureDesc", group: "focus", comingSoon: false },
+  { type: "status", icon: Activity, descKey: "statusDesc", group: "insight" },
+  { type: "session-pulse", icon: BarChart3, descKey: "sessionPulseDesc", group: "insight", comingSoon: false },
+  { type: "goal-progress", icon: TrendingUp, descKey: "goalProgressDesc", group: "insight", comingSoon: false },
+  { type: "browser-activity", icon: Globe, descKey: "browserActivityDesc", group: "insight", comingSoon: false },
 ];
+
+const GROUP_ORDER: WidgetGroup[] = ["utility", "focus", "insight", "reflection"];
 
 function isPetManifest(input: unknown): input is DesktopPetPackManifest {
   if (!input || typeof input !== "object") return false;
@@ -408,6 +547,56 @@ function MarketplaceCard({ type, title, icon: Icon, description, source, install
   );
 }
 
+function OfficialWidgetGroup({
+  group,
+  entries,
+  installedCount,
+  onAdd,
+}: {
+  group: WidgetGroup;
+  entries: ReturnType<typeof buildOfficialEntries>;
+  installedCount: (type: string) => number;
+  onAdd: (type: string, perms: string[], comingSoon: boolean) => void;
+}) {
+  const { t } = useTranslation("widgets");
+  return (
+    <div className="space-y-3">
+      <p className="text-xs font-semibold text-text-secondary uppercase tracking-wider">
+        {t(`group.${group}`)}
+      </p>
+      <div className="space-y-3">
+        {entries.map(({ type, icon, description, title, source, permissions, comingSoon }) => (
+          <MarketplaceCard
+            key={type}
+            type={type}
+            title={title}
+            icon={icon}
+            source={source}
+            description={description}
+            permissions={permissions}
+            installedCount={installedCount(type)}
+            comingSoon={comingSoon}
+            onAdd={onAdd}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function buildOfficialEntries(t: (key: string) => string) {
+  return OFFICIAL_CATALOG.map((item) => ({
+    type: item.type,
+    icon: item.icon,
+    source: "official" as const,
+    title: t(TYPE_LABELS[item.type] ?? `widgets:${item.type}.title`),
+    description: t(item.descKey),
+    permissions: [] as string[],
+    comingSoon: item.comingSoon ?? false,
+    group: item.group,
+  }));
+}
+
 // ── Main component ────────────────────────────────────────────
 
 export default function WidgetCenter() {
@@ -494,15 +683,13 @@ export default function WidgetCenter() {
     widgets.filter((w) => w.widget_type === type).length;
 
   // Build official entries list
-  const officialEntries = OFFICIAL_CATALOG.map((item) => ({
-    type: item.type,
-    icon: item.icon,
-    source: "official" as const,
-    title: t(`${item.type}.title`),
-    description: t(item.descKey),
-    permissions: [] as string[],
-    comingSoon: item.comingSoon ?? false,
-  }));
+  const officialEntries = buildOfficialEntries(t);
+
+  // Group official entries by category.
+  const officialEntriesByGroup = GROUP_ORDER.reduce((acc, group) => {
+    acc[group] = officialEntries.filter((e) => e.group === group);
+    return acc;
+  }, {} as Record<WidgetGroup, typeof officialEntries>);
 
   // Build third-party entries from registry
   const thirdPartyEntries = registryItems
@@ -578,7 +765,7 @@ export default function WidgetCenter() {
   };
 
   return (
-    <div className="p-6 space-y-5 animate-fade-in">
+    <div className="p-6 space-y-5 animate-fade-in h-full flex flex-col">
       {/* Permission dialog */}
       <WidgetPermissionDialog
         open={permDialog.open}
@@ -625,148 +812,152 @@ export default function WidgetCenter() {
 
       {/* ── My Widgets tab ── */}
       {tab === "mine" && (
-        <>
-          {loading && (
-            <AsyncStateCard variant="loading" title={t("loading")} compact />
-          )}
-          {!loading && widgets.length === 0 && (
-            <AsyncStateCard
-              variant="empty"
-              title={t("noWidgets")}
-              action={(
+        <div className="flex-1 min-h-0 overflow-y-auto pr-1">
+          <div className="space-y-4">
+            {loading && (
+              <AsyncStateCard variant="loading" title={t("loading")} compact />
+            )}
+            {!loading && widgets.length === 0 && (
+              <AsyncStateCard
+                variant="empty"
+                title={t("noWidgets")}
+                action={(
+                  <button
+                    onClick={() => setTab("selfAdd")}
+                    className="text-xs text-accent-blue underline underline-offset-2"
+                  >
+                    {t("selfAdd")} →
+                  </button>
+                )}
+              />
+            )}
+            {!loading && widgets.length > 0 && (
+              <div className="flex justify-end">
                 <button
                   onClick={() => setTab("selfAdd")}
-                  className="text-xs text-accent-blue underline underline-offset-2"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs border border-surface-border text-text-secondary hover:text-text-primary"
                 >
-                  {t("selfAdd")} →
+                  <Plus size={12} /> {t("selfAdd")}
                 </button>
-              )}
-            />
-          )}
-          {!loading && widgets.length > 0 && (
-            <div className="flex justify-end">
-              <button
-                onClick={() => setTab("selfAdd")}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs border border-surface-border text-text-secondary hover:text-text-primary"
-              >
-                <Plus size={12} /> {t("selfAdd")}
-              </button>
-            </div>
-          )}
-          {!loading && widgets.length > 0 && (
-            <div className={clsx(
-              "grid gap-3",
-              widgets.length === 1 ? "grid-cols-1" : "grid-cols-2"
-            )}>
-              {widgets.map((w) => (
-                <WidgetCard
-                  key={w.id}
-                  config={w}
-                  permissionEntries={permissionMatrixByWidget[w.id] ?? []}
-                  permissionAuditEntries={permissionAuditByWidget[w.id] ?? []}
-                  onPermissionsChanged={() => {
-                    void refreshPermissionData();
-                  }}
-                  onNotify={(message) => {
-                    setImportMsg(message);
-                    setTimeout(() => setImportMsg(null), 4000);
-                  }}
-                />
-              ))}
-            </div>
-          )}
-          {importMsg && (
-            <p className={clsx(
-              "text-xs px-3 py-2 rounded-lg",
-              importMsg.kind === "ok" ? "bg-accent-green/10 text-accent-green" : "bg-accent-red/10 text-accent-red"
-            )}>
-              {importMsg.text}
-            </p>
-          )}
-        </>
+              </div>
+            )}
+            {!loading && widgets.length > 0 && (
+              <div className={clsx(
+                "grid gap-3",
+                widgets.length === 1 ? "grid-cols-1" : "grid-cols-2"
+              )}>
+                {widgets.map((w) => (
+                  <WidgetCard
+                    key={w.id}
+                    config={w}
+                    permissionEntries={permissionMatrixByWidget[w.id] ?? []}
+                    permissionAuditEntries={permissionAuditByWidget[w.id] ?? []}
+                    onPermissionsChanged={() => {
+                      void refreshPermissionData();
+                    }}
+                    onNotify={(message) => {
+                      setImportMsg(message);
+                      setTimeout(() => setImportMsg(null), 4000);
+                    }}
+                  />
+                ))}
+              </div>
+            )}
+            {importMsg && (
+              <p className={clsx(
+                "text-xs px-3 py-2 rounded-lg",
+                importMsg.kind === "ok" ? "bg-accent-green/10 text-accent-green" : "bg-accent-red/10 text-accent-red"
+              )}>
+                {importMsg.text}
+              </p>
+            )}
+          </div>
+        </div>
       )}
 
       {/* ── Add Widget tab — split columns ── */}
       {tab === "selfAdd" && (
-        <div className="flex gap-6">
+        <div className="flex-1 min-h-0 flex gap-1">
           {/* Left column: official */}
-          <div className="flex-1 min-w-0 space-y-3">
-            <p className="text-xs font-semibold text-text-secondary uppercase tracking-wider">
-              {t("officialWidgets")}
-            </p>
-            <div className="space-y-3">
-              {officialEntries.map(({ type, icon, description, title, source, permissions }) => (
-                <MarketplaceCard
-                  key={type}
-                  type={type}
-                  title={title}
-                  icon={icon}
-                  source={source}
-                  description={description}
-                  permissions={permissions}
-                  installedCount={countByType(type)}
-                  onAdd={handleAdd}
-                />
-              ))}
+          <div className="flex-1 min-w-0 h-full overflow-y-auto px-2 py-1">
+            <div className="space-y-5">
+              {GROUP_ORDER.map((group) => {
+                const groupEntries = officialEntriesByGroup[group];
+                if (!groupEntries || groupEntries.length === 0) return null;
+                return (
+                  <OfficialWidgetGroup
+                    key={group}
+                    group={group}
+                    entries={groupEntries}
+                    installedCount={countByType}
+                    onAdd={handleAdd}
+                  />
+                );
+              })}
             </div>
           </div>
 
+          {/* Subtle divider */}
+          <div className="w-px h-full bg-surface-border/60 flex-shrink-0" />
+
           {/* Right column: third-party */}
-          <div className="flex-1 min-w-0 space-y-3">
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold text-text-secondary uppercase tracking-wider">
-                {t("thirdPartyWidgets")}
-              </p>
-              <div className="flex items-center gap-2">
-                {showDevHarness && (
+          <div className="flex-1 min-w-0 h-full overflow-y-auto px-2 py-1">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold text-text-secondary uppercase tracking-wider">
+                  {t("thirdPartyWidgets")}
+                </p>
+                <div className="flex items-center gap-2">
+                  {showDevHarness && (
+                    <button
+                      onClick={() => navigate("/widget-dev-harness")}
+                      className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs border border-surface-border
+                                 text-text-secondary hover:text-text-primary transition-colors"
+                    >
+                      <Wrench size={12} /> {t("devHarness.open")}
+                    </button>
+                  )}
                   <button
-                    onClick={() => navigate("/widget-dev-harness")}
+                    onClick={handleImportLocalWidget}
                     className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs border border-surface-border
                                text-text-secondary hover:text-text-primary transition-colors"
                   >
-                    <Wrench size={12} /> {t("devHarness.open")}
+                    <FolderOpen size={12} /> {t("importLocalWidget")}
                   </button>
-                )}
-                <button
-                  onClick={handleImportLocalWidget}
-                  className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs border border-surface-border
-                             text-text-secondary hover:text-text-primary transition-colors"
-                >
-                  <FolderOpen size={12} /> {t("importLocalWidget")}
-                </button>
+                </div>
               </div>
-            </div>
 
-            {thirdPartyEntries.length === 0 && (
-              <AsyncStateCard variant="empty" title={t("thirdParty.noWidgets")} compact />
-            )}
-            <div className="space-y-3">
-              {thirdPartyEntries.map(({ type, icon, description, title, source, permissions }) => (
-                <MarketplaceCard
-                  key={type}
-                  type={type}
-                  title={title}
-                  icon={icon}
-                  source={source}
-                  description={description}
-                  permissions={permissions}
-                  installedCount={countByType(type)}
-                  onAdd={handleAdd}
-                />
-              ))}
-            </div>
-
-            {/* Registry errors */}
-            {registryErrors.length > 0 && (
-              <div className="space-y-1.5 mt-2">
-                {registryErrors.map((err, i) => (
-                  <div key={i} className="flex items-start gap-2 p-2 rounded-lg bg-accent-red/10 text-accent-red text-xs">
-                    <span className="font-mono opacity-70 truncate">{err.path}</span>
-                    <span>{err.message}</span>
-                  </div>
+              {thirdPartyEntries.length === 0 && (
+                <AsyncStateCard variant="empty" title={t("thirdParty.noWidgets")} compact />
+              )}
+              <div className="space-y-3">
+                {thirdPartyEntries.map(({ type, icon, description, title, source, permissions }) => (
+                  <MarketplaceCard
+                    key={type}
+                    type={type}
+                    title={title}
+                    icon={icon}
+                    source={source}
+                    description={description}
+                    permissions={permissions}
+                    installedCount={countByType(type)}
+                    onAdd={handleAdd}
+                  />
                 ))}
               </div>
-            )}
+
+              {/* Registry errors */}
+              {registryErrors.length > 0 && (
+                <div className="space-y-1.5 mt-2">
+                  {registryErrors.map((err, i) => (
+                    <div key={i} className="flex items-start gap-2 p-2 rounded-lg bg-accent-red/10 text-accent-red text-xs">
+                      <span className="font-mono opacity-70 truncate">{err.path}</span>
+                      <span>{err.message}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

@@ -5,6 +5,31 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [2.0.5] - 2026-08-26
+
+### Added
+
+- **Widget Center two-column layout** — official widgets and third-party widgets now scroll independently, with a subtler divider and proper edge padding so the left column is no longer clipped.
+- **Cross-window Quick Capture refresh** — capturing a todo or note from the Quick Capture widget now broadcasts a Tauri event, so open Todo and Note widgets refresh automatically.
+- **Widget error reporter** — added `useWidgetErrorReporter` hook that catches unhandled errors and promise rejections in first-party widgets and records them to the per-widget error log with recovery hints.
+- **Error log filtering** — the Widget Center error log panel now has a real-time filter input.
+- **Settings auto-blur modal** — turning on "Fade widgets when unfocused" now opens a modal where users can choose which widgets auto-blur; the choice is persisted per widget and editable later from the same settings card.
+
+### Changed
+
+- **Pet widget rewrite** — simplified the desktop pet into a cleaner companion view with import success/error feedback and integrated error reporting.
+- **Focus rule save UX** — the Focus Mode rule form now validates required fields, shows a loading state, and displays success or error messages after saving.
+
+### Fixed
+
+- **Focus Coach timer showing `-2` / freezing** — the widget now parses backend local datetimes as local time instead of UTC, preventing negative durations. The timer also starts counting immediately and the button label updates right away.
+- **Focus Coach button state** — "Start Focus" now correctly becomes "Stop Focus" after a session is started.
+- **Focus rule "Add rule" not working** — the backend `FocusRule` model now accepts an optional `created_at`, so rules submitted from the frontend save successfully instead of failing deserialization.
+- **Goals and Categories dropdown layering** — the app/executable picker dropdown now renders above subsequent cards instead of being clipped underneath.
+- **Widget auto-blur and permission item backgrounds** — lowered the background opacity of per-widget items in Settings for a lighter appearance.
+
+---
+
 ## [2.0.2] - 2026-07-27
 
 ### Added

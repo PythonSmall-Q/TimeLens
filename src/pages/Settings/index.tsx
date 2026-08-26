@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSettingsStore } from "@/stores/settingsStore";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
-import { Moon, Sun, Activity, Database, Info, Rocket, Keyboard, PanelsTopLeft, ArrowLeft, Search, Lock, Copy, RotateCw, User, Shield } from "lucide-react";
+import { Moon, Sun, Activity, Database, Info, Rocket, Keyboard, PanelsTopLeft, ArrowLeft, Search, Lock, Copy, RotateCw, User, Shield, Droplet } from "lucide-react";
 import clsx from "clsx";
 import * as api from "@/services/tauriApi";
 import { APP_VERSION } from "../../version";
@@ -28,6 +28,8 @@ import type {
   RetentionRunResult,
   ShortcutSettings,
   TrackingTransparencyReport,
+  WidgetConfig,
+  WidgetPermissionEntry,
 } from "@/types";
 import ExePickerInput from "@/components/ExePickerInput";
 import BackupSection from "./BackupSection";
@@ -114,6 +116,10 @@ export default function Settings() {
     start_recording: "Alt+R",
     pause_recording: "Alt+P",
   });
+  const [widgetList, setWidgetList] = useState<WidgetConfig[]>([]);
+  const [widgetPermissions, setWidgetPermissions] = useState<Record<string, WidgetPermissionEntry[]>>({});
+  const [widgetAutoBlur, setWidgetAutoBlur] = useState<Record<string, boolean>>({});
+  const [autoBlurDialogOpen, setAutoBlurDialogOpen] = useState(false);
 
   // v2.0.0 data health state
   const [integrityResult, setIntegrityResult] = useState<DataIntegrityResult | null>(null);
@@ -300,7 +306,43 @@ export default function Settings() {
 
     const fade = localStorage.getItem("timelens-widget-fade-on-blur");
     setFadeOnBlur(fade !== "0");
+
+    // Load widget permission matrix for the widgets settings panel.
+    const loadWidgetPermissions = async () => {
+      try {
+        const widgets = await api.getAllWidgets();
+        setWidgetList(widgets);
+        const entries = await Promise.all(
+          widgets.map(async (w) => {
+            try {
+              const perms = await api.getWidgetPermissionMatrix(w.id);
+              return [w.id, perms] as [string, WidgetPermissionEntry[]];
+            } catch {
+              return [w.id, []] as [string, WidgetPermissionEntry[]];
+            }
+          })
+        );
+        setWidgetPermissions(Object.fromEntries(entries));
+      } catch {
+        setWidgetList([]);
+        setWidgetPermissions({});
+      }
+    };
+    void loadWidgetPermissions();
   }, []);
+
+  // Load per-widget auto-blur preferences when the widget list is known.
+  useEffect(() => {
+    const next: Record<string, boolean> = {};
+    widgetList.forEach((w) => {
+      try {
+        next[w.id] = localStorage.getItem(`${w.id}-auto-blur`) === "1";
+      } catch {
+        next[w.id] = false;
+      }
+    });
+    setWidgetAutoBlur(next);
+  }, [widgetList]);
 
   const setShortcut = (key: keyof ShortcutSettings, value: string) => {
     setShortcutState((prev) => ({ ...prev, [key]: value }));
@@ -1266,6 +1308,9 @@ export default function Settings() {
               const next = !fadeOnBlur;
               setFadeOnBlur(next);
               localStorage.setItem("timelens-widget-fade-on-blur", next ? "1" : "0");
+              if (next && widgetList.length > 0) {
+                setAutoBlurDialogOpen(true);
+              }
             }}
             title={t("widgets.fadeOnBlur")}
             className={clsx(
@@ -1282,6 +1327,115 @@ export default function Settings() {
           </button>
         </SettingsRow>
         <p className="text-xs text-text-muted text-right">{t("widgets.fadeHint")}</p>
+
+        {autoBlurDialogOpen && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+            <div className="w-full max-w-md rounded-2xl border border-surface-border bg-surface-card shadow-2xl p-5 space-y-4">
+              <div className="flex items-center gap-2">
+                <Droplet size={18} className="text-accent-blue" />
+                <h3 className="text-base font-semibold text-text-primary">{t("widgets.autoBlurTitle")}</h3>
+              </div>
+              <p className="text-xs text-text-muted">{t("widgets.autoBlurDesc")}</p>
+              <div className="space-y-1.5 max-h-72 overflow-y-auto pr-1">
+                {widgetList.map((w) => (
+                  <label
+                    key={w.id}
+                    className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl border border-surface-border bg-surface-hover/20 cursor-pointer hover:border-accent-blue/30 transition-colors"
+                  >
+                    <span className="text-sm text-text-secondary truncate">
+                      {w.widget_type} <span className="text-text-muted font-mono text-xs">({w.id})</span>
+                    </span>
+                    <input
+                      type="checkbox"
+                      className="ui-checkbox flex-shrink-0"
+                      checked={widgetAutoBlur[w.id] ?? false}
+                      onChange={(e) => {
+                        const next = e.target.checked;
+                        try {
+                          localStorage.setItem(`${w.id}-auto-blur`, next ? "1" : "0");
+                        } catch {
+                          // ignore
+                        }
+                        setWidgetAutoBlur((prev) => ({ ...prev, [w.id]: next }));
+                      }}
+                    />
+                  </label>
+                ))}
+              </div>
+              <div className="flex justify-end">
+                <button
+                  onClick={() => setAutoBlurDialogOpen(false)}
+                  className="px-4 py-2 rounded-xl text-sm font-medium bg-accent-blue text-white hover:bg-accent-blue/90 transition-colors"
+                >
+                  {t("common:confirm")}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {fadeOnBlur && widgetList.length > 0 && (
+          <div className="mt-4 rounded-xl border border-surface-border bg-surface-hover/20 p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-medium text-text-primary flex items-center gap-2">
+                <Droplet size={14} className="text-accent-blue" />
+                {t("widgets.autoBlurTitle")}
+              </h4>
+              <button
+                onClick={() => setAutoBlurDialogOpen(true)}
+                className="text-xs px-2 py-1 rounded-lg border border-surface-border text-text-secondary hover:text-text-primary transition-colors"
+              >
+                {t("common:edit")}
+              </button>
+            </div>
+            <p className="text-[11px] text-text-muted">{t("widgets.autoBlurDesc")}</p>
+            <div className="text-xs text-text-secondary">
+              {Object.entries(widgetAutoBlur).filter(([, v]) => v).length} / {widgetList.length}{" "}
+              {t("widgets.autoBlurEnabledCount")}
+            </div>
+          </div>
+        )}
+
+        {/* Widget permission review */}
+        <div className="mt-5 pt-4 border-t border-surface-border">
+          <h4 className="text-sm font-medium text-text-primary mb-2 flex items-center gap-2">
+            <Shield size={14} className="text-accent-blue" />
+            {t("widgets.permissionsTitle")}
+          </h4>
+          {widgetList.length === 0 ? (
+            <p className="text-xs text-text-muted">{t("widgets.noWidgetsForPermissions")}</p>
+          ) : (
+            <div className="space-y-3">
+              {widgetList.map((w) => {
+                const perms = widgetPermissions[w.id] ?? [];
+                return (
+                  <div key={w.id} className="rounded-lg border border-surface-border bg-surface-hover/20 p-3">
+                    <div className="flex items-center justify-between gap-2 mb-1.5">
+                      <span className="text-xs font-medium text-text-primary">{w.widget_type}</span>
+                      <span className="text-[10px] font-mono text-text-muted">{w.id}</span>
+                    </div>
+                    {perms.length === 0 ? (
+                      <p className="text-[11px] text-text-muted">{t("widgets.noPermissions")}</p>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {perms.map((p) => (
+                          <div key={p.permission} className="text-[11px] text-text-secondary flex items-center justify-between gap-2">
+                            <span className="truncate">{p.permission}</span>
+                            <span className="text-text-muted whitespace-nowrap">
+                              {p.last_access_at
+                                ? new Date(p.last_access_at).toLocaleString()
+                                : t("widgets.neverAccessed")}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </SettingsCard>
       )}
 

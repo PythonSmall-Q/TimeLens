@@ -4,7 +4,7 @@
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
   IgnorableNamespaces="uap rescap">
-  <Identity Name="ShanWenxiao.TimeLens-TimeManagementAppwithWidgets" Publisher="CN=67203FD7-3571-4CF3-9A8B-DE6BA454CE5B" Version="2.0.2.0" />
+  <Identity Name="ShanWenxiao.TimeLens-TimeManagementAppwithWidgets" Publisher="CN=67203FD7-3571-4CF3-9A8B-DE6BA454CE5B" Version="2.0.5.0" />
   <Properties>
     <DisplayName>TimeLens - Time Management App with Widgets</DisplayName>
     <PublisherDisplayName>Shan Wenxiao</PublisherDisplayName>

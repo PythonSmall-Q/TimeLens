@@ -44,6 +44,12 @@
     "ruleMetaTimeWindow": "时段：{{start}} - {{end}}",
     "ruleMetaApp": "应用：{{app}}",
     "noMatch": "规则未匹配当前条件。",
-    "simulationError": "当前无法评估规则。"
+    "simulationError": "当前无法评估规则。",
+    "saveSuccess": "规则已保存。",
+    "saveFailed": "保存规则失败。",
+    "nameRequired": "请输入规则名称。",
+    "keywordRequired": "请输入关键词。",
+    "appRequired": "请输入应用名称。",
+    "timeWindowRequired": "请选择开始和结束时间。"
   }
 }

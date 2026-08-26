@@ -51,5 +51,11 @@
   "skipToMainContent": "Saltar al contenido principal",
   "mainNavigation": "Navegación principal",
   "clearSearch": "Borrar búsqueda",
-  "openGlobalSearch": "Abrir búsqueda global"
+  "openGlobalSearch": "Abrir búsqueda global",
+  "browseExecutable": "Browse for executable",
+  "searchAppPlaceholder": "Search app…",
+  "noAppsFoundBrowse": "No apps found — use the folder button to browse",
+  "executableFilter": "Executable",
+  "unknownError": "Unknown error",
+  "unhandledRejection": "Unhandled promise rejection"
 }

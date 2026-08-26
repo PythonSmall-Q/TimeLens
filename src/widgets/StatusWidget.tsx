@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { CheckSquare2, Plus, RotateCcw, X } from "lucide-react";
+import { CheckSquare2, Plus, RotateCcw, X, Zap, Flame } from "lucide-react";
+import * as api from "@/services/tauriApi";
 
 interface Props {
   widgetId: string;
@@ -17,6 +18,8 @@ interface HabitItem {
 interface HabitState {
   date: string;
   habits: HabitItem[];
+  streak: number;
+  lastCompletedDate: string | null;
 }
 
 function todayKey(): string {
@@ -38,6 +41,8 @@ function loadHabits(widgetId: string, fallback: HabitItem[]): HabitState {
     return {
       date: todayKey(),
       habits: fallback,
+      streak: 0,
+      lastCompletedDate: null,
     };
   }
   try {
@@ -52,23 +57,38 @@ function loadHabits(widgetId: string, fallback: HabitItem[]): HabitState {
         }))
       : fallback;
 
+    const streak = typeof parsed.streak === "number" ? parsed.streak : 0;
+    const lastCompletedDate = typeof parsed.lastCompletedDate === "string" ? parsed.lastCompletedDate : null;
+
     // Day changed: keep content, reset checkboxes.
     if (parsed.date !== currentDate) {
       return {
         date: currentDate,
         habits: safeHabits.map((h) => ({ ...h, done: false })),
+        streak,
+        lastCompletedDate,
       };
     }
     return {
       date: currentDate,
       habits: safeHabits,
+      streak,
+      lastCompletedDate,
     };
   } catch {
     return {
       date: todayKey(),
       habits: fallback,
+      streak: 0,
+      lastCompletedDate: null,
     };
   }
+}
+
+function yesterdayKey(): string {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return d.toISOString().slice(0, 10);
 }
 
 export default function StatusWidget({ widgetId }: Props) {
@@ -77,25 +97,57 @@ export default function StatusWidget({ widgetId }: Props) {
     loadHabits(widgetId, defaultHabits((k, p) => t(k, p)))
   );
   const [selectedId, setSelectedId] = useState<string>(() => state.habits[0]?.id ?? "");
+  const [focusActive, setFocusActive] = useState(false);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const active = await api.getFocusModeActive();
+        setFocusActive(active);
+      } catch {
+        // Ignore focus load errors.
+      }
+    };
+    void load();
+    const timer = setInterval(() => void load(), 10000);
+    return () => clearInterval(timer);
+  }, []);
 
   const saveState = (next: HabitState) => {
     setState(next);
     localStorage.setItem(`${widgetId}-habit-board`, JSON.stringify(next));
   };
 
+  const computeStreak = (habits: HabitItem[], currentStreak: number, lastCompletedDate: string | null): { streak: number; lastCompletedDate: string | null } => {
+    const allDone = habits.length > 0 && habits.every((h) => h.done);
+    if (!allDone) return { streak: currentStreak, lastCompletedDate };
+
+    const today = todayKey();
+    if (lastCompletedDate === today) return { streak: currentStreak, lastCompletedDate };
+
+    const yesterday = yesterdayKey();
+    const newStreak = lastCompletedDate === yesterday || lastCompletedDate === today ? currentStreak + 1 : 1;
+    return { streak: newStreak, lastCompletedDate: today };
+  };
+
+  const updateHabits = (habits: HabitItem[]) => {
+    const { streak, lastCompletedDate } = computeStreak(habits, state.streak, state.lastCompletedDate);
+    saveState({ ...state, habits, streak, lastCompletedDate });
+  };
+
   const setHabitTitle = (id: string, title: string) => {
     const habits = state.habits.map((h) => (h.id === id ? { ...h, title } : h));
-    saveState({ ...state, habits });
+    updateHabits(habits);
   };
 
   const setHabitNote = (id: string, note: string) => {
     const habits = state.habits.map((h) => (h.id === id ? { ...h, note } : h));
-    saveState({ ...state, habits });
+    updateHabits(habits);
   };
 
   const toggleHabit = (id: string) => {
     const habits = state.habits.map((h) => (h.id === id ? { ...h, done: !h.done } : h));
-    saveState({ ...state, habits });
+    updateHabits(habits);
   };
 
   const addHabit = () => {
@@ -130,7 +182,15 @@ export default function StatusWidget({ widgetId }: Props) {
   return (
     <div className="w-full h-full glass-card flex flex-col p-4 select-none overflow-hidden">
       <div data-tauri-drag-region className="flex items-center justify-between mb-3">
-        <span className="text-text-muted text-xs">{t("status.title")}</span>
+        <div className="flex items-center gap-2">
+          <span className="text-text-muted text-xs">{t("status.title")}</span>
+          {focusActive && (
+            <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-accent-blue/15 text-accent-blue">
+              <Zap size={10} />
+              {t("status.focusBadge")}
+            </span>
+          )}
+        </div>
         <button
           onClick={() => getCurrentWebviewWindow().close()}
           className="text-text-muted hover:text-accent-red transition-colors"
@@ -139,6 +199,22 @@ export default function StatusWidget({ widgetId }: Props) {
         >
           <X size={13} />
         </button>
+      </div>
+
+      <div className="flex items-center gap-3 mb-3">
+        <div className="flex-1 rounded-xl border border-surface-border bg-surface-hover/40 p-2.5 flex items-center gap-2">
+          <div className="p-1.5 rounded-lg bg-accent-orange/10 text-accent-orange">
+            <Flame size={14} />
+          </div>
+          <div>
+            <div className="text-[11px] text-text-muted uppercase tracking-wider">{t("status.streak")}</div>
+            <div className="text-base font-semibold text-text-primary">{state.streak}</div>
+          </div>
+        </div>
+        <div className="flex-1 rounded-xl border border-surface-border bg-surface-hover/40 p-2.5">
+          <div className="text-[11px] text-text-muted uppercase tracking-wider">{t("status.completion")}</div>
+          <div className="text-base font-semibold text-text-primary">{percent}%</div>
+        </div>
       </div>
 
       <div className="flex-1 min-h-0 grid grid-cols-[0.95fr_1.35fr] gap-3">
@@ -231,7 +307,7 @@ export default function StatusWidget({ widgetId }: Props) {
         <button
           onClick={addHabit}
           disabled={state.habits.length >= 8}
-          className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md border border-accent-blue/40 text-accent-blue hover:bg-accent-blue/10 transition-colors"
+          className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md border border-accent-blue/40 text-accent-blue hover:bg-accent-blue/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Plus size={12} />
           {t("status.addHabit")}

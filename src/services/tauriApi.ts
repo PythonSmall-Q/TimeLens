@@ -67,6 +67,9 @@ import type {
   LocalApiSecuritySettings,
   WidgetPermissionEntry,
   WidgetPermissionAuditEntry,
+  WidgetQueryRequest,
+  WidgetErrorLogEntry,
+  WidgetLifecycleEvent,
 } from "@/types";
 
 let localApiBaseUrl = "http://127.0.0.1:49152";
@@ -283,6 +286,18 @@ export const setFocusModeActive = (active: boolean): Promise<void> =>
 
 export const getFocusModeActive = (): Promise<boolean> =>
   invoke("get_focus_mode_active");
+
+export interface QuietHoursSettings {
+  enabled: boolean;
+  start: string;
+  end: string;
+}
+
+export const getQuietHours = (): Promise<QuietHoursSettings> =>
+  invoke("get_quiet_hours");
+
+export const setQuietHours = (settings: QuietHoursSettings): Promise<void> =>
+  invoke("set_quiet_hours", { settings });
 
 export const startFocusSession = (
   reason?: string,
@@ -604,6 +619,60 @@ export const revokeAllWidgetPermissions = (widgetId: string, actor?: string): Pr
 export const importLocalWidget = (srcDir: string): Promise<WidgetRegistryItem> =>
   invoke("import_local_widget", { srcDir });
 
+export const importPetPack = (widgetId: string, srcDir: string): Promise<WidgetConfig> =>
+  invoke("import_pet_pack", { widgetId, srcDir });
+
+export const setWidgetPaused = (widgetId: string, paused: boolean): Promise<void> =>
+  invoke("set_widget_paused", { widgetId, paused });
+
+export const widgetQuery = <T = unknown>(
+  request: WidgetQueryRequest
+): Promise<T> => invoke("widget_query", { request });
+
+export const widgetSubscribe = (
+  widgetId: string,
+  events: string[]
+): Promise<void> => invoke("widget_subscribe", { widgetId, events });
+
+export const widgetUnsubscribe = (widgetId: string): Promise<void> =>
+  invoke("widget_unsubscribe", { widgetId });
+
+export const getWidgetState = (
+  widgetId: string,
+  key: string
+): Promise<string | null> => invoke("get_widget_state", { widgetId, key });
+
+export const setWidgetState = (
+  widgetId: string,
+  key: string,
+  value: string
+): Promise<void> => invoke("set_widget_state", { widgetId, key, value });
+
+export const deleteWidgetState = (widgetId: string, key: string): Promise<void> =>
+  invoke("delete_widget_state", { widgetId, key });
+
+export const emitWidgetLifecycle = (request: WidgetLifecycleEvent): Promise<void> =>
+  invoke("emit_widget_lifecycle", { request });
+
+export const recordWidgetError = (
+  widgetId: string,
+  error: string,
+  recoveryHint?: string
+): Promise<void> => invoke("record_widget_error", { widgetId, error, recoveryHint });
+
+export const getWidgetErrorLog = (
+  widgetId: string,
+  limit = 20
+): Promise<WidgetErrorLogEntry[]> => invoke("get_widget_error_log", { widgetId, limit });
+
+export const clearWidgetErrorLog = (widgetId: string): Promise<void> =>
+  invoke("clear_widget_error_log", { widgetId });
+
+export const resetWidgetPermissionsAndState = (
+  widgetId: string,
+  actor?: string
+): Promise<void> => invoke("reset_widget_permissions_and_state", { widgetId, actor });
+
 export const issueWidgetApiToken = (
   widgetId: string,
   scopes: string[]
@@ -782,3 +851,11 @@ export const setLocalApiSecuritySettings = (
     allowlistEnforced: patch.allowlist_enforced,
     rateLimitPerMin: patch.rate_limit_per_min,
   });
+
+// ── Widget runtime v2.2.0 event listener ──────────────────────
+
+export const listenWidgetEvent = <T = unknown>(
+  event: string,
+  callback: (payload: T) => void
+): Promise<UnlistenFn> =>
+  listen<T>(`widget:${event}`, (e) => callback(e.payload));

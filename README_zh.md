@@ -165,6 +165,8 @@ TimeLens/
 ## 🗺 路线图
 
 - [统一路线图](docs/ROADMAP.md)
+- [小组件底层重写专项路线图（提案）](docs/ROADMAP_WIDGET_RUNTIME_REWRITE.md)
+- [小组件底层重写详细实施方案（草案）](docs/WIDGET_RUNTIME_REWRITE_IMPLEMENTATION_PLAN.md)
 
 ---
 

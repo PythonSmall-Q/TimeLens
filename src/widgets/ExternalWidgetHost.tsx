@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useTranslation } from "react-i18next";
 import * as api from "@/services/tauriApi";
-import type { WidgetRegistryItem } from "@/types";
+import type { WidgetQueryNamespace, WidgetRegistryItem } from "@/types";
 
 interface Props {
   widgetId: string;
@@ -14,11 +15,24 @@ interface ThirdPartyWidgetInstance {
   unmount?: () => void | Promise<void>;
 }
 
-// Expanded channel exposed to third-party widgets
 interface ThirdPartyWidgetContext {
   widgetId: string;
   widgetType: string;
   channel: Record<string, (...args: unknown[]) => Promise<unknown>>;
+  lifecycle: {
+    onMount?: () => void;
+    onForeground?: () => void;
+    onBackground?: () => void;
+    onSuspend?: () => void;
+    onResume?: () => void;
+    onUninstall?: () => void;
+  };
+}
+
+interface SubscriptionRecord {
+  event: string;
+  callback: (payload: unknown) => void;
+  unlisten?: () => void;
 }
 
 function normalizeModule(
@@ -53,7 +67,7 @@ function normalizeModule(
   return null;
 }
 
-// Permission → channel method names mapping
+// Permission → legacy channel method names mapping
 const PERMISSION_METHODS: Record<string, string[]> = {
   "screen-time:read": [
     "getTodayAppTotals",
@@ -74,7 +88,11 @@ function denied(method: string, perm: string): () => Promise<never> {
   return () => Promise.reject(new Error(`permission denied: ${perm} required for ${method}`));
 }
 
-function buildChannel(widgetId: string, grantedPerms: string[]) {
+function buildChannel(
+  widgetId: string,
+  grantedPerms: string[],
+  subscriptionsRef: React.MutableRefObject<SubscriptionRecord[]>
+) {
   const markPermissionAccess = (permission: string) => {
     void api.recordWidgetPermissionAccess(widgetId, permission).catch(() => {});
   };
@@ -89,7 +107,6 @@ function buildChannel(widgetId: string, grantedPerms: string[]) {
     };
   };
 
-  // Full method → api function map
   const allMethods: Record<string, (...args: unknown[]) => Promise<unknown>> = {
     // screen-time:read
     getTodayAppTotals: withPermission("screen-time:read", () => api.getTodayAppTotals() as Promise<unknown>),
@@ -158,6 +175,44 @@ function buildChannel(widgetId: string, grantedPerms: string[]) {
       }
       return (await resp.json()) as unknown;
     }),
+    // v2.2.0 typed query API (requires screen-time:read)
+    query: withPermission("screen-time:read", async (namespace: unknown, payload?: unknown) => {
+      const result = await api.widgetQuery<unknown>({
+        widget_id: widgetId,
+        namespace: namespace as WidgetQueryNamespace,
+        payload: payload as Record<string, unknown> | undefined,
+      });
+      return result;
+    }),
+    // v2.2.0 subscriptions
+    subscribe: withPermission("screen-time:read", async (event: unknown, cb: unknown) => {
+      const eventName = event as string;
+      const callback = cb as (payload: unknown) => void;
+      const unlisten = await api.listenWidgetEvent<unknown>(eventName, callback);
+      subscriptionsRef.current.push({ event: eventName, callback, unlisten });
+      return subscriptionsRef.current.length - 1;
+    }),
+    unsubscribe: async (handle: unknown) => {
+      const index = handle as number;
+      const record = subscriptionsRef.current[index];
+      if (record) {
+        record.unlisten?.();
+        subscriptionsRef.current[index] = { event: "", callback: () => {} };
+      }
+    },
+    // v2.2.0 scoped state persistence (no extra permission required)
+    getState: async (key: unknown) => {
+      const value = await api.getWidgetState(widgetId, key as string);
+      return value;
+    },
+    setState: async (key: unknown, value: unknown) => {
+      await api.setWidgetState(widgetId, key as string, value as string);
+      return undefined;
+    },
+    deleteState: async (key: unknown) => {
+      await api.deleteWidgetState(widgetId, key as string);
+      return undefined;
+    },
     // always available
     getUsageGoals: () => api.getUsageGoals() as Promise<unknown>,
     listFocusSessions: () => api.listFocusSessions() as Promise<unknown>,
@@ -184,7 +239,8 @@ function buildChannel(widgetId: string, grantedPerms: string[]) {
 export default function ExternalWidgetHost({ widgetId, widgetType }: Props) {
   const { t } = useTranslation("widgets");
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const unmountRef = useRef<ThirdPartyWidgetInstance["unmount"]>();
+  const unmountRef = useRef<ThirdPartyWidgetInstance["unmount"]>(undefined);
+  const subscriptionsRef = useRef<SubscriptionRecord[]>([]);
   const [registryItem, setRegistryItem] = useState<WidgetRegistryItem | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [grantedPerms, setGrantedPerms] = useState<string[]>([]);
@@ -218,15 +274,18 @@ export default function ExternalWidgetHost({ widgetId, widgetType }: Props) {
   }, [widgetId]);
 
   const channel = useMemo(
-    () => buildChannel(widgetId, grantedPerms),
+    () => buildChannel(widgetId, grantedPerms, subscriptionsRef),
     [widgetId, grantedPerms]
   );
 
   useEffect(() => {
     let disposed = false;
+    const win = getCurrentWebviewWindow();
 
     const run = async () => {
       try {
+        await api.emitWidgetLifecycle({ widget_id: widgetId, event: "mount" });
+
         const registry = await api.getWidgetRegistry();
         const item = registry.items.find((it) => it.widget_type === widgetType) ?? null;
         if (!item) {
@@ -251,26 +310,71 @@ export default function ExternalWidgetHost({ widgetId, widgetType }: Props) {
           return;
         }
 
+        const lifecycle: ThirdPartyWidgetContext["lifecycle"] = {
+          onMount: () => {
+            void api.emitWidgetLifecycle({ widget_id: widgetId, event: "foreground" });
+          },
+          onForeground: () => {
+            void api.emitWidgetLifecycle({ widget_id: widgetId, event: "foreground" });
+          },
+          onBackground: () => {
+            void api.emitWidgetLifecycle({ widget_id: widgetId, event: "background" });
+          },
+          onSuspend: () => {
+            void api.emitWidgetLifecycle({ widget_id: widgetId, event: "suspend" });
+          },
+          onResume: () => {
+            void api.emitWidgetLifecycle({ widget_id: widgetId, event: "resume" });
+          },
+          onUninstall: () => {
+            void api.emitWidgetLifecycle({ widget_id: widgetId, event: "uninstall" });
+          },
+        };
+
         await widget.mount(containerRef.current, {
           widgetId,
           widgetType,
           channel,
+          lifecycle,
         });
 
         unmountRef.current = widget.unmount;
+
+        // Listen to window focus changes for foreground/background lifecycle
+        const unlistenFocus = await win.onFocusChanged(({ payload: focused }) => {
+          if (focused) {
+            lifecycle.onForeground?.();
+          } else {
+            lifecycle.onBackground?.();
+          }
+        });
+
+        return () => {
+          unlistenFocus?.();
+        };
       } catch (err) {
         if (!disposed) {
-          setError(err instanceof Error ? err.message : String(err));
+          const message = err instanceof Error ? err.message : String(err);
+          setError(message);
+          void api.recordWidgetError(widgetId, message, t("thirdParty.loadErrorHint")).catch(() => {});
         }
+        return undefined;
       }
     };
 
-    run();
+    let cleanupFocus: (() => void) | undefined;
+    run().then((cleanup) => {
+      cleanupFocus = cleanup;
+    });
 
     return () => {
       disposed = true;
+      cleanupFocus?.();
       Promise.resolve(unmountRef.current?.()).catch(() => {});
       unmountRef.current = undefined;
+      subscriptionsRef.current.forEach((s) => s.unlisten?.());
+      subscriptionsRef.current = [];
+      void api.emitWidgetLifecycle({ widget_id: widgetId, event: "uninstall" }).catch(() => {});
     };
   }, [channel, widgetId, widgetType]);
 
@@ -282,6 +386,9 @@ export default function ExternalWidgetHost({ widgetId, widgetType }: Props) {
         </div>
         <div className="rounded-lg border border-accent-red/30 bg-accent-red/10 px-3 py-2 text-accent-red">
           {error}
+        </div>
+        <div className="text-[11px] text-text-muted">
+          {t("thirdParty.recoveryHint")}
         </div>
       </div>
     );

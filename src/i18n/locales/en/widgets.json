@@ -20,6 +20,14 @@
   "permissionTodoWrite": "Create / modify todos",
   "permissionSettingsWrite": "Change app settings",
   "permissionLocalApi": "Call the local TimeLens API",
+  "permissionRationale": {
+    "screen-time": "Allows the widget to read your app usage history and today’s screen time.",
+    "active-window": "Lets the widget react to which window is currently active.",
+    "todo-read": "Lets the widget display or count your existing tasks.",
+    "todo-write": "Allows the widget to create, complete, or modify tasks.",
+    "settings-write": "Allows the widget to update app settings like theme or behavior.",
+    "local-api": "Lets the widget call TimeLens APIs on your behalf from this device."
+  },
   "permissionsGranted": "Permissions granted",
   "registryErrors": "Load errors ({{count}})",
   "loading": "Loading...",
@@ -56,6 +64,7 @@
   "removeWidget": "Remove",
   "resetPosition": "Reset Position",
   "opacity": "Opacity",
+  "autoBlur": "Auto-blur when unfocused",
   "alwaysOnTop": "Always on Top",
   "alwaysOnTopMode": {
     "always": "Always",
@@ -69,7 +78,9 @@
     "showSeconds": "Show seconds",
     "hideSeconds": "Hide seconds",
     "digital": "Digital",
-    "analog": "Analog"
+    "analog": "Analog",
+    "focus": "Focus",
+    "focusTimer": "Focus"
   },
   "note": {
     "title": "Note",
@@ -82,7 +93,11 @@
     "empty": "No notes yet. Create your first one.",
     "selectHint": "Select a note to view or edit",
     "lastEdited": "Last edited",
-    "untitled": "Untitled note"
+    "untitled": "Untitled note",
+    "savedAt": "Saved at",
+    "unsaved": "Unsaved changes",
+    "recovered": "Notes restored from backup",
+    "restore": "Restore from backup"
   },
   "status": {
     "title": "Habit Tracker",
@@ -94,13 +109,17 @@
     "detailTitle": "Details",
     "notePlaceholder": "Add notes, trigger cues, or today's context...",
     "markDone": "Mark as done",
-    "empty": "No habits yet. Add one from the left panel"
+    "empty": "No habits yet. Add one from the left panel",
+    "focusBadge": "Focus",
+    "streak": "Streak",
+    "completion": "Completion"
   },
   "todo": {
     "title": "Todo",
     "addPlaceholder": "Add a task…",
     "emptyState": "All done! 🎉",
-    "clearCompleted": "Clear completed"
+    "clearCompleted": "Clear completed",
+    "noGoal": "Link to goal"
   },
   "timer": {
     "title": "Timer",
@@ -118,6 +137,59 @@
     "pomodoroComplete": "Pomodoro complete! Take a break.",
     "breakComplete": "Break over. Back to work!"
   },
+  "focusCoach": {
+    "title": "Focus Coach",
+    "focusActive": "Focus mode on",
+    "focusInactive": "Ready to focus",
+    "start": "Start focus",
+    "stop": "Stop focus",
+    "todayTotal": "Today",
+    "sessions": "Sessions",
+    "manualReason": "Focus coach"
+  },
+  "quickCapture": {
+    "title": "Quick Capture",
+    "todo": "Todo",
+    "note": "Note",
+    "todoPlaceholder": "Add a quick task…",
+    "notePlaceholder": "Jot a quick note…",
+    "addTodo": "Add todo",
+    "addNote": "Save note",
+    "saved": "Saved",
+    "hint": "Cmd/Ctrl + Enter to submit"
+  },
+  "sessionPulse": {
+    "title": "Session Pulse",
+    "focusTime": "Focus time",
+    "interruptions": "Switches",
+    "hourlyBreakdown": "Hourly breakdown",
+    "sessions": "Sessions",
+    "active": "Active",
+    "done": "Done",
+    "empty": "No activity data yet",
+    "noSessions": "No sessions today"
+  },
+  "goalProgress": {
+    "title": "Goal Progress",
+    "empty": "No active goals",
+    "done": "Done",
+    "over": "Over limit",
+    "period": {
+      "daily": "daily",
+      "weekly": "weekly"
+    },
+    "operator": {
+      "at_least": "at least",
+      "at_most": "at most"
+    }
+  },
+  "browserActivity": {
+    "title": "Browser Activity",
+    "connected": "Connected",
+    "disconnected": "Disconnected",
+    "visits": "visits",
+    "empty": "No browser data today"
+  },
   "marketplace": "Marketplace",
   "installed": "Installed",
   "addOne": "Add",
@@ -129,7 +201,12 @@
   "timerDesc": "Pomodoro, countdown, and stopwatch modes in a compact floating window.",
   "noteDesc": "Floating sticky-note pad for jotting down ideas without leaving your workflow.",
   "statusDesc": "Habit tracker widget to track daily goals and streaks.",
-  "petDesc": "Desktop pet widget is under development. Stay tuned.",
+  "petDesc": "A companion desktop pet widget that reacts to your flow. Supports custom pet packs.",
+  "focusCoachDesc": "Gentle nudges and guidance to keep your focus sessions on track.",
+  "quickCaptureDesc": "Instantly capture thoughts or tasks without breaking flow.",
+  "sessionPulseDesc": "Visualize your current focus session momentum at a glance.",
+  "goalProgressDesc": "Track progress toward your daily and weekly usage goals.",
+  "browserActivityDesc": "See website-level activity summaries from the browser extension.",
   "petStudio": {
     "title": "Pet Settings",
     "desc": "Adjust the current pet widget size and import a JSON pet pack.",
@@ -146,9 +223,24 @@
     "packImported": "Pet pack applied to {{count}} pet widgets.",
     "importPackError": "Failed to import pet pack"
   },
+  "group": {
+    "utility": "Utility",
+    "focus": "Focus",
+    "insight": "Insight",
+    "reflection": "Reflection"
+  },
+  "pauseUpdates": "Pause updates",
+  "resumeUpdates": "Resume updates",
+  "refreshNow": "Refresh now",
+  "errorLog": {
+    "title": "Error log",
+    "noErrors": "No errors logged yet.",
+    "clear": "Clear log",
+    "filterPlaceholder": "Filter errors..."
+  },
   "official": "Official",
   "pet": {
-    "title": "Desktop Pet (Coming Soon)",
+    "title": "Desktop Pet",
     "pack": "Pack",
     "focusLabel": "Focus mode",
     "restLabel": "Resting",
@@ -159,12 +251,35 @@
     "fallbackMessage": "I am here to keep your rhythm steady.",
     "manifestBadge": "Pet Pack",
     "clickAction": "Tap",
-    "comingSoon": "Desktop pet widget is under development. Stay tuned."
+    "comingSoon": "Desktop pet widget is under development. Stay tuned.",
+    "importSuccess": "Pet pack imported.",
+    "importError": "Could not import pet pack.",
+    "fallback": {
+      "name": "Companion",
+      "description": "A friendly desktop companion.",
+      "characterName": "Buddy",
+      "states": {
+        "idle": { "label": "Companion", "messages": ["I am here to keep your rhythm steady."] },
+        "focus": { "label": "Focus mode", "messages": ["Protect this block. You do not need to switch context yet."] },
+        "rest": { "label": "Resting", "messages": ["A short reset is part of the work, not a failure."] }
+      },
+      "interactions": {
+        "tap_messages": ["Hydrate, breathe, then continue."]
+      }
+    }
   },
   "thirdParty": {
     "title": "Third-party Widget",
     "source": "Third-party",
     "loading": "Loading widget module...",
+    "recoveryHint": "Try revoking permissions, removing the widget, or importing an updated version.",
+    "loadErrorHint": "Check permissions and reload the widget.",
+    "recoveryHints": {
+      "permission": "Review widget permissions in Widget Center or Settings.",
+      "rateLimit": "The widget was rate-limited or suspended. Pause it or revoke and re-grant permissions.",
+      "network": "Check network access and that the requested local service is running.",
+      "generic": "Restart the widget or check its configuration."
+    },
     "noDescription": "No description provided.",
     "noWidgets": "No third-party widgets installed. Click \"Import Local Widget\" to add one."
   },

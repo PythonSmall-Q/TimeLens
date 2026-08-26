@@ -609,6 +609,70 @@ fn migration_010_compressed_archive(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
+/// Migration 011: widget runtime v2.2.0
+/// - Per-widget scoped state persistence
+/// - Per-widget subscription event set
+/// - Per-widget error log with recovery hints
+/// - Runtime lifecycle/control columns on widget_configs
+fn migration_011_widget_runtime_v220(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        "
+        CREATE TABLE IF NOT EXISTS widget_state (
+            widget_id   TEXT    NOT NULL,
+            key         TEXT    NOT NULL,
+            value       TEXT    NOT NULL,
+            updated_at  TEXT    NOT NULL,
+            PRIMARY KEY (widget_id, key)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_widget_state_widget_id
+            ON widget_state(widget_id);
+
+        CREATE TABLE IF NOT EXISTS widget_subscriptions (
+            widget_id   TEXT    PRIMARY KEY,
+            events_json TEXT    NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS widget_error_log (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            widget_id       TEXT    NOT NULL,
+            occurred_at     TEXT    NOT NULL,
+            error           TEXT    NOT NULL,
+            recovery_hint   TEXT    NOT NULL DEFAULT ''
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_widget_error_log_widget_time
+            ON widget_error_log(widget_id, occurred_at DESC);
+        ",
+    )?;
+
+    let add_if_missing = |table: &str, column: &str, ddl: &str| -> Result<()> {
+        let cols = super::table_columns(conn, table)?;
+        if !cols.iter().any(|c| c == column) {
+            conn.execute(ddl, [])?;
+        }
+        Ok(())
+    };
+
+    add_if_missing(
+        "widget_configs",
+        "paused",
+        "ALTER TABLE widget_configs ADD COLUMN paused INTEGER NOT NULL DEFAULT 0",
+    )?;
+    add_if_missing(
+        "widget_configs",
+        "consecutive_failures",
+        "ALTER TABLE widget_configs ADD COLUMN consecutive_failures INTEGER NOT NULL DEFAULT 0",
+    )?;
+    add_if_missing(
+        "widget_configs",
+        "suspended_until",
+        "ALTER TABLE widget_configs ADD COLUMN suspended_until TEXT",
+    )?;
+
+    Ok(())
+}
+
 pub const DEFAULT_PROFILE_ID: &str = "default";
 
 /// Compute the database file path for a given profile.
@@ -809,6 +873,9 @@ pub fn merge_default_profile_into_legacy_db(data_dir: &Path) -> Result<(), Strin
         ("browser_domain_limits", &[][..]),
         ("widget_permissions", &[][..]),
         ("widget_permission_audit_log", &[][..]),
+        ("widget_state", &[][..]),
+        ("widget_subscriptions", &[][..]),
+        ("widget_error_log", &[][..]),
         ("vscode_sessions", &[][..]),
         ("vscode_session_languages", &[][..]),
         ("api_tokens", &[][..]),
@@ -1007,6 +1074,7 @@ const MIGRATIONS: &[Migration] = &[
     Migration::new(8, "encryption_metadata", migration_008_encryption_metadata),
     Migration::new(9, "profile_settings", migration_009_profile_settings),
     Migration::new(10, "compressed_archive", migration_010_compressed_archive),
+    Migration::new(11, "widget_runtime_v220", migration_011_widget_runtime_v220),
 ];
 
 /// Returns the highest migration version defined.

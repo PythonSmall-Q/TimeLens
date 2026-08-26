@@ -51,5 +51,11 @@
   "skipToMainContent": "メインコンテンツへスキップ",
   "mainNavigation": "メインナビゲーション",
   "clearSearch": "検索をクリア",
-  "openGlobalSearch": "グローバル検索を開く"
+  "openGlobalSearch": "グローバル検索を開く",
+  "browseExecutable": "Browse for executable",
+  "searchAppPlaceholder": "Search app…",
+  "noAppsFoundBrowse": "No apps found — use the folder button to browse",
+  "executableFilter": "Executable",
+  "unknownError": "Unknown error",
+  "unhandledRejection": "Unhandled promise rejection"
 }

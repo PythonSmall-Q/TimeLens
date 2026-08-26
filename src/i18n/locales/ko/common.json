@@ -51,5 +51,11 @@
   "skipToMainContent": "주 콘텐츠로 건너뛰기",
   "mainNavigation": "주 탐색",
   "clearSearch": "검색 지우기",
-  "openGlobalSearch": "전역 검색 열기"
+  "openGlobalSearch": "전역 검색 열기",
+  "browseExecutable": "Browse for executable",
+  "searchAppPlaceholder": "Search app…",
+  "noAppsFoundBrowse": "No apps found — use the folder button to browse",
+  "executableFilter": "Executable",
+  "unknownError": "Unknown error",
+  "unhandledRejection": "Unhandled promise rejection"
 }

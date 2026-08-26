@@ -1,8 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { X, RotateCcw } from "lucide-react";
-import { pad2 } from "@/utils/format";
+import { X, RotateCcw, Focus } from "lucide-react";
+import { pad2, formatDuration, todayString } from "@/utils/format";
+import * as api from "@/services/tauriApi";
+import type { FocusSession } from "@/types";
+import clsx from "clsx";
 
 interface Props {
   widgetId: string;
@@ -19,11 +22,37 @@ export default function ClockWidget({ widgetId, isBlurred = false }: Props) {
   const [showSeconds, setShowSeconds] = useState(
     () => localStorage.getItem(`${widgetId}-show-seconds`) !== "false"
   );
+  const [focusActive, setFocusActive] = useState(false);
+  const [activeSession, setActiveSession] = useState<FocusSession | null>(null);
 
   useEffect(() => {
     const id = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(id);
   }, []);
+
+  useEffect(() => {
+    const today = todayString();
+    const load = async () => {
+      try {
+        const [active, sessions] = await Promise.all([
+          api.getFocusModeActive(),
+          api.listFocusSessions(`${today}T00:00:00`, `${today}T23:59:59`),
+        ]);
+        setFocusActive(active);
+        setActiveSession(sessions.find((s) => !s.ended_at) ?? null);
+      } catch {
+        // Keep current state on error.
+      }
+    };
+    void load();
+    const timer = setInterval(() => void load(), 10000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const focusSeconds = useMemo(() => {
+    if (!activeSession) return 0;
+    return Math.floor((time.getTime() - new Date(activeSession.started_at).getTime()) / 1000);
+  }, [activeSession, time]);
 
   const toggleHour = () => {
     setIs24h((v) => {
@@ -65,16 +94,29 @@ export default function ClockWidget({ widgetId, isBlurred = false }: Props) {
   const minDeg = time.getMinutes() * 6 + time.getSeconds() * 0.1;
   const hrDeg = (time.getHours() % 12) * 30 + time.getMinutes() * 0.5;
 
+  const accentColor = focusActive ? "#0ea5e9" : "#6c8ebf";
+
   return (
     <div
-      className={`w-full h-full glass-card flex flex-col items-center justify-between p-4 select-none clock-widget ${isBlurred ? "clock-widget--blurred" : ""}`}
+      className={clsx(
+        "w-full h-full glass-card flex flex-col items-center justify-between p-4 select-none clock-widget",
+        isBlurred && "clock-widget--blurred"
+      )}
     >
       {/* Title bar / drag region */}
       <div
         data-tauri-drag-region
         className="w-full flex items-center justify-between mb-2 clock-widget__chrome"
       >
-        <span className="text-text-muted text-xs">{t("clock.title")}</span>
+        <div className="flex items-center gap-2">
+          <span className="text-text-muted text-xs">{t("clock.title")}</span>
+          {focusActive && (
+            <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-accent-blue/15 text-accent-blue">
+              <Focus size={10} />
+              {t("clock.focus")}
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-1">
           <button
             onClick={toggleAnalog}
@@ -115,16 +157,26 @@ export default function ClockWidget({ widgetId, isBlurred = false }: Props) {
             stroke="#9ca3b0" strokeWidth="2" strokeLinecap="round" />
           {/* Second hand */}
           <line x1="60" y1="60" x2={60 + 44 * Math.sin((secDeg * Math.PI) / 180)} y2={60 - 44 * Math.cos((secDeg * Math.PI) / 180)}
-            stroke="#6c8ebf" strokeWidth="1.5" strokeLinecap="round" />
-          <circle cx="60" cy="60" r="3" fill="#6c8ebf" />
+            stroke={accentColor} strokeWidth="1.5" strokeLinecap="round" />
+          <circle cx="60" cy="60" r="3" fill={accentColor} />
         </svg>
       ) : (
         /* Digital clock */
         <div className="flex flex-col items-center">
-          <div className="text-5xl font-bold text-text-primary tracking-tight font-mono clock-widget__time widget-prominent">
+          <div
+            className={clsx(
+              "text-5xl font-bold tracking-tight font-mono clock-widget__time widget-prominent",
+              focusActive ? "text-accent-blue" : "text-text-primary"
+            )}
+          >
             {timeStr}
             {ampm && <span className="text-xl text-text-secondary ml-1">{ampm}</span>}
           </div>
+          {activeSession && (
+            <div className="mt-1 text-xs text-accent-blue font-medium">
+              {t("clock.focusTimer")}: {formatDuration(focusSeconds)}
+            </div>
+          )}
         </div>
       )}
 

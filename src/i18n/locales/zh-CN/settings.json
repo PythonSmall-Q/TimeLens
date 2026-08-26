@@ -71,7 +71,14 @@
   "widgets": {
     "title": "小组件",
     "fadeOnBlur": "失焦时透明化",
-    "fadeHint": "小组件被覆盖时近透明显示，点击后恢复"
+    "fadeHint": "小组件被覆盖时近透明显示，点击后恢复",
+    "permissionsTitle": "小组件权限",
+    "noWidgetsForPermissions": "尚未安装小组件。",
+    "noPermissions": "未授予任何权限。",
+    "neverAccessed": "从未访问",
+    "autoBlurTitle": "按小组件自动虚化",
+    "autoBlurDesc": "选择哪些小组件在失焦时自动虚化。",
+    "autoBlurEnabledCount": "个小组件已启用自动虚化"
   },
   "browser": {
     "title": "浏览器扩展",

@@ -44,6 +44,12 @@
     "ruleMetaTimeWindow": "시간 창: {{start}} - {{end}}",
     "ruleMetaApp": "앱: {{app}}",
     "noMatch": "규칙이 현재 조건과 일치하지 않았습니다.",
-    "simulationError": "지금 규칙을 평가할 수 없습니다."
+    "simulationError": "지금 규칙을 평가할 수 없습니다.",
+    "saveSuccess": "Rule saved.",
+    "saveFailed": "Could not save rule.",
+    "nameRequired": "Please enter a rule name.",
+    "keywordRequired": "Please enter a keyword.",
+    "appRequired": "Please enter an app name.",
+    "timeWindowRequired": "Please select a start and end time."
   }
 }

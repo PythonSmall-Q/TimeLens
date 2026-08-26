@@ -21,5 +21,7 @@
   "limitReached100Title": "已达每日使用限额",
   "limitReached100Body": "今日已使用 {{app}} {{used}}，已达到您设定的每日限额 {{limit}}，建议适当休息。",
   "dismiss": "知道了",
-  "noAppsFound": "未找到应用"
+  "noAppsFound": "未找到应用",
+  "hoursShort": "时",
+  "minutesShort": "分"
 }

@@ -71,7 +71,14 @@
   "widgets": {
     "title": "Widgets",
     "fadeOnBlur": "Fade when unfocused",
-    "fadeHint": "Widget becomes nearly transparent when covered; click to restore"
+    "fadeHint": "Widget becomes nearly transparent when covered; click to restore",
+    "permissionsTitle": "Widget permissions",
+    "noWidgetsForPermissions": "No widgets installed.",
+    "noPermissions": "No permissions granted.",
+    "neverAccessed": "Never accessed",
+    "autoBlurTitle": "Auto-blur per widget",
+    "autoBlurDesc": "Choose which widgets blur when unfocused.",
+    "autoBlurEnabledCount": "widgets auto-blur"
   },
   "browser": {
     "title": "Browser Extension",

@@ -19,6 +19,15 @@
   "permissionTodoRead": "读取待办事项",
   "permissionTodoWrite": "创建／修改待办事项",
   "permissionSettingsWrite": "修改应用设置",
+  "permissionLocalApi": "调用本地 TimeLens API",
+  "permissionRationale": {
+    "screen-time": "允许小组件读取你的应用使用历史与今日屏幕时间。",
+    "active-window": "允许小组件根据当前活跃窗口做出响应。",
+    "todo-read": "允许小组件展示或统计已有任务。",
+    "todo-write": "允许小组件创建、完成或修改任务。",
+    "settings-write": "允许小组件更新主题或行为等应用设置。",
+    "local-api": "允许小组件在本设备上代你调用 TimeLens API。"
+  },
   "permissionsGranted": "已授权",
   "registryErrors": "加载错误（{{count}}）",
   "loading": "加载中...",
@@ -55,6 +64,7 @@
   "removeWidget": "移除",
   "resetPosition": "重置位置",
   "opacity": "透明度",
+  "autoBlur": "失去焦点时自动虚化",
   "alwaysOnTop": "置顶方式",
   "alwaysOnTopMode": {
     "always": "始终置顶",
@@ -68,7 +78,9 @@
     "showSeconds": "显示秒",
     "hideSeconds": "隐藏秒",
     "digital": "数字",
-    "analog": "指针"
+    "analog": "指针",
+    "focus": "专注",
+    "focusTimer": "专注计时"
   },
   "note": {
     "title": "便签",
@@ -81,7 +93,11 @@
     "empty": "还没有便签，点击右上角的加号新建一条吧",
     "selectHint": "请选择左侧便签开始查看或编辑",
     "lastEdited": "最近修改",
-    "untitled": "未命名便签"
+    "untitled": "未命名便签",
+    "savedAt": "已保存于",
+    "unsaved": "未保存的更改",
+    "recovered": "已从备份恢复便签",
+    "restore": "从备份恢复"
   },
   "status": {
     "title": "习惯打卡",
@@ -93,13 +109,17 @@
     "detailTitle": "详情",
     "notePlaceholder": "记录这个习惯的说明、触发条件或今日备注…",
     "markDone": "标记为已完成",
-    "empty": "暂无习惯，请先在左侧新增"
+    "empty": "暂无习惯，请先在左侧新增",
+    "focusBadge": "专注",
+    "streak": "连续天数",
+    "completion": "完成度"
   },
   "todo": {
     "title": "待办",
     "addPlaceholder": "添加任务…",
     "emptyState": "全部完成啦！🎉",
-    "clearCompleted": "清除已完成"
+    "clearCompleted": "清除已完成",
+    "noGoal": "关联目标"
   },
   "timer": {
     "title": "计时器",
@@ -128,7 +148,27 @@
   "timerDesc": "集番茄钟、倒计时、正计时于一体的紧凑悬浮窗口。",
   "noteDesc": "浮动便签本，随手记录想法，不影响当前工作流。",
   "statusDesc": "习惯打卡小组件，追踪每日目标与连续完成天数。",
-  "petDesc": "桌宠小组件正在开发中，敬请期待。",
+  "petDesc": "可在桌面陪伴你的官方桌宠小组件，支持导入自定义 JSON 资源包。",
+  "focusCoachDesc": "专注教练小组件，在你专注时段提供轻提醒与引导。",
+  "quickCaptureDesc": "快速记录灵感或任务，不打断当前工作流。",
+  "sessionPulseDesc": "一眼查看当前专注会话的实时节奏与状态。",
+  "goalProgressDesc": "追踪每日与每周使用目标的完成进度。",
+  "browserActivityDesc": "查看浏览器扩展提供的网站级活动时间摘要。",
+  "group": {
+    "utility": "工具",
+    "focus": "专注",
+    "insight": "洞察",
+    "reflection": "回顾"
+  },
+  "pauseUpdates": "暂停更新",
+  "resumeUpdates": "恢复更新",
+  "refreshNow": "立即刷新",
+  "errorLog": {
+    "title": "错误日志",
+    "noErrors": "暂无错误记录。",
+    "clear": "清空日志",
+    "filterPlaceholder": "筛选错误…"
+  },
   "petStudio": {
     "title": "桌宠设置",
     "desc": "在这里调整当前桌宠的窗口尺寸，并导入 JSON 资源包。",
@@ -147,7 +187,7 @@
   },
   "official": "官方",
   "pet": {
-    "title": "桌宠（开发中）",
+    "title": "桌宠",
     "pack": "资源包",
     "focusLabel": "专注模式",
     "restLabel": "休息中",
@@ -158,12 +198,88 @@
     "fallbackMessage": "我会在这里陪你稳住节奏。",
     "manifestBadge": "桌宠包",
     "clickAction": "点击",
-    "comingSoon": "桌宠小组件正在开发中，敬请期待。"
+    "comingSoon": "桌宠小组件正在开发中，敬请期待。",
+    "importSuccess": "桌宠资源包已导入。",
+    "importError": "无法导入桌宠资源包。",
+    "fallback": {
+      "name": "陪伴",
+      "description": "一个友好的桌面伙伴。",
+      "characterName": "小伙伴",
+      "states": {
+        "idle": { "label": "陪伴中", "messages": ["我会在这里陪你稳住节奏。"] },
+        "focus": { "label": "专注模式", "messages": ["守护这个时段，你还不需要切换上下文。"] },
+        "rest": { "label": "休息中", "messages": ["短暂的休整也是工作的一部分，不是失败。"] }
+      },
+      "interactions": {
+        "tap_messages": ["喝口水，深呼吸，然后继续。"]
+      }
+    }
+  },
+  "focusCoach": {
+    "title": "专注教练",
+    "focusActive": "专注中",
+    "focusInactive": "准备专注",
+    "start": "开始专注",
+    "stop": "结束专注",
+    "todayTotal": "今日总计",
+    "sessions": "会话数",
+    "manualReason": "专注教练"
+  },
+  "quickCapture": {
+    "title": "快速记录",
+    "todo": "待办",
+    "note": "便签",
+    "todoPlaceholder": "快速添加任务…",
+    "notePlaceholder": "快速记录想法…",
+    "addTodo": "添加待办",
+    "addNote": "保存便签",
+    "saved": "已保存",
+    "hint": "Cmd/Ctrl + Enter 提交"
+  },
+  "sessionPulse": {
+    "title": "会话脉搏",
+    "focusTime": "专注时长",
+    "interruptions": "切换次数",
+    "hourlyBreakdown": "小时分布",
+    "sessions": "会话",
+    "active": "进行中",
+    "done": "已完成",
+    "empty": "暂无活动数据",
+    "noSessions": "今日无会话"
+  },
+  "goalProgress": {
+    "title": "目标进度",
+    "empty": "暂无活跃目标",
+    "done": "已完成",
+    "over": "已超量",
+    "period": {
+      "daily": "每日",
+      "weekly": "每周"
+    },
+    "operator": {
+      "at_least": "至少",
+      "at_most": "至多"
+    }
+  },
+  "browserActivity": {
+    "title": "浏览器活动",
+    "connected": "已连接",
+    "disconnected": "未连接",
+    "visits": "次访问",
+    "empty": "今日无浏览器数据"
   },
   "thirdParty": {
     "title": "第三方小组件",
     "source": "第三方",
     "loading": "正在加载小组件模块...",
+    "recoveryHint": "请尝试撤销权限、移除该小组件，或导入更新版本。",
+    "loadErrorHint": "请检查权限并重新加载小组件。",
+    "recoveryHints": {
+      "permission": "请在小组件中心或设置中检查小组件权限。",
+      "rateLimit": "该小组件被限流或已暂停，请暂停它或撤销并重新授权。",
+      "network": "请检查网络连接，并确认请求的本地服务正在运行。",
+      "generic": "请重启小组件或检查其配置。"
+    },
     "noDescription": "暂无描述。",
     "noWidgets": "暂无第三方小组件，点击「导入本地组件」添加。"
   },

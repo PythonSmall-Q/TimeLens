@@ -51,5 +51,11 @@
   "skipToMainContent": "跳转到主内容",
   "mainNavigation": "主导航",
   "clearSearch": "清除搜索",
-  "openGlobalSearch": "打开全局搜索"
+  "openGlobalSearch": "打开全局搜索",
+  "browseExecutable": "浏览可执行文件",
+  "searchAppPlaceholder": "搜索应用…",
+  "noAppsFoundBrowse": "未找到应用，请点击文件夹按钮浏览",
+  "executableFilter": "可执行文件",
+  "unknownError": "未知错误",
+  "unhandledRejection": "未处理的 Promise 拒绝"
 }

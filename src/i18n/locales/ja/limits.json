@@ -21,5 +21,7 @@
   "limitReached100Title": "1日の制限に達しました",
   "limitReached100Body": "今日、{{app}} を {{used}} 使用し、1日の制限 {{limit}} に達しました。休憩を取ることを検討してください。",
   "dismiss": "閉じる",
-  "noAppsFound": "アプリが見つかりません"
+  "noAppsFound": "アプリが見つかりません",
+  "hoursShort": "h",
+  "minutesShort": "m"
 }
