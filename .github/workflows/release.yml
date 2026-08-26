@@ -30,6 +30,12 @@ jobs:
 
     runs-on: ${{ matrix.platform }}
 
+    env:
+      CARGO_INCREMENTAL: "0"
+      RUSTC_WRAPPER: "sccache"
+      SCCACHE_GHA_ENABLED: "true"
+      SCCACHE_GHA_VERSION: "${{ matrix.platform }}-release"
+
     steps:
       - uses: actions/checkout@v4
         with:
@@ -125,6 +131,9 @@ jobs:
       # ── Rust ────────────────────────────────────────────────────────────────
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@v0.0.7
 
       - name: Cache Rust
         uses: Swatinem/rust-cache@v2
@@ -235,6 +244,13 @@ jobs:
     name: Build and upload Windows installers (WithWebView2)
     runs-on: windows-latest
     needs: build
+
+    env:
+      CARGO_INCREMENTAL: "0"
+      RUSTC_WRAPPER: "sccache"
+      SCCACHE_GHA_ENABLED: "true"
+      SCCACHE_GHA_VERSION: "windows-latest-release"
+
     steps:
       - uses: actions/checkout@v4
         with:
@@ -290,6 +306,9 @@ jobs:
 
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@v0.0.7
 
       - name: Cache Rust
         uses: Swatinem/rust-cache@v2
