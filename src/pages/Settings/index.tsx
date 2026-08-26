@@ -731,7 +731,6 @@ export default function Settings() {
     }
   };
 
-  const showWindowsStartupSettings = installChannelInfo?.platform === "windows";
   const showStartupSettings =
     installChannelInfo?.platform === "windows" || installChannelInfo?.platform === "macos";
   const activeApiTokenCount = apiTokens.filter((token) => !token.revoked_at).length;

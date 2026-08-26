@@ -148,7 +148,7 @@ export default function MainApp() {
         }
       }
 
-      let permission = "default";
+      let permission: string;
       try {
         permission = (await isPermissionGranted()) ? "granted" : await requestPermission();
       } catch {

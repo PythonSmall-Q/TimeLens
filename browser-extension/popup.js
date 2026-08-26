@@ -1,7 +1,6 @@
 import { getLocale, t } from "./i18n.js";
 import {
   discoverApiBaseUrl,
-  getApiBaseUrl,
   clearApiBaseUrlCache,
   API_STORAGE_KEYS,
   DEFAULT_CACHE_SECONDS_VALUE,
@@ -25,7 +24,6 @@ const todayList = document.querySelector("#today-list");
 const recentList = document.querySelector("#recent-list");
 const activeTabPill = document.querySelector("#active-tab-pill");
 const refreshButton = document.querySelector("#refresh-button");
-const bridgeKeyPanel = document.querySelector("#bridge-key-panel");
 const bridgeKeyInput = document.querySelector("#bridge-key-input");
 const saveKeyButton = document.querySelector("#save-key-button");
 const apiPortInput = document.querySelector("#api-port-input");

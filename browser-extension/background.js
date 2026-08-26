@@ -12,7 +12,7 @@
  */
 
 import { getLocale, t } from "./i18n.js";
-import { discoverApiBaseUrl, getApiBaseUrl, clearApiBaseUrlCache, resetManualPortFailureTracking } from "./api.js";
+import { discoverApiBaseUrl, clearApiBaseUrlCache, resetManualPortFailureTracking } from "./api.js";
 
 function log(...args) {
   console.log("[TimeLens BG]", ...args);

@@ -63,7 +63,6 @@ async function fixTaskbarIcon() {
             const r = data[i];
             const g = data[i + 1];
             const b = data[i + 2];
-            const a = data[i + 3] || 255;
             
             // Check if pixel is part of blue background
             // Blue background is darker: b > r+20 and b > g+20 and overall dark

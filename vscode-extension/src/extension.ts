@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { postVsCodeSession, resolveApiBaseUrl } from "./api/timelensApi";
+import { resolveApiBaseUrl } from "./api/timelensApi";
 import { SessionTracker } from "./sessionTracker";
 import { DashboardPanel } from "./dashboardPanel";
 import { DashboardSidebarViewProvider } from "./dashboardSidebarView";
@@ -44,7 +44,9 @@ export function activate(context: vscode.ExtensionContext): void {
 
   sidebarProvider = new DashboardSidebarViewProvider(
     context,
-    () => tracker?.snapshotAndFlush() ?? Promise.resolve(),
+    async () => {
+      await tracker?.snapshotAndFlush();
+    },
   );
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(

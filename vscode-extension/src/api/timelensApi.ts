@@ -1,6 +1,5 @@
 import { workspace } from "vscode";
 
-const DEFAULT_LOCAL_API_URL = "http://127.0.0.1:49152";
 const LOCAL_API_PORT_FALLBACK_COUNT = 1000;
 const MANUAL_PORT_FAILURE_THRESHOLD = 5;
 

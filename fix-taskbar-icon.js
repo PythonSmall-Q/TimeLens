@@ -20,7 +20,6 @@ try {
         console.log(`Processing ${path.basename(inputPath)}...`);
         
         const image = sharp(inputPath);
-        const metadata = await image.metadata();
         
         // Read the image as raw pixel data
         const { data, info } = await image.raw().toBuffer({ resolveWithObject: true });
@@ -32,7 +31,6 @@ try {
             const r = data[i];
             const g = data[i + 1];
             const b = data[i + 2];
-            const a = data[i + 3];
             
             // Check if pixel is part of blue background
             // Blue background is darker: b > r+20 and b > g+20 and overall dark
@@ -106,8 +104,8 @@ async function fixTaskbarIcon() {
                 image.resize(44, 44);
                 
                 // Process each pixel to remove blue background
-                image.forEachPixel((pixel, x, y) => {
-                    const { r, g, b, a } = pixel;
+                image.forEachPixel((pixel, _x, _y) => {
+                    const { r, g, b } = pixel;
                     
                     // If blue background, make transparent
                     if (b > r + 20 && b > g + 20 && (r + g + b) < 300) {

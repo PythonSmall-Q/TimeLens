@@ -277,7 +277,6 @@ function buildHtml(opts: BuildHtmlOptions): string {
           .join("")
       : `<div class="empty-hint">${level !== "detailed" ? "Project data only recorded at detailed level" : "No data yet"}</div>`;
 
-  const levelBadgeClass = level === "basic" ? "badge-muted" : level === "detailed" ? "badge-green" : "badge-accent";
 
   return /* html */ `<!DOCTYPE html>
 <html lang="en">
