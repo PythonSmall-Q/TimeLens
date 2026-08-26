@@ -34,11 +34,7 @@ jobs:
 
     - name: Setup Rust and build (for Rust)
       if: matrix.language == 'rust'
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
-        profile: minimal
-        override: true
+      uses: dtolnay/rust-toolchain@stable
 
     - name: Install Tauri system dependencies (for Rust)
       if: matrix.language == 'rust'
@@ -63,13 +59,13 @@ jobs:
       run: npm ci
 
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@v3
+      uses: github/codeql-action/init@v4
       with:
         languages: ${{ matrix.language }}
         build-mode: ${{ matrix.build-mode }}
         queries: security-extended,security-and-quality
 
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@v3
+      uses: github/codeql-action/analyze@v4
       with:
         category: "/language:${{matrix.language}}"
