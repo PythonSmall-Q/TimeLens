@@ -50,7 +50,7 @@ Track VS Code coding sessions and send local analytics to TimeLens desktop app.
 - Ensure TimeLens desktop app is running
 - Restart VS Code
 
-**"未连接到 TimeLens 桌面端"**
+**"Unable to connect to TimeLens desktop app"**
 - Start the TimeLens desktop app
 - Check that Local API is enabled in TimeLens Settings
 - Verify `timelens.apiBaseUrl` matches your setup
