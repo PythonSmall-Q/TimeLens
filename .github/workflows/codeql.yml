@@ -48,6 +48,7 @@ jobs:
 
     - name: Build Rust backend (for Rust)
       if: matrix.language == 'rust'
+      working-directory: src-tauri
       run: cargo build --release
 
     - name: Setup Node.js and install dependencies (for JavaScript)
