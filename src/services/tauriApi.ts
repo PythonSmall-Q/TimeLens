@@ -859,3 +859,7 @@ export const listenWidgetEvent = <T = unknown>(
   callback: (payload: T) => void
 ): Promise<UnlistenFn> =>
   listen<T>(`widget:${event}`, (e) => callback(e.payload));
+
+// ── App lifecycle ─────────────────────────────────────────────
+
+export const relaunchApp = (): Promise<void> => invoke("relaunch_app");

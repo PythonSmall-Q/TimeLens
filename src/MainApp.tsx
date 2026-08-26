@@ -6,6 +6,7 @@ import { register as registerGlobalShortcut, unregisterAll as unregisterAllGloba
 import { isPermissionGranted, requestPermission, sendNotification } from "@tauri-apps/plugin-notification";
 import { open as openExternal } from "@tauri-apps/plugin-shell";
 import { check } from "@tauri-apps/plugin-updater";
+import type { Update, DownloadEvent } from "@tauri-apps/plugin-updater";
 import MainLayout from "./components/layout/MainLayout";
 import Loading from "./components/Loading";
 
@@ -86,7 +87,7 @@ export default function MainApp() {
   } = useStatsStore();
   const {
     setMonitoringActive,
-    autoCheckUpdates,
+    updateMode,
     notificationQuietHoursEnabled,
     notificationQuietStart,
     notificationQuietEnd,
@@ -94,7 +95,9 @@ export default function MainApp() {
   } = useSettingsStore();
   const { t } = useTranslation(["common", "limits", "browserUsage"]);
 
-  const [updateInfo, setUpdateInfo] = useState<{ version: string; notes: string; url: string } | null>(null);
+  const [updateInfo, setUpdateInfo] = useState<{ version: string; notes: string; url: string; update: Update | null } | null>(null);
+  const [updatePhase, setUpdatePhase] = useState<"available" | "downloading" | "downloaded" | "installing">("available");
+  const [downloadProgress, setDownloadProgress] = useState(0);
   const updateCloseButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -318,7 +321,7 @@ export default function MainApp() {
 
   // Update check – once after 4 s
   useEffect(() => {
-    if (!autoCheckUpdates) return;
+    if (updateMode === "off") return;
 
     const timer = setTimeout(async () => {
       try {
@@ -329,7 +332,6 @@ export default function MainApp() {
         if (!(latest && compareVersions(latest, CURRENT_VERSION) > 0)) return;
 
         const channel = await api.getInstallChannelInfo();
-        setUpdateInfo({ version: latest, notes: data.body ?? "", url: data.html_url ?? "" });
 
         if (!channel.should_trigger_update) {
           const storeUpdateUrl = channel.update_url ?? "ms-windows-store://downloadsandupdates";
@@ -347,32 +349,46 @@ export default function MainApp() {
           return;
         }
 
+        if (updateMode === "auto") {
+          try {
+            const update = await check();
+            if (update) {
+              await update.downloadAndInstall();
+              await api.relaunchApp();
+              return;
+            }
+          } catch {
+            // fallback to release page
+          }
+          if (data.html_url) window.open(data.html_url, "_blank", "noopener,noreferrer");
+          await notifyWithNavigate(
+            t("common:updateAvailableTitle"),
+            t("common:updateAvailableBody", { version: latest, current: CURRENT_VERSION }),
+            "#/settings"
+          );
+          return;
+        }
+
+        // notify mode: show the manual download/install dialog
         try {
           const update = await check();
           if (update) {
-            await update.downloadAndInstall();
-            await notifyWithNavigate(
-              t("common:updateAvailableTitle"),
-              t("common:updateInstallReady", { version: latest }),
-              "#/settings"
-            );
+            setUpdateInfo({ version: latest, notes: data.body ?? "", url: data.html_url ?? "", update });
+            setUpdatePhase("available");
+            setDownloadProgress(0);
             return;
           }
         } catch {
-          // fallback to release page
+          // fallback to release page modal
         }
 
-        if (data.html_url) window.open(data.html_url, "_blank", "noopener,noreferrer");
-
-        await notifyWithNavigate(
-          t("common:updateAvailableTitle"),
-          t("common:updateAvailableBody", { version: latest, current: CURRENT_VERSION }),
-          "#/settings"
-        );
+        setUpdateInfo({ version: latest, notes: data.body ?? "", url: data.html_url ?? "", update: null });
+        setUpdatePhase("available");
+        setDownloadProgress(0);
       } catch { /* offline */ }
     }, 4000);
     return () => clearTimeout(timer);
-  }, [autoCheckUpdates, notifyWithNavigate, t]);
+  }, [updateMode, notifyWithNavigate, t]);
 
   useEffect(() => {
     if (updateInfo) {
@@ -447,6 +463,54 @@ export default function MainApp() {
     };
   }, [focusMainAndNavigate, setMonitorActive, setMonitoringActive, toggleWidgetsVisibility]);
 
+  const closeUpdateModal = useCallback(() => {
+    if (updateInfo?.update && updatePhase === "available") {
+      updateInfo.update.close().catch(() => {});
+    }
+    setUpdateInfo(null);
+    setUpdatePhase("available");
+    setDownloadProgress(0);
+  }, [updateInfo, updatePhase]);
+
+  const handleDownloadUpdate = useCallback(async () => {
+    if (!updateInfo?.update) return;
+    setUpdatePhase("downloading");
+    setDownloadProgress(0);
+    let downloaded = 0;
+    let contentLength = 0;
+    try {
+      await updateInfo.update.download((event: DownloadEvent) => {
+        if (event.event === "Started") {
+          contentLength = event.data.contentLength ?? 0;
+        } else if (event.event === "Progress") {
+          downloaded += event.data.chunkLength;
+          if (contentLength > 0) {
+            setDownloadProgress(Math.min(100, Math.round((downloaded / contentLength) * 100)));
+          }
+        }
+      });
+      setUpdatePhase("downloaded");
+    } catch (err) {
+      setUpdatePhase("available");
+      setDownloadProgress(0);
+      const message = err instanceof Error ? err.message : "";
+      await notifyWithNavigate(t("common:downloadUpdateFailed"), message, "#/settings");
+    }
+  }, [updateInfo, notifyWithNavigate, t]);
+
+  const handleInstallUpdate = useCallback(async () => {
+    if (!updateInfo?.update) return;
+    setUpdatePhase("installing");
+    try {
+      await updateInfo.update.install();
+      await api.relaunchApp();
+    } catch (err) {
+      setUpdatePhase("downloaded");
+      const message = err instanceof Error ? err.message : "";
+      await notifyWithNavigate(t("common:error"), message, "#/settings");
+    }
+  }, [updateInfo, notifyWithNavigate, t]);
+
   return (
     <HashRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <MainLayout>
@@ -486,7 +550,7 @@ export default function MainApp() {
               </div>
               <button
                 ref={updateCloseButtonRef}
-                onClick={() => setUpdateInfo(null)}
+                onClick={closeUpdateModal}
                 aria-label={t("common:close")}
                 title={t("common:close")}
                 className="text-text-muted hover:text-text-primary flex-shrink-0"
@@ -494,19 +558,80 @@ export default function MainApp() {
                 ✕
               </button>
             </div>
-            {updateInfo.notes && (
+
+            {updateInfo.notes && updatePhase === "available" && (
               <div className="bg-surface-light rounded-xl p-3 max-h-52 overflow-y-auto">
                 <p className="text-xs font-semibold text-text-secondary mb-1">{t("common:whatsNew")}</p>
                 <pre className="text-xs text-text-muted whitespace-pre-wrap font-sans leading-relaxed">{updateInfo.notes}</pre>
               </div>
             )}
+
+            {updatePhase === "downloading" && (
+              <div className="space-y-2">
+                <div className="w-full bg-surface-hover rounded-full h-2 overflow-hidden">
+                  <div
+                    className="bg-accent-blue h-full transition-all duration-150"
+                    style={{ width: `${downloadProgress}%` }}
+                  />
+                </div>
+                <p className="text-xs text-text-muted">
+                  {t("common:downloadingUpdate")}
+                  {downloadProgress > 0 ? ` ${downloadProgress}%` : ""}
+                </p>
+              </div>
+            )}
+
+            {updatePhase === "downloaded" && (
+              <p className="text-sm text-text-secondary">{t("common:updateDownloadReady")}</p>
+            )}
+
+            {updatePhase === "installing" && (
+              <p className="text-sm text-text-secondary">{t("common:installingUpdate")}</p>
+            )}
+
             <div className="flex gap-3">
-              <a href={updateInfo.url} target="_blank" rel="noopener noreferrer" className="flex-1 py-2.5 rounded-xl text-sm font-medium text-center bg-accent-blue/20 text-accent-blue hover:bg-accent-blue/30 transition-colors border border-accent-blue/30">
-                {t("common:viewOnGitHub")}
-              </a>
-              <button onClick={() => setUpdateInfo(null)} className="flex-1 py-2.5 rounded-xl text-sm font-medium border border-surface-border text-text-muted hover:text-text-secondary hover:bg-surface-hover transition-colors">
-                {t("common:remindLater")}
-              </button>
+              {updatePhase === "available" && updateInfo.update && (
+                <button
+                  onClick={handleDownloadUpdate}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-medium text-center bg-accent-blue/20 text-accent-blue hover:bg-accent-blue/30 transition-colors border border-accent-blue/30"
+                >
+                  {t("common:downloadUpdate")}
+                </button>
+              )}
+              {updatePhase === "available" && !updateInfo.update && updateInfo.url && (
+                <a
+                  href={updateInfo.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 py-2.5 rounded-xl text-sm font-medium text-center bg-accent-blue/20 text-accent-blue hover:bg-accent-blue/30 transition-colors border border-accent-blue/30"
+                >
+                  {t("common:viewOnGitHub")}
+                </a>
+              )}
+              {updatePhase === "downloaded" && updateInfo.update && (
+                <button
+                  onClick={handleInstallUpdate}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-medium text-center bg-accent-green/20 text-accent-green hover:bg-accent-green/30 transition-colors border border-accent-green/30"
+                >
+                  {t("common:installUpdate")}
+                </button>
+              )}
+              {(updatePhase === "available" || updatePhase === "downloaded") && (
+                <button
+                  onClick={closeUpdateModal}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-medium border border-surface-border text-text-muted hover:text-text-secondary hover:bg-surface-hover transition-colors"
+                >
+                  {updatePhase === "downloaded" ? t("common:installLater") : t("common:remindLater")}
+                </button>
+              )}
+              {(updatePhase === "downloading" || updatePhase === "installing") && (
+                <button
+                  disabled
+                  className="flex-1 py-2.5 rounded-xl text-sm font-medium border border-surface-border text-text-muted opacity-50 cursor-not-allowed"
+                >
+                  {updatePhase === "downloading" ? t("common:downloadingUpdate") : t("common:installingUpdate")}
+                </button>
+              )}
             </div>
           </div>
         </div>

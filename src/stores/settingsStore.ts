@@ -22,7 +22,7 @@ const safeSettingsStorage = createJSONStorage(() => ({
 interface SettingsState {
   language: string;
   theme: "dark" | "light" | "system";
-  autoCheckUpdates: boolean;
+  updateMode: "off" | "notify" | "auto";
   monitoringActive: boolean;
   samplingIntervalMs: number;
   debounceMs: number;
@@ -38,7 +38,7 @@ interface SettingsState {
   notificationCooldownMin: number;
   setLanguage: (lang: string) => void;
   setTheme: (theme: "dark" | "light" | "system") => void;
-  setAutoCheckUpdates: (enabled: boolean) => void;
+  setUpdateMode: (mode: "off" | "notify" | "auto") => void;
   setMonitoringActive: (active: boolean) => Promise<void>;
   setSamplingInterval: (ms: number) => void;
   setDebounce: (ms: number) => void;
@@ -59,7 +59,7 @@ export const useSettingsStore = create<SettingsState>()(
     (set) => ({
       language: i18n.language || "en",
       theme: "dark",
-      autoCheckUpdates: true,
+      updateMode: "notify",
       monitoringActive: true,
       samplingIntervalMs: 1000,
       debounceMs: 500,
@@ -82,7 +82,7 @@ export const useSettingsStore = create<SettingsState>()(
 
       setTheme: (theme) => set({ theme }),
 
-      setAutoCheckUpdates: (autoCheckUpdates) => set({ autoCheckUpdates }),
+      setUpdateMode: (updateMode) => set({ updateMode }),
 
       setMonitoringActive: (monitoringActive) => {
         set({ monitoringActive });
@@ -170,9 +170,17 @@ export const useSettingsStore = create<SettingsState>()(
       name: "timelens-settings",
       storage: safeSettingsStorage,
       migrate: (persistedState) => {
-        if (persistedState && typeof persistedState === "object") return persistedState;
-        // Corrupted persisted payloads are discarded to keep app bootable.
-        return undefined;
+        if (!persistedState || typeof persistedState !== "object") {
+          // Corrupted persisted payloads are discarded to keep app bootable.
+          return undefined;
+        }
+        const state = persistedState as Record<string, unknown>;
+        // Migrate legacy boolean autoCheckUpdates to the new updateMode enum.
+        if (!("updateMode" in state) && "autoCheckUpdates" in state) {
+          state.updateMode = state.autoCheckUpdates === true ? "notify" : "off";
+          delete state.autoCheckUpdates;
+        }
+        return state;
       },
       onRehydrateStorage: () => (state) => {
         if (state?.language) {

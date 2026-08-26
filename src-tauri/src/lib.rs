@@ -16,6 +16,7 @@ use tauri::{
     tray::{TrayIconBuilder, TrayIconEvent},
     AppHandle, Emitter, Listener, Manager,
 };
+use tauri_plugin_autostart::ManagerExt;
 
 use commands::storage_cmd::DbState;
 use monitor::{MonitorStatus, SharedMonitorStatus};
@@ -609,6 +610,25 @@ pub fn run() {
             // Widget/main windows can start invoking commands immediately.
             app.manage(db_state.clone());
 
+            // Sync OS-level autostart with the stored user preference. Re-installing the
+            // app often clears the registry/launch-agent entry, so re-apply it here.
+            {
+                let conn = db_state.lock().unwrap();
+                match crate::db::get_bool_setting(&conn, "launch_at_startup", false) {
+                    Ok(true) => {
+                        if let Err(e) = app.autolaunch().enable() {
+                            log::warn!("Failed to enable launch at startup: {}", e);
+                        }
+                    }
+                    Ok(false) => {
+                        if let Err(e) = app.autolaunch().disable() {
+                            log::warn!("Failed to disable launch at startup: {}", e);
+                        }
+                    }
+                    Err(e) => log::warn!("Failed to read launch_at_startup setting: {}", e),
+                }
+            }
+
             // Widget runtime v2.2.0 rate limiters
             app.manage(commands::WidgetCallRateLimiter::new());
             app.manage(commands::WidgetEventRateLimiter::new());
@@ -1123,6 +1143,7 @@ pub fn run() {
             commands::get_browser_extension_status,
             commands::get_local_api_base_url,
             commands::get_install_channel_info,
+            commands::relaunch_app,
             commands::set_launch_at_startup,
             commands::get_tray_icon_style,
             commands::set_tray_icon_style,

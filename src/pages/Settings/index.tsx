@@ -185,8 +185,8 @@ export default function Settings() {
     setNotificationQuietStart,
     setNotificationQuietEnd,
     setNotificationCooldownMin,
-    autoCheckUpdates,
-    setAutoCheckUpdates,
+    updateMode,
+    setUpdateMode,
   } = useSettingsStore();
 
   useEffect(() => {
@@ -2353,22 +2353,17 @@ export default function Settings() {
             {t("about.openLogFolder")}
           </button>
         </SettingsRow>
-        <SettingsRow label={t("about.autoCheckUpdates")}> 
-          <button
-            onClick={() => setAutoCheckUpdates(!autoCheckUpdates)}
-            title={t("about.autoCheckUpdates")}
-            className={clsx(
-              "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
-              autoCheckUpdates ? "bg-accent-blue" : "bg-surface-hover"
-            )}
+        <SettingsRow label={t("about.updateMode")}>
+          <select
+            value={updateMode}
+            onChange={(e) => setUpdateMode(e.target.value as "off" | "notify" | "auto")}
+            title={t("about.updateMode")}
+            className="bg-surface-hover border border-surface-border rounded-lg px-3 py-2 text-sm text-text-primary outline-none focus:border-accent-blue"
           >
-            <span
-              className={clsx(
-                "inline-block h-4 w-4 rounded-full bg-white shadow transition-transform",
-                autoCheckUpdates ? "translate-x-6" : "translate-x-1"
-              )}
-            />
-          </button>
+            <option value="off">{t("about.updateModeOff")}</option>
+            <option value="notify">{t("about.updateModeNotify")}</option>
+            <option value="auto">{t("about.updateModeAuto")}</option>
+          </select>
         </SettingsRow>
         <SettingsRow label={t("about.checkUpdate")}>
           <div className="flex items-center gap-2">

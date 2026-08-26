@@ -100,6 +100,11 @@ pub fn get_install_channel_info() -> InstallChannelInfo {
     }
 }
 
+#[tauri::command]
+pub fn relaunch_app(app: AppHandle) {
+    app.restart();
+}
+
 fn default_shortcuts() -> ShortcutSettings {
     ShortcutSettings {
         open_widget_center: "Alt+W".to_string(),
@@ -110,10 +115,11 @@ fn default_shortcuts() -> ShortcutSettings {
 }
 
 #[tauri::command]
-pub fn get_app_settings(app: AppHandle, db: State<DbState>) -> Result<AppSettingsPayload, String> {
+pub fn get_app_settings(db: State<DbState>) -> Result<AppSettingsPayload, String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
 
-    let launch_at_startup = app.autolaunch().is_enabled().unwrap_or(false);
+    let launch_at_startup =
+        crate::db::get_bool_setting(&conn, "launch_at_startup", false).unwrap_or(false);
     let silent_startup =
         crate::db::get_bool_setting(&conn, "silent_startup", true).map_err(|e| e.to_string())?;
     let auto_open_widgets =
