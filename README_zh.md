@@ -164,8 +164,7 @@ TimeLens/
 
 ## 🗺 路线图
 
-- [v2.0.0 路线图（本地优先）](docs/ROADMAP_v2.0.0.md)
-- [v2.0.0 之后路线图（扩展平台）](docs/ROADMAP_POST_v2.0.0.md)
+- [统一路线图](docs/ROADMAP.md)
 
 ---
 

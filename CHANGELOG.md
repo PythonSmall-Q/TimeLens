@@ -87,7 +87,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
-- Consolidated roadmap governance into a single canonical local-first source at `docs/ROADMAP_v2.0.0.md`.
+- Consolidated roadmap governance into the unified canonical source at `docs/ROADMAP.md`.
 - Archived the parallel roadmap track to avoid split planning ownership and version drift.
 - Normalized core desktop release metadata to `2.0.0` across npm, Tauri, and Windows MSIX manifest sources.
 - Added advanced Browser Usage date-range exploration with local saved views (custom range, save/apply/delete presets).
