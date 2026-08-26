@@ -512,7 +512,7 @@ export default function MainApp() {
   }, [updateInfo, notifyWithNavigate, t]);
 
   return (
-    <HashRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <HashRouter>
       <MainLayout>
         <Suspense fallback={<Loading />}>
           <Routes>
