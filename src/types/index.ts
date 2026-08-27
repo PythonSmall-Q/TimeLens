@@ -122,6 +122,18 @@ export interface WidgetConfig {
   suspended_until?: string | null;
 }
 
+export interface WidgetRegistryRuntimeInfo {
+  language: string;
+  version: string;
+  entry?: string | null;
+  memory_budget_mb?: number | null;
+  cpu_budget_ms?: number | null;
+}
+
+export interface WidgetRegistryUiInfo {
+  model: "web-sandbox" | "host-block" | string;
+}
+
 export interface WidgetRegistryItem {
   widget_type: string;
   display_name: string;
@@ -136,6 +148,17 @@ export interface WidgetRegistryItem {
   capabilities: string[];
   sdk_version?: string | null;
   csp?: string | null;
+  // v4 runtime rewrite fields
+  runtime_language?: string | null;
+  runtime_version?: string | null;
+  runtime_entry?: string | null;
+  runtime_memory_budget_mb?: number | null;
+  runtime_cpu_budget_ms?: number | null;
+  ui_model?: string | null;
+  capability_justifications?: Record<string, string> | null;
+  network_domains_requested?: string[];
+  media_sources_requested?: string[];
+  publisher_verification?: string | null;
 }
 
 export interface WidgetRegistryLoadError {
@@ -173,7 +196,9 @@ export type WidgetQueryNamespace =
   | "projects"
   | "tags"
   | "goals"
-  | "rules";
+  | "rules"
+  | "focus"
+  | "todos";
 
 export interface WidgetQueryRequest {
   widget_id: string;
@@ -192,6 +217,113 @@ export interface WidgetErrorLogEntry {
 export interface WidgetLifecycleEvent {
   widget_id: string;
   event: "mount" | "foreground" | "background" | "suspend" | "resume" | "uninstall";
+}
+
+export type WidgetGatewayStatus =
+  | "success"
+  | "denied"
+  | "revoked"
+  | "throttled"
+  | "timed_out"
+  | "degraded"
+  | "error";
+
+export type WidgetGatewayRequestType =
+  | "query"
+  | "subscribe"
+  | "unsubscribe"
+  | "state_read"
+  | "state_write"
+  | "state_delete"
+  | "media_load"
+  | "network_fetch"
+  | "local_api_call"
+  | "notification_send"
+  | "focus_mode_write"
+  | "runtime_info";
+
+export interface WidgetGatewayRequest {
+  widget_id: string;
+  request_id: string;
+  scope: string;
+  request_type: WidgetGatewayRequestType;
+  payload?: unknown;
+  resource_hint?: string;
+  occurred_at?: string;
+}
+
+export interface WidgetGatewayError {
+  code: string;
+  message: string;
+  scope?: string;
+  recoverable?: boolean;
+}
+
+export interface WidgetGatewayResponse {
+  request_id: string;
+  status: WidgetGatewayStatus;
+  payload?: unknown;
+  error?: WidgetGatewayError;
+}
+
+export interface WidgetConsentDecision {
+  id?: number;
+  widget_id: string;
+  scope: string;
+  decision: "granted" | "denied" | string;
+  remembered: boolean;
+  risk_level: "low" | "medium" | "high" | string;
+  source: string;
+  granted_at?: string | null;
+  revoked_at?: string | null;
+}
+
+export interface WidgetNetworkDomainRule {
+  id?: number;
+  widget_id: string;
+  domain_pattern: string;
+  decision: "allow" | "deny" | string;
+  policy_source: string;
+  created_at: string;
+}
+
+export interface WidgetAccessAuditEntry {
+  id?: number;
+  widget_id: string;
+  scope: string;
+  request_type: string;
+  decision: string;
+  resource_hint: string;
+  payload_class: string;
+  occurred_at: string;
+}
+
+export interface WidgetRuntimeHealth {
+  widget_id: string;
+  host_id?: string | null;
+  memory_used_mb: number;
+  cpu_used_ms: number;
+  last_heartbeat_at?: string | null;
+  status: string;
+}
+
+export interface WidgetRuntimeCrash {
+  id?: number;
+  widget_id: string;
+  host_id?: string | null;
+  error: string;
+  stack_hint: string;
+  occurred_at: string;
+}
+
+export interface WidgetStreamSession {
+  id?: number;
+  widget_id: string;
+  stream_type: string;
+  resource_hint: string;
+  started_at: string;
+  ended_at?: string | null;
+  status: string;
 }
 
 export type DesktopPetStateKey = "idle" | "focus" | "rest";

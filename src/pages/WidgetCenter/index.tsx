@@ -5,7 +5,7 @@ import {
   Clock, List, Timer, ExternalLink, Trash2, Plus, StickyNote, Activity,
   Puzzle, FolderOpen, ShieldCheck, PawPrint, Ruler, Upload, Wrench,
   Target, Lightbulb, BarChart3, TrendingUp, Globe, Pause, Play, RefreshCw,
-  Terminal, ChevronDown, ChevronUp,
+  Terminal, ChevronDown, ChevronUp, X,
 } from "lucide-react";
 import { useWidgetStore } from "@/stores/widgetStore";
 import type {
@@ -145,6 +145,24 @@ function WidgetCard({
     } finally {
       setRevokingPermissions(false);
       setConfirmingRevoke(false);
+    }
+  };
+
+  const handleRevokeSinglePermission = async (permission: string) => {
+    if (revokingPermissions) return;
+    setRevokingPermissions(true);
+    try {
+      const remaining = permissionEntries
+        .map((e) => e.permission)
+        .filter((p) => p !== permission);
+      await api.setWidgetPermissions(config.id, remaining, "widget-center");
+      onPermissionsChanged();
+      onNotify({ kind: "ok", text: t("permissionMatrix.revokeOneSuccess", { permission }) });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      onNotify({ kind: "err", text: t("permissionMatrix.revokeError", { message }) });
+    } finally {
+      setRevokingPermissions(false);
     }
   };
 
@@ -329,12 +347,23 @@ function WidgetCard({
             <div key={entry.permission} className="rounded-lg border border-surface-border px-2 py-1.5 text-[11px] text-text-muted">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-text-primary truncate">{entry.permission}</span>
-                <span className={clsx(
-                  "px-1.5 py-0.5 rounded-full border",
-                  entry.risk_label === "high" ? "border-red-300/40 text-red-300" : entry.risk_label === "medium" ? "border-yellow-300/40 text-yellow-300" : "border-accent-green/40 text-accent-green"
-                )}>
-                  {entry.risk_label}
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className={clsx(
+                    "px-1.5 py-0.5 rounded-full border",
+                    entry.risk_label === "high" ? "border-red-300/40 text-red-300" : entry.risk_label === "medium" ? "border-yellow-300/40 text-yellow-300" : "border-accent-green/40 text-accent-green"
+                  )}>
+                    {entry.risk_label}
+                  </span>
+                  <button
+                    onClick={() => handleRevokeSinglePermission(entry.permission)}
+                    disabled={revokingPermissions}
+                    title={t("permissionMatrix.revokeOne")}
+                    aria-label={t("permissionMatrix.revokeOneAria", { permission: entry.permission })}
+                    className="text-text-muted hover:text-accent-red disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
               </div>
                   <p>{t("permissionMatrix.capability", { value: entry.capability })}</p>
                   <p>{t("permissionMatrix.grantedAt", { value: new Date(entry.granted_at).toLocaleString() })}</p>

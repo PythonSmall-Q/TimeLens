@@ -1983,6 +1983,159 @@ pub fn get_widget_permission_audit_log(
     rows.collect()
 }
 
+// ── Widget runtime rewrite consent and audit ─────────────────
+
+pub fn get_widget_consent_decisions(
+    conn: &Connection,
+    widget_id: &str,
+) -> Result<Vec<crate::models::WidgetConsentDecision>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, widget_id, scope, decision, remembered, risk_level, source, granted_at, revoked_at
+         FROM widget_consent_decisions
+         WHERE widget_id = ?1
+         ORDER BY granted_at DESC",
+    )?;
+    let rows = stmt.query_map(params![widget_id], |row| {
+        Ok(crate::models::WidgetConsentDecision {
+            id: row.get(0)?,
+            widget_id: row.get(1)?,
+            scope: row.get(2)?,
+            decision: row.get(3)?,
+            remembered: row.get::<_, i32>(4)? != 0,
+            risk_level: row.get(5)?,
+            source: row.get(6)?,
+            granted_at: row.get(7)?,
+            revoked_at: row.get(8)?,
+        })
+    })?;
+    rows.collect()
+}
+
+pub fn set_widget_consent_decision(
+    conn: &Connection,
+    widget_id: &str,
+    scope: &str,
+    decision: &str,
+    remembered: bool,
+    risk_level: &str,
+    source: &str,
+) -> Result<()> {
+    let now = chrono::Local::now().format("%Y-%m-%dT%H:%M:%S").to_string();
+    conn.execute(
+        "INSERT INTO widget_consent_decisions
+         (widget_id, scope, decision, remembered, risk_level, source, granted_at, revoked_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, NULL)
+         ON CONFLICT(widget_id, scope) DO UPDATE SET
+            decision = excluded.decision,
+            remembered = excluded.remembered,
+            risk_level = excluded.risk_level,
+            source = excluded.source,
+            granted_at = excluded.granted_at,
+            revoked_at = NULL",
+        params![
+            widget_id,
+            scope,
+            decision,
+            if remembered { 1 } else { 0 },
+            risk_level,
+            source,
+            now,
+        ],
+    )?;
+    Ok(())
+}
+
+pub fn revoke_widget_consent_decision(conn: &Connection, widget_id: &str, scope: &str) -> Result<()> {
+    let now = chrono::Local::now().format("%Y-%m-%dT%H:%M:%S").to_string();
+    conn.execute(
+        "UPDATE widget_consent_decisions
+         SET decision = 'denied', revoked_at = ?3
+         WHERE widget_id = ?1 AND scope = ?2",
+        params![widget_id, scope, now],
+    )?;
+    Ok(())
+}
+
+pub fn insert_widget_access_audit(
+    conn: &Connection,
+    entry: &crate::models::WidgetAccessAuditEntry,
+) -> Result<()> {
+    conn.execute(
+        "INSERT INTO widget_access_audit
+         (widget_id, scope, request_type, decision, resource_hint, payload_class, occurred_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        params![
+            &entry.widget_id,
+            &entry.scope,
+            &entry.request_type,
+            &entry.decision,
+            &entry.resource_hint,
+            &entry.payload_class,
+            &entry.occurred_at,
+        ],
+    )?;
+    Ok(())
+}
+
+pub fn get_widget_network_domain_rules(
+    conn: &Connection,
+    widget_id: &str,
+) -> Result<Vec<crate::models::WidgetNetworkDomainRule>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, widget_id, domain_pattern, decision, policy_source, created_at
+         FROM widget_network_domain_rules
+         WHERE widget_id = ?1
+         ORDER BY created_at DESC",
+    )?;
+    let rows = stmt.query_map(params![widget_id], |row| {
+        Ok(crate::models::WidgetNetworkDomainRule {
+            id: row.get(0)?,
+            widget_id: row.get(1)?,
+            domain_pattern: row.get(2)?,
+            decision: row.get(3)?,
+            policy_source: row.get(4)?,
+            created_at: row.get(5)?,
+        })
+    })?;
+    rows.collect()
+}
+
+pub fn set_widget_network_domain_rule(
+    conn: &Connection,
+    widget_id: &str,
+    domain_pattern: &str,
+    decision: &str,
+    policy_source: &str,
+) -> Result<()> {
+    let now = chrono::Local::now().format("%Y-%m-%dT%H:%M:%S").to_string();
+    conn.execute(
+        "INSERT INTO widget_network_domain_rules
+         (widget_id, domain_pattern, decision, policy_source, created_at)
+         VALUES (?1, ?2, ?3, ?4, ?5)",
+        params![widget_id, domain_pattern, decision, policy_source, now],
+    )?;
+    Ok(())
+}
+
+pub fn insert_widget_runtime_crash(
+    conn: &Connection,
+    crash: &crate::models::WidgetRuntimeCrash,
+) -> Result<()> {
+    conn.execute(
+        "INSERT INTO widget_runtime_crashes
+         (widget_id, host_id, error, stack_hint, occurred_at)
+         VALUES (?1, ?2, ?3, ?4, ?5)",
+        params![
+            &crash.widget_id,
+            &crash.host_id,
+            &crash.error,
+            &crash.stack_hint,
+            &crash.occurred_at,
+        ],
+    )?;
+    Ok(())
+}
+
 // ── Widget scoped state ───────────────────────────────────────
 
 pub fn get_widget_state(conn: &Connection, widget_id: &str, key: &str) -> Result<Option<String>> {

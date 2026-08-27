@@ -6,6 +6,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { X, Upload, Sparkles } from "lucide-react";
 import * as api from "@/services/tauriApi";
 import { useWidgetErrorReporter } from "@/hooks/useWidgetErrorReporter";
+import { useWidgetClient } from "@/hooks/useWidgetClient";
 import type {
   DesktopPetPackManifest,
   DesktopPetPackState,
@@ -117,6 +118,7 @@ function pickMessage(messages: string[], index: number): string {
 export default function PetWidget({ widgetId }: Props) {
   const { t } = useTranslation(["widgets", "common"]);
   useWidgetErrorReporter(widgetId);
+  const client = useWidgetClient({ widgetId, widgetType: "pet" });
 
   const fallbackManifest = useMemo<DesktopPetPackManifest>(() => {
     const makeState = (key: string, color: string, emoji: string): DesktopPetPackState => ({
@@ -180,13 +182,13 @@ export default function PetWidget({ widgetId }: Props) {
       }
 
       try {
-        const [monitor, focus] = await Promise.all([
+        const [monitor, focusResult] = await Promise.all([
           api.getMonitorStatus(),
-          api.getFocusModeActive(),
+          client.query<{ active: boolean }>("focus"),
         ]);
         if (mounted) {
           setMonitorStatus(monitor);
-          setFocusActive(focus);
+          setFocusActive(focusResult.active);
         }
       } catch {
         // Keep fallback display state.
@@ -213,7 +215,10 @@ export default function PetWidget({ widgetId }: Props) {
     });
 
     const timer = window.setInterval(() => {
-      api.getFocusModeActive().then(setFocusActive).catch(() => {});
+      client
+        .query<{ active: boolean }>("focus")
+        .then((r) => setFocusActive(r.active))
+        .catch(() => {});
       api.getMonitorStatus().then(setMonitorStatus).catch(() => {});
     }, 5000);
 
@@ -222,7 +227,7 @@ export default function PetWidget({ widgetId }: Props) {
       window.clearInterval(timer);
       cleanup?.();
     };
-  }, [widgetId, fallbackManifest]);
+  }, [client, widgetId, fallbackManifest]);
 
   const stateKey: DesktopPetStateKey = focusActive
     ? "focus"

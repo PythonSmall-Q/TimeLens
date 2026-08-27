@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://timelens.example/schemas/widget-gateway-response.json",
+  "title": "TimeLens Widget Gateway Response",
+  "description": "Normalized response returned by the Widget Gateway to a widget runtime host.",
+  "type": "object",
+  "required": ["request_id", "status"],
+  "properties": {
+    "request_id": { "type": "string" },
+    "status": {
+      "type": "string",
+      "enum": ["success", "denied", "revoked", "throttled", "timed_out", "degraded", "error"]
+    },
+    "payload": {},
+    "error": {
+      "type": "object",
+      "properties": {
+        "code": { "type": "string" },
+        "message": { "type": "string" },
+        "scope": { "type": "string" },
+        "recoverable": { "type": "boolean" }
+      }
+    }
+  }
+}

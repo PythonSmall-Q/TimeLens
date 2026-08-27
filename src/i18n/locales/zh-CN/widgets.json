@@ -10,6 +10,14 @@
   "importError": "导入失败",
   "officialWidgets": "官方组件",
   "thirdPartyWidgets": "第三方组件",
+  "consentPrompt": {
+    "title": "小组件访问请求 — {{widget}}",
+    "description": "该小组件正在请求一项需要您批准的权限。",
+    "scopeLabel": "请求的权限",
+    "remember": "记住我对该小组件的选择",
+    "allow": "允许",
+    "deny": "拒绝"
+  },
   "permissionDialogTitle": "小组件权限申请",
   "permissionDialogDesc": "该小组件申请以下权限，请确认后再允许：",
   "permissionGrant": "允许并添加",
@@ -42,6 +50,9 @@
     "confirm": "确认",
     "cancel": "取消",
     "confirmRevokeHint": "将撤销该小组件实例的全部权限。",
+    "revokeOne": "撤销此权限",
+    "revokeOneAria": "撤销 {{permission}}",
+    "revokeOneSuccess": "已撤销 {{permission}}。",
     "revokeSuccess": "已撤销 {{count}} 项权限。",
     "revokeError": "撤销权限失败：{{message}}",
     "timelineTitle": "权限时间线",
@@ -119,7 +130,9 @@
     "addPlaceholder": "添加任务…",
     "emptyState": "全部完成啦！🎉",
     "clearCompleted": "清除已完成",
-    "noGoal": "关联目标"
+    "noGoal": "关联目标",
+    "add": "添加待办",
+    "delete": "删除待办"
   },
   "timer": {
     "title": "计时器",

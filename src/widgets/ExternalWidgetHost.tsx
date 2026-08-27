@@ -3,7 +3,9 @@ import { convertFileSrc } from "@tauri-apps/api/core";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useTranslation } from "react-i18next";
 import * as api from "@/services/tauriApi";
-import type { WidgetQueryNamespace, WidgetRegistryItem } from "@/types";
+import type { WidgetRegistryItem } from "@/types";
+import { WidgetClient, buildLegacyChannel, type LegacyChannel } from "./sdk";
+import WidgetConsentPrompt from "@/components/WidgetConsentPrompt";
 
 interface Props {
   widgetId: string;
@@ -18,7 +20,10 @@ interface ThirdPartyWidgetInstance {
 interface ThirdPartyWidgetContext {
   widgetId: string;
   widgetType: string;
-  channel: Record<string, (...args: unknown[]) => Promise<unknown>>;
+  /** Backward-compatible channel. Legacy widgets should use this. */
+  channel: LegacyChannel;
+  /** New SDK client. New widgets should use this for Gateway-mediated access. */
+  client: WidgetClient;
   lifecycle: {
     onMount?: () => void;
     onForeground?: () => void;
@@ -29,10 +34,11 @@ interface ThirdPartyWidgetContext {
   };
 }
 
-interface SubscriptionRecord {
-  event: string;
-  callback: (payload: unknown) => void;
-  unlisten?: () => void;
+interface PendingConsent {
+  id: string;
+  scope: string;
+  message: string;
+  resolve: (granted: boolean) => void;
 }
 
 function normalizeModule(
@@ -67,216 +73,62 @@ function normalizeModule(
   return null;
 }
 
-// Permission → legacy channel method names mapping
-const PERMISSION_METHODS: Record<string, string[]> = {
-  "screen-time:read": [
-    "getTodayAppTotals",
-    "getAppTotalsInRange",
-    "getCategoryTotalsInRange",
-    "getHourlyForDate",
-    "getRecentDailyTotalsRange",
-    "getAppCategoryMap",
-  ],
-  "active-window:subscribe": ["onActiveWindowChanged"],
-  "todo:read": ["getTodos"],
-  "todo:write": ["addTodo", "toggleTodo", "deleteTodo"],
-  "settings:write": ["setFocusModeActive", "setMonitoringActive"],
-  "local-api:call": ["localApiCall"],
-};
-
-function denied(method: string, perm: string): () => Promise<never> {
-  return () => Promise.reject(new Error(`permission denied: ${perm} required for ${method}`));
-}
-
-function buildChannel(
-  widgetId: string,
-  grantedPerms: string[],
-  subscriptionsRef: React.MutableRefObject<SubscriptionRecord[]>
-) {
-  const markPermissionAccess = (permission: string) => {
-    void api.recordWidgetPermissionAccess(widgetId, permission).catch(() => {});
-  };
-
-  const withPermission = (
-    permission: string,
-    fn: (...args: unknown[]) => Promise<unknown>
-  ) => {
-    return (...args: unknown[]) => {
-      markPermissionAccess(permission);
-      return fn(...args);
-    };
-  };
-
-  const allMethods: Record<string, (...args: unknown[]) => Promise<unknown>> = {
-    // screen-time:read
-    getTodayAppTotals: withPermission("screen-time:read", () => api.getTodayAppTotals() as Promise<unknown>),
-    getAppTotalsInRange: withPermission("screen-time:read", (start: unknown, end: unknown) =>
-      api.getAppTotalsInRange(start as string, end as string) as Promise<unknown>,
-    ),
-    getCategoryTotalsInRange: withPermission("screen-time:read", (start: unknown, end: unknown) =>
-      api.getCategoryTotalsInRange(start as string, end as string) as Promise<unknown>,
-    ),
-    getHourlyForDate: withPermission("screen-time:read", (date: unknown) =>
-      api.getHourlyDistributionForDate(date as string) as Promise<unknown>,
-    ),
-    getRecentDailyTotalsRange: withPermission("screen-time:read", (start: unknown, end: unknown) =>
-      api.getRecentDailyTotalsRange(start as string, end as string) as Promise<unknown>,
-    ),
-    getAppCategoryMap: withPermission("screen-time:read", () => api.getAppCategoryMap() as Promise<unknown>),
-    // active-window:subscribe
-    onActiveWindowChanged: withPermission("active-window:subscribe", (cb: unknown) =>
-      api.onActiveWindowChanged(cb as Parameters<typeof api.onActiveWindowChanged>[0]) as Promise<unknown>,
-    ),
-    // todo:read
-    getTodos: withPermission("todo:read", () => api.getTodos() as Promise<unknown>),
-    // todo:write
-    addTodo: withPermission("todo:write", (content: unknown) => api.addTodo(content as string) as Promise<unknown>),
-    toggleTodo: withPermission("todo:write", (id: unknown) => api.toggleTodo(id as number) as Promise<unknown>),
-    deleteTodo: withPermission("todo:write", (id: unknown) => api.deleteTodo(id as number) as Promise<unknown>),
-    // settings:write
-    setFocusModeActive: withPermission("settings:write", (active: unknown) =>
-      api.setFocusModeActive(Boolean(active)) as Promise<unknown>,
-    ),
-    setMonitoringActive: withPermission("settings:write", (active: unknown) =>
-      api.setMonitoringActive(Boolean(active)) as Promise<unknown>,
-    ),
-    // local-api:call
-    localApiCall: withPermission("local-api:call", async (options: unknown) => {
-      const {
-        method = "GET",
-        path,
-        body,
-        scopes = [],
-      } = options as {
-        method?: string;
-        path: string;
-        body?: unknown;
-        scopes?: string[];
-      };
-      if (!path || typeof path !== "string") {
-        throw new Error("localApiCall requires a path string");
-      }
-      const token = await api.issueWidgetApiToken(widgetId, scopes);
-      const baseUrl = await api.getLocalApiBaseUrl();
-      const resp = await fetch(`${baseUrl}${path}`, {
-        method: method.toUpperCase(),
-        headers: {
-          "Content-Type": "application/json",
-          "X-Client-Id": `widget-${widgetId}`,
-          "X-Api-Token": token.token,
-        },
-        body: body !== undefined ? JSON.stringify(body) : undefined,
-      });
-      if (!resp.ok) {
-        throw new Error(`local API call failed: ${resp.status}`);
-      }
-      if (resp.status === 204) {
-        return undefined;
-      }
-      return (await resp.json()) as unknown;
-    }),
-    // v2.2.0 typed query API (requires screen-time:read)
-    query: withPermission("screen-time:read", async (namespace: unknown, payload?: unknown) => {
-      const result = await api.widgetQuery<unknown>({
-        widget_id: widgetId,
-        namespace: namespace as WidgetQueryNamespace,
-        payload: payload as Record<string, unknown> | undefined,
-      });
-      return result;
-    }),
-    // v2.2.0 subscriptions
-    subscribe: withPermission("screen-time:read", async (event: unknown, cb: unknown) => {
-      const eventName = event as string;
-      const callback = cb as (payload: unknown) => void;
-      const unlisten = await api.listenWidgetEvent<unknown>(eventName, callback);
-      subscriptionsRef.current.push({ event: eventName, callback, unlisten });
-      return subscriptionsRef.current.length - 1;
-    }),
-    unsubscribe: async (handle: unknown) => {
-      const index = handle as number;
-      const record = subscriptionsRef.current[index];
-      if (record) {
-        record.unlisten?.();
-        subscriptionsRef.current[index] = { event: "", callback: () => {} };
-      }
-    },
-    // v2.2.0 scoped state persistence (no extra permission required)
-    getState: async (key: unknown) => {
-      const value = await api.getWidgetState(widgetId, key as string);
-      return value;
-    },
-    setState: async (key: unknown, value: unknown) => {
-      await api.setWidgetState(widgetId, key as string, value as string);
-      return undefined;
-    },
-    deleteState: async (key: unknown) => {
-      await api.deleteWidgetState(widgetId, key as string);
-      return undefined;
-    },
-    // always available
-    getUsageGoals: () => api.getUsageGoals() as Promise<unknown>,
-    listFocusSessions: () => api.listFocusSessions() as Promise<unknown>,
-  };
-
-  const channel: Record<string, (...args: unknown[]) => Promise<unknown>> = {};
-
-  for (const [method, fn] of Object.entries(allMethods)) {
-    // Check if method requires a permission
-    const requiredPerm = Object.entries(PERMISSION_METHODS).find(([, methods]) =>
-      methods.includes(method)
-    )?.[0];
-
-    if (requiredPerm && !grantedPerms.includes(requiredPerm)) {
-      channel[method] = denied(method, requiredPerm);
-    } else {
-      channel[method] = fn;
-    }
-  }
-
-  return channel;
-}
-
 export default function ExternalWidgetHost({ widgetId, widgetType }: Props) {
   const { t } = useTranslation("widgets");
   const containerRef = useRef<HTMLDivElement | null>(null);
   const unmountRef = useRef<ThirdPartyWidgetInstance["unmount"]>(undefined);
-  const subscriptionsRef = useRef<SubscriptionRecord[]>([]);
   const [registryItem, setRegistryItem] = useState<WidgetRegistryItem | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [grantedPerms, setGrantedPerms] = useState<string[]>([]);
+  const [pendingConsents, setPendingConsents] = useState<PendingConsent[]>([]);
+  const pendingConsentsRef = useRef<PendingConsent[]>([]);
 
-  // Load permissions once
-  useEffect(() => {
-    let disposed = false;
+  const client = useMemo(() => {
+    return new WidgetClient({
+      widgetId,
+      widgetType,
+      onConsentRequired: (scope, _riskLevel, message) => {
+        return new Promise((resolve) => {
+          const consent: PendingConsent = {
+            id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            scope,
+            message,
+            resolve,
+          };
+          setPendingConsents((prev) => {
+            const next = [...prev, consent];
+            pendingConsentsRef.current = next;
+            return next;
+          });
+        });
+      },
+    });
+  }, [widgetId, widgetType]);
 
-    const refreshPermissions = async () => {
-      try {
-        const next = await api.getWidgetPermissions(widgetId);
-        if (!disposed) {
-          setGrantedPerms(next);
-        }
-      } catch {
-        if (!disposed) {
-          setGrantedPerms([]);
-        }
+  const channel = useMemo(() => buildLegacyChannel(client), [client]);
+
+  const activeConsent = pendingConsents[0] ?? null;
+
+  const handleConsentDecision = async (granted: boolean, remember: boolean) => {
+    if (!activeConsent) return;
+
+    try {
+      if (granted) {
+        await api.widgetGrantConsent(widgetId, activeConsent.scope, remember, "low");
+      } else {
+        await api.widgetDenyConsent(widgetId, activeConsent.scope, remember, "low");
       }
-    };
-
-    void refreshPermissions();
-    const timer = window.setInterval(() => {
-      void refreshPermissions();
-    }, 2000);
-
-    return () => {
-      disposed = true;
-      window.clearInterval(timer);
-    };
-  }, [widgetId]);
-
-  const channel = useMemo(
-    () => buildChannel(widgetId, grantedPerms, subscriptionsRef),
-    [widgetId, grantedPerms]
-  );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      void api.recordWidgetError(widgetId, message, t("thirdParty.loadErrorHint")).catch(() => {});
+    } finally {
+      activeConsent.resolve(granted);
+      setPendingConsents((prev) => {
+        const next = prev.slice(1);
+        pendingConsentsRef.current = next;
+        return next;
+      });
+    }
+  };
 
   useEffect(() => {
     let disposed = false;
@@ -335,6 +187,7 @@ export default function ExternalWidgetHost({ widgetId, widgetType }: Props) {
           widgetId,
           widgetType,
           channel,
+          client,
           lifecycle,
         });
 
@@ -372,11 +225,14 @@ export default function ExternalWidgetHost({ widgetId, widgetType }: Props) {
       cleanupFocus?.();
       Promise.resolve(unmountRef.current?.()).catch(() => {});
       unmountRef.current = undefined;
-      subscriptionsRef.current.forEach((s) => s.unlisten?.());
-      subscriptionsRef.current = [];
+      client.dispose();
+      // Reject any pending consent prompts so awaiting widgets unblock.
+      pendingConsentsRef.current.forEach((c) => c.resolve(false));
+      pendingConsentsRef.current = [];
+      setPendingConsents([]);
       void api.emitWidgetLifecycle({ widget_id: widgetId, event: "uninstall" }).catch(() => {});
     };
-  }, [channel, widgetId, widgetType]);
+  }, [channel, client, t, widgetId, widgetType]);
 
   if (error) {
     return (
@@ -401,6 +257,17 @@ export default function ExternalWidgetHost({ widgetId, widgetType }: Props) {
         <div className="absolute inset-0 grid place-items-center text-xs text-text-muted">
           {t("thirdParty.loading")}
         </div>
+      )}
+      {activeConsent && (
+        <WidgetConsentPrompt
+          open
+          widgetName={registryItem?.display_name ?? widgetType}
+          scope={activeConsent.scope}
+          message={activeConsent.message}
+          onAccept={(remember) => void handleConsentDecision(true, remember)}
+          onDeny={(remember) => void handleConsentDecision(false, remember)}
+          onClose={() => void handleConsentDecision(false, false)}
+        />
       )}
     </div>
   );

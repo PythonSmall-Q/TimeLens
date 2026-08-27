@@ -10,6 +10,14 @@
   "importError": "Failed to import widget",
   "officialWidgets": "Official",
   "thirdPartyWidgets": "Third-party",
+  "consentPrompt": {
+    "title": "Widget Access Request — {{widget}}",
+    "description": "This widget is trying to access a capability that requires your approval.",
+    "scopeLabel": "Requested capability",
+    "remember": "Remember my decision for this widget",
+    "allow": "Allow",
+    "deny": "Deny"
+  },
   "permissionDialogTitle": "Widget Permissions",
   "permissionDialogDesc": "This widget requests the following permissions. Review before allowing:",
   "permissionGrant": "Allow & Add",
@@ -42,6 +50,9 @@
     "confirm": "Confirm",
     "cancel": "Cancel",
     "confirmRevokeHint": "This will revoke all permissions for this widget instance.",
+    "revokeOne": "Revoke this permission",
+    "revokeOneAria": "Revoke {{permission}}",
+    "revokeOneSuccess": "Revoked {{permission}}.",
     "revokeSuccess": "Revoked {{count}} permission(s).",
     "revokeError": "Failed to revoke permissions: {{message}}",
     "timelineTitle": "Permission Timeline",
@@ -119,7 +130,9 @@
     "addPlaceholder": "Add a task…",
     "emptyState": "All done! 🎉",
     "clearCompleted": "Clear completed",
-    "noGoal": "Link to goal"
+    "noGoal": "Link to goal",
+    "add": "Add todo",
+    "delete": "Delete todo"
   },
   "timer": {
     "title": "Timer",

@@ -392,3 +392,155 @@ pub struct WidgetPermissionAuditEntry {
     pub occurred_at: String,
     pub detail: String,
 }
+
+// ── Widget Runtime Rewrite (v2.2.0+) ───────────────────────────
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct WidgetRuntimeHost {
+    pub host_id: String,
+    pub language: String,
+    pub version: String,
+    pub path: Option<String>,
+    pub health: String,
+    pub created_at: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct WidgetGatewayPolicy {
+    pub id: Option<i64>,
+    pub scope: String,
+    pub decision: String,
+    pub policy_source: String,
+    pub created_at: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct WidgetConsentDecision {
+    pub id: Option<i64>,
+    pub widget_id: String,
+    pub scope: String,
+    pub decision: String,
+    pub remembered: bool,
+    pub risk_level: String,
+    pub source: String,
+    pub granted_at: Option<String>,
+    pub revoked_at: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct WidgetAccessAuditEntry {
+    pub id: Option<i64>,
+    pub widget_id: String,
+    pub scope: String,
+    pub request_type: String,
+    pub decision: String,
+    pub resource_hint: String,
+    pub payload_class: String,
+    pub occurred_at: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct WidgetNetworkDomainRule {
+    pub id: Option<i64>,
+    pub widget_id: String,
+    pub domain_pattern: String,
+    pub decision: String,
+    pub policy_source: String,
+    pub created_at: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct WidgetRuntimeHealth {
+    pub widget_id: String,
+    pub host_id: Option<String>,
+    pub memory_used_mb: i64,
+    pub cpu_used_ms: i64,
+    pub last_heartbeat_at: Option<String>,
+    pub status: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct WidgetRuntimeCrash {
+    pub id: Option<i64>,
+    pub widget_id: String,
+    pub host_id: Option<String>,
+    pub error: String,
+    pub stack_hint: String,
+    pub occurred_at: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct WidgetStreamSession {
+    pub id: Option<i64>,
+    pub widget_id: String,
+    pub stream_type: String,
+    pub resource_hint: String,
+    pub started_at: String,
+    pub ended_at: Option<String>,
+    pub status: String,
+}
+
+// ── Widget Gateway Contract ────────────────────────────────────
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WidgetGatewayRequestType {
+    Query,
+    Subscribe,
+    Unsubscribe,
+    StateRead,
+    StateWrite,
+    StateDelete,
+    MediaLoad,
+    NetworkFetch,
+    LocalApiCall,
+    NotificationSend,
+    FocusModeWrite,
+    RuntimeInfo,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct WidgetGatewayRequest {
+    pub widget_id: String,
+    pub request_id: String,
+    pub scope: String,
+    pub request_type: WidgetGatewayRequestType,
+    #[serde(default)]
+    pub payload: Option<serde_json::Value>,
+    #[serde(default)]
+    pub resource_hint: Option<String>,
+    #[serde(default)]
+    pub occurred_at: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WidgetGatewayStatus {
+    Success,
+    Denied,
+    Revoked,
+    Throttled,
+    TimedOut,
+    Degraded,
+    Error,
+}
+
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+pub struct WidgetGatewayError {
+    pub code: String,
+    pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scope: Option<String>,
+    #[serde(default)]
+    pub recoverable: bool,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct WidgetGatewayResponse {
+    pub request_id: String,
+    pub status: WidgetGatewayStatus,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub payload: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<WidgetGatewayError>,
+}

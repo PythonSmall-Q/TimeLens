@@ -6,6 +6,7 @@ import * as api from "@/services/tauriApi";
 import type { FocusSession } from "@/types";
 import { formatDuration, todayString } from "@/utils/format";
 import { useWidgetErrorReporter } from "@/hooks/useWidgetErrorReporter";
+import { useWidgetClient } from "@/hooks/useWidgetClient";
 import clsx from "clsx";
 
 interface Props {
@@ -32,6 +33,7 @@ function parseLocalDateTime(dt: string): Date {
 export default function FocusCoachWidget({ widgetId }: Props) {
   const { t } = useTranslation(["widgets", "common"]);
   useWidgetErrorReporter(widgetId);
+  const client = useWidgetClient({ widgetId, widgetType: "focus-coach" });
 
   const [activeSession, setActiveSession] = useState<FocusSession | null>(null);
   const [todaySessions, setTodaySessions] = useState<FocusSession[]>([]);
@@ -43,10 +45,10 @@ export default function FocusCoachWidget({ widgetId }: Props) {
 
   const refresh = useCallback(async () => {
     try {
-      const sessions = await api.listFocusSessions(
-        `${today}T00:00:00`,
-        `${today}T23:59:59`
-      );
+      const sessions = await client.query<FocusSession[]>("sessions", {
+        start_at: `${today}T00:00:00`,
+        end_at: `${today}T23:59:59`,
+      });
       setTodaySessions(sessions);
       setActiveSession(sessions.find((s) => !s.ended_at) ?? null);
       setError(null);
@@ -54,7 +56,7 @@ export default function FocusCoachWidget({ widgetId }: Props) {
       const message = err instanceof Error ? err.message : String(err);
       setError(message);
     }
-  }, [today]);
+  }, [client, today]);
 
   useEffect(() => {
     void refresh();

@@ -4,6 +4,8 @@ pub mod db;
 pub mod db_encryption;
 pub mod models;
 pub mod monitor;
+pub mod widget_gateway;
+pub mod widget_kernel;
 pub mod widget_registry;
 
 use std::path::{Path, PathBuf};
@@ -322,8 +324,14 @@ fn init_file_logger(log_dir: &Path) -> Result<(), String> {
                 message
             ));
         })
-        .chain(std::io::stdout())
         .chain(file);
+
+    // Only write logs to stdout in debug builds. Release builds are GUI
+    // subsystem apps and writing to stdout can cause a terminal window to
+    // appear when launched via autostart or from an existing console.
+    if cfg!(debug_assertions) {
+        dispatch = dispatch.chain(std::io::stdout());
+    }
 
     dispatch = if cfg!(debug_assertions) {
         dispatch.level(log::LevelFilter::Debug)
@@ -519,6 +527,19 @@ fn cleanup_database_encryption(target_db_path: &Path, data_dir: &Path) {
 }
 
 pub fn run() {
+    // When Windows launches us via autostart from a console process (for
+    // example, if the executable is a debug/console-subsystem build), detach
+    // from the inherited console so no terminal window is shown to the user.
+    #[cfg(target_os = "windows")]
+    {
+        let is_autostart = std::env::args().any(|a| a == "--autostart");
+        if is_autostart {
+            unsafe {
+                let _ = windows::Win32::System::Console::FreeConsole();
+            }
+        }
+    }
+
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
@@ -630,8 +651,15 @@ pub fn run() {
             }
 
             // Widget runtime v2.2.0 rate limiters
-            app.manage(commands::WidgetCallRateLimiter::new());
-            app.manage(commands::WidgetEventRateLimiter::new());
+            let widget_call_rate_limiter = commands::WidgetCallRateLimiter::new();
+            let widget_event_rate_limiter = commands::WidgetEventRateLimiter::new();
+            app.manage(widget_call_rate_limiter.clone());
+            app.manage(widget_event_rate_limiter.clone());
+
+            // Widget Runtime Rewrite kernel + gateway
+            let widget_kernel =
+                widget_kernel::WidgetKernel::new(db_state.clone(), widget_call_rate_limiter.clone());
+            app.manage(widget_kernel);
 
             // Initialize extension bridge key on first run
             {

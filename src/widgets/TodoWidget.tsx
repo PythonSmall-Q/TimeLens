@@ -24,6 +24,7 @@ import * as api from "@/services/tauriApi";
 import type { GoalProgress, TodoItem, UsageGoal } from "@/types";
 import { formatDuration } from "@/utils/format";
 import { useWidgetErrorReporter } from "@/hooks/useWidgetErrorReporter";
+import { useWidgetClient } from "@/hooks/useWidgetClient";
 import clsx from "clsx";
 
 const GOAL_PREFIX_RE = /^\[goal:([^\]]+)\]\s*/;
@@ -50,6 +51,7 @@ interface SortableRowProps {
 }
 
 function SortableRow({ item, progress, onToggle, onDelete }: SortableRowProps) {
+  const { t } = useTranslation("widgets");
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: item.id });
 
@@ -112,6 +114,8 @@ function SortableRow({ item, progress, onToggle, onDelete }: SortableRowProps) {
       </div>
       <button
         onClick={() => onDelete(item.id)}
+        aria-label={t("todo.delete")}
+        title={t("todo.delete")}
         className="text-text-muted hover:text-accent-red opacity-0 group-hover:opacity-100
                    transition-all flex-shrink-0"
       >
@@ -128,6 +132,7 @@ interface Props {
 export default function TodoWidget({ widgetId }: Props) {
   const { t } = useTranslation("widgets");
   useWidgetErrorReporter(widgetId);
+  const client = useWidgetClient({ widgetId, widgetType: "todo" });
   const [todos, setTodos] = useState<TodoItem[]>([]);
   const [input, setInput] = useState("");
   const [goals, setGoals] = useState<UsageGoal[]>([]);
@@ -163,7 +168,10 @@ export default function TodoWidget({ widgetId }: Props) {
 
   useEffect(() => {
     const onChanged = () => {
-      api.getTodos().then(setTodos).catch(console.error);
+      client
+        .query<TodoItem[]>("todos")
+        .then(setTodos)
+        .catch(console.error);
     };
     window.addEventListener("timelens-todos-changed", onChanged);
 
@@ -182,7 +190,7 @@ export default function TodoWidget({ widgetId }: Props) {
       window.removeEventListener("timelens-todos-changed", onChanged);
       unlisten?.();
     };
-  }, []);
+  }, [client]);
 
   const toggleAutoBlur = () => {
     const next = !autoBlur;
@@ -202,18 +210,21 @@ export default function TodoWidget({ widgetId }: Props) {
   );
 
   useEffect(() => {
-    api.getTodos().then(setTodos).catch(console.error);
-    const loadGoals = async () => {
+    const load = async () => {
       try {
-        const [g, p] = await Promise.all([api.getUsageGoals(), api.getGoalProgress(1)]);
-        setGoals(g.filter((goal) => goal.enabled));
-        setProgress(p);
+        const [todosResult, goalsResult] = await Promise.all([
+          client.query<TodoItem[]>("todos"),
+          client.query<{ goals: UsageGoal[]; progress: GoalProgress[] }>("goals"),
+        ]);
+        setTodos(todosResult);
+        setGoals(goalsResult.goals.filter((goal) => goal.enabled));
+        setProgress(goalsResult.progress);
       } catch {
-        // Ignore goal load errors.
+        // Ignore load errors; keep existing state.
       }
     };
-    void loadGoals();
-  }, []);
+    void load();
+  }, [client]);
 
   const progressByKey = new Map<string, GoalProgress>();
   progress.forEach((p) => {
@@ -314,6 +325,8 @@ export default function TodoWidget({ widgetId }: Props) {
           />
           <button
             onClick={handleAdd}
+            aria-label={t("todo.add")}
+            title={t("todo.add")}
             className="bg-accent-blue/20 hover:bg-accent-blue/30 text-accent-blue rounded-lg
                        p-2 transition-colors flex-shrink-0"
           >

@@ -527,7 +527,7 @@ Review checkpoint:
 
 ## Delivery Phases
 
-### Phase A: Contract and Threat Model
+### Phase A: Contract and Threat Model ✅ Completed
 
 Deliverables:
 
@@ -536,7 +536,7 @@ Deliverables:
 - Initial manifest v4 draft.
 - Consent UX copy draft.
 
-### Phase B: Kernel and Gateway Core
+### Phase B: Kernel and Gateway Core ✅ Completed
 
 Deliverables:
 
@@ -545,7 +545,7 @@ Deliverables:
 - Audit store.
 - Compatibility adapter.
 
-### Phase C: JS or TS Runtime Migration
+### Phase C: JS or TS Runtime Migration ✅ Completed
 
 Deliverables:
 
@@ -661,3 +661,81 @@ After this plan is reviewed, the next artifact should be a narrow RFC that freez
 - Consent prompt variants.
 - Audit storage schema.
 - Java packaging contract.
+
+---
+
+## 实际执行记录（Agent Implementation Log）
+
+> 由 Kimi Code agent 基于本计划逐步实施，记录已完成阶段、关键文件变更与下一步建议。
+
+### 已完成阶段
+
+- **Phase A — 契约与 Schema 冻结**：已完成。
+- **Phase B — Kernel 与 Gateway Core**：已完成。
+- **Phase C — JS/TS Runtime 迁移**：已完成（SDK、ExternalWidgetHost、运行时同意提示、全部适用 Gateway 的官方组件迁移、SDK 测试均已落地）。
+
+### 关键交付物
+
+| 模块 | 主要文件 | 说明 |
+|---|---|---|
+| 数据库迁移 | `src-tauri/src/db/migrations.rs` migration 012 | 新增 8 张 runtime rewrite 表 |
+| Rust 模型 | `src-tauri/src/models/mod.rs` | 新增表模型 + Gateway Request/Response 契约 |
+| Manifest v4 | `src-tauri/src/widget_registry.rs` | 支持 `runtime`、`ui`、`capability_justifications`、网络/媒体域等 v4 字段 |
+| 共享契约 Schema | `src-tauri/widget-contract/*.schema.json` | manifest-v4、gateway-request、gateway-response |
+| 前端类型 | `src/types/index.ts` | 同步 WidgetRegistryItem v4 字段、Gateway 类型、Consent/Stream/Health 等 |
+| Gateway | `src-tauri/src/widget_gateway/` | capability_resolver、consent_service、policy_firewall、usage_data_broker、audit_emitter |
+| Kernel | `src-tauri/src/widget_kernel/` | instance_manager、WidgetKernel（生命周期/错误/健康/权限重置） |
+| 命令改造 | `src-tauri/src/commands/widget_runtime_cmd.rs` | 现有命令改走 Kernel/Gateway；新增 `widget_gateway_request`、`widget_grant_consent`、`widget_deny_consent`、`widget_revoke_consent` |
+| 状态注册 | `src-tauri/src/lib.rs` | 注册 `WidgetKernel` 状态 |
+| 前端 API | `src/services/tauriApi.ts` | 新增 `widgetGatewayRequest`、`widgetGrantConsent`、`widgetDenyConsent`、`widgetRevokeConsent` |
+| 前端 SDK | `src/widgets/sdk/index.ts` | `WidgetClient`、`WidgetGatewayError`、`buildLegacyChannel`、`LegacyChannel` |
+| 第三方组件 Host | `src/widgets/ExternalWidgetHost.tsx` | 实例化 `WidgetClient`，通过 Gateway 请求；保留 legacy channel；集成运行时同意提示 |
+| 同意提示组件 | `src/components/WidgetConsentPrompt.tsx` | 运行时权限请求弹窗，支持 Allow/Deny 与记住选择 |
+| 文案 | `src/i18n/locales/*/widgets.json` | `consentPrompt.*` 多语言文案 |
+| Hook | `src/hooks/useWidgetClient.ts` | 为官方组件提供自动 dispose 的 `WidgetClient` |
+| 官方组件迁移 | `src/widgets/{Clock,Todo,Note,Status,GoalProgress,SessionPulse,FocusCoach,Pet}Widget.tsx` | 适用 Gateway 的官方组件均已迁移；Timer/QuickCapture/BrowserActivity 因无对应 Gateway API 暂保留直接调用 |
+| 后端默认权限 | `src-tauri/src/commands/widget_cmd.rs`、`src-tauri/src/widget_registry.rs` | 创建官方组件时按 capability 自动授予默认权限 |
+| Gateway query | `src-tauri/src/widget_gateway/usage_data_broker.rs`、capability_resolver | 新增 `focus` namespace，返回 `active` + `active_session` |
+| SDK 测试 | `src/widgets/sdk/__tests__/WidgetClient.test.ts` | mock gateway 覆盖 query/state/subscribe/consent retry |
+| 权限治理 UX | `src/pages/WidgetCenter/index.tsx` | 权限矩阵支持单个权限撤销，保留「撤销全部」入口 |
+
+### 验证结果
+
+- `npm run typecheck` ✅
+- `npm run lint` ✅（0 errors，8 pre-existing warnings）
+- `npm run test` ✅（22/22，含 11 个新增 WidgetClient 测试）
+- `cargo check` ✅
+- `cargo test` ✅（38/38）
+
+### 当前限制
+
+- Gateway 中的 `network_fetch`、`media_load`、`local_api_call`、`notification_send` 已占位，尚未实现完整代理逻辑，计划在 Phase D 补齐。
+- 旧 widget 的 `widget_permissions` 被 Gateway 视为已授权，保证迁移期兼容。
+- `WidgetClient.fetch` 与 `loadMedia` 为占位实现，会抛出未实现错误。
+- 同意提示目前统一按 `low` 风险等级记录；后续应结合 capability 风险分级自动映射 `low/medium/high`。
+- TimerWidget、QuickCaptureWidget、BrowserActivityWidget 仍使用直接 `tauriApi` 调用，待 Gateway 暴露对应能力后再迁移。
+
+### 建议下一步
+
+进入 **Phase D — Media 与 Sensitive Access Hardening**：
+
+1. 实现 Gateway `network_fetch` 代理与域名策略防火墙。
+2. 实现 Gateway `media_load` 代理与本地/远程媒体白名单。
+3. 实现高风险数据访问的二次确认提示。
+4. 处理 widget 被撤销权限（revoked）后的降级 UI 与事件通知。
+5. 评估是否将 `buildLegacyChannel` 标记为 deprecated，并更新 `WIDGET_SDK_v2_MIGRATION.md`。
+
+---
+
+## Agent 下一步计划（由当前 Kimi Code agent 制定）
+
+基于 Phase C 已完成，当前建议转向用户此前提到的 v2.2.0 其他需求。优先级最高的未解决项包括：
+
+1. **小组件中心左右栏独立滚动**：当前官方/第三方两栏共用滚动容器，需拆分布局。
+2. **桌宠重写**：改为纯宠物资源包模式，支持用户导入 JSON pack（参考 Codex 宠物）。
+3. **专注教练按钮/计时卡死问题**：开始专注后时间显示 `-2`、按钮状态不切换。
+4. **快速记录后待办/便签页面自动刷新**：保存后触发对应 widget 刷新事件。
+5. **错误日志筛选失效**：当前筛选输入不生效，所有行被隐藏。
+6. **自动更新弹窗与下载安装**：应用内检测更新、每次下载/安装需用户确认、支持关闭/仅提示。
+
+如果用户继续输入「继续」，则默认从第 1 项开始：修复小组件中心左右栏独立滚动。

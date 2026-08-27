@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { CheckSquare2, Plus, RotateCcw, X, Zap, Flame } from "lucide-react";
-import * as api from "@/services/tauriApi";
+import { useWidgetClient } from "@/hooks/useWidgetClient";
 
 interface Props {
   widgetId: string;
@@ -22,8 +22,16 @@ interface HabitState {
   lastCompletedDate: string | null;
 }
 
+const STATE_KEY = "habit_board";
+
 function todayKey(): string {
   return new Date().toISOString().slice(0, 10);
+}
+
+function yesterdayKey(): string {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return d.toISOString().slice(0, 10);
 }
 
 function defaultHabits(t: (key: string, params?: Record<string, unknown>) => string): HabitItem[] {
@@ -35,8 +43,7 @@ function defaultHabits(t: (key: string, params?: Record<string, unknown>) => str
   }));
 }
 
-function loadHabits(widgetId: string, fallback: HabitItem[]): HabitState {
-  const raw = localStorage.getItem(`${widgetId}-habit-board`);
+function parseHabitState(raw: string | null, fallback: HabitItem[]): HabitState {
   if (!raw) {
     return {
       date: todayKey(),
@@ -85,37 +92,72 @@ function loadHabits(widgetId: string, fallback: HabitItem[]): HabitState {
   }
 }
 
-function yesterdayKey(): string {
-  const d = new Date();
-  d.setDate(d.getDate() - 1);
-  return d.toISOString().slice(0, 10);
+function serializeHabitState(state: HabitState): string {
+  return JSON.stringify(state);
 }
 
 export default function StatusWidget({ widgetId }: Props) {
   const { t } = useTranslation(["widgets", "common"]);
+  const client = useWidgetClient({ widgetId, widgetType: "status" });
   const [state, setState] = useState<HabitState>(() =>
-    loadHabits(widgetId, defaultHabits((k, p) => t(k, p)))
+    parseHabitState(null, defaultHabits((k, p) => t(k, p)))
   );
-  const [selectedId, setSelectedId] = useState<string>(() => state.habits[0]?.id ?? "");
+  const [loaded, setLoaded] = useState(false);
+  const [selectedId, setSelectedId] = useState<string>("");
   const [focusActive, setFocusActive] = useState(false);
 
   useEffect(() => {
+    let disposed = false;
     const load = async () => {
       try {
-        const active = await api.getFocusModeActive();
-        setFocusActive(active);
+        const [raw, focusResult] = await Promise.all([
+          client.getState(STATE_KEY),
+          client.query<{ active: boolean }>("focus"),
+        ]);
+        let parsed = parseHabitState(raw, defaultHabits((k, p) => t(k, p)));
+        // Migrate legacy localStorage once.
+        if (parsed.habits.length === 0 || parsed.habits.every((h) => h.title === "")) {
+          const legacy = localStorage.getItem(`${widgetId}-habit-board`);
+          if (legacy) {
+            parsed = parseHabitState(legacy, defaultHabits((k, p) => t(k, p)));
+            await client.setState(STATE_KEY, serializeHabitState(parsed));
+            localStorage.removeItem(`${widgetId}-habit-board`);
+          }
+        }
+        if (!disposed) {
+          setState(parsed);
+          setSelectedId(parsed.habits[0]?.id ?? "");
+          setFocusActive(focusResult.active);
+          setLoaded(true);
+        }
       } catch {
-        // Ignore focus load errors.
+        if (!disposed) setLoaded(true);
       }
     };
     void load();
-    const timer = setInterval(() => void load(), 10000);
-    return () => clearInterval(timer);
-  }, []);
 
-  const saveState = (next: HabitState) => {
+    const timer = window.setInterval(() => {
+      client
+        .query<{ active: boolean }>("focus")
+        .then((r) => {
+          if (!disposed) setFocusActive(r.active);
+        })
+        .catch(() => {});
+    }, 10000);
+
+    return () => {
+      disposed = true;
+      window.clearInterval(timer);
+    };
+  }, [client, t, widgetId]);
+
+  const saveState = async (next: HabitState) => {
     setState(next);
-    localStorage.setItem(`${widgetId}-habit-board`, JSON.stringify(next));
+    try {
+      await client.setState(STATE_KEY, serializeHabitState(next));
+    } catch {
+      // Keep local state even if gateway write fails.
+    }
   };
 
   const computeStreak = (habits: HabitItem[], currentStreak: number, lastCompletedDate: string | null): { streak: number; lastCompletedDate: string | null } => {
@@ -132,7 +174,7 @@ export default function StatusWidget({ widgetId }: Props) {
 
   const updateHabits = (habits: HabitItem[]) => {
     const { streak, lastCompletedDate } = computeStreak(habits, state.streak, state.lastCompletedDate);
-    saveState({ ...state, habits, streak, lastCompletedDate });
+    void saveState({ ...state, habits, streak, lastCompletedDate });
   };
 
   const setHabitTitle = (id: string, title: string) => {
@@ -162,13 +204,13 @@ export default function StatusWidget({ widgetId }: Props) {
         done: false,
       },
     ];
-    saveState({ ...state, habits });
+    void saveState({ ...state, habits });
     setSelectedId(id);
   };
 
   const resetDay = () => {
     const habits = state.habits.map((h) => ({ ...h, done: false }));
-    saveState({ ...state, date: todayKey(), habits });
+    void saveState({ ...state, date: todayKey(), habits });
   };
 
   const doneCount = useMemo(() => state.habits.filter((h) => h.done).length, [state.habits]);
@@ -227,38 +269,42 @@ export default function StatusWidget({ widgetId }: Props) {
             {t("status.completed", { done: doneCount, total: totalCount })} ({percent}%)
           </div>
           <div className="flex-1 min-h-0 overflow-y-auto space-y-1.5 pr-1">
-            {state.habits.map((habit, idx) => {
-              const active = selectedHabit?.id === habit.id;
-              return (
-                <button
-                  key={habit.id}
-                  onClick={() => setSelectedId(habit.id)}
-                  className={`w-full text-left px-2.5 py-2 rounded-lg border transition-colors ${
-                    active
-                      ? "border-accent-blue/60 bg-accent-blue/10"
-                      : "border-surface-border hover:border-accent-blue/30"
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={habit.done}
-                      onChange={(e) => {
-                        e.stopPropagation();
-                        toggleHabit(habit.id);
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                      className="ui-checkbox"
-                      title={habit.title || t("status.habitPlaceholder", { index: idx + 1 })}
-                      aria-label={habit.title || t("status.habitPlaceholder", { index: idx + 1 })}
-                    />
-                    <div className="text-sm text-text-primary truncate">
-                      {habit.title || t("status.habitPlaceholder", { index: idx + 1 })}
+            {!loaded ? (
+              <div className="text-xs text-text-muted text-center py-4">{t("loading")}</div>
+            ) : (
+              state.habits.map((habit, idx) => {
+                const active = selectedHabit?.id === habit.id;
+                return (
+                  <button
+                    key={habit.id}
+                    onClick={() => setSelectedId(habit.id)}
+                    className={`w-full text-left px-2.5 py-2 rounded-lg border transition-colors ${
+                      active
+                        ? "border-accent-blue/60 bg-accent-blue/10"
+                        : "border-surface-border hover:border-accent-blue/30"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={habit.done}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          toggleHabit(habit.id);
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        className="ui-checkbox"
+                        title={habit.title || t("status.habitPlaceholder", { index: idx + 1 })}
+                        aria-label={habit.title || t("status.habitPlaceholder", { index: idx + 1 })}
+                      />
+                      <div className="text-sm text-text-primary truncate">
+                        {habit.title || t("status.habitPlaceholder", { index: idx + 1 })}
+                      </div>
                     </div>
-                  </div>
-                </button>
-              );
-            })}
+                  </button>
+                );
+              })
+            )}
           </div>
         </div>
 

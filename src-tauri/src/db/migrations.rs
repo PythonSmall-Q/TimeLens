@@ -1050,6 +1050,111 @@ pub fn current_profile_id_from_conn(conn: &Connection) -> String {
         .unwrap_or_else(|| DEFAULT_PROFILE_ID.to_string())
 }
 
+/// Migration 012: widget runtime rewrite foundation tables.
+/// Supports kernel/gateway/consent/audit/network policy/health/crash/stream tracking.
+fn migration_012_widget_runtime_rewrite(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        "
+        CREATE TABLE IF NOT EXISTS widget_runtime_hosts (
+            host_id         TEXT    PRIMARY KEY,
+            language        TEXT    NOT NULL,
+            version         TEXT    NOT NULL,
+            path            TEXT,
+            health          TEXT    NOT NULL DEFAULT 'unknown',
+            created_at      TEXT    NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS widget_gateway_policies (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            scope           TEXT    NOT NULL,
+            decision        TEXT    NOT NULL,
+            policy_source   TEXT    NOT NULL DEFAULT 'system',
+            created_at      TEXT    NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_widget_gateway_policies_scope
+            ON widget_gateway_policies(scope);
+
+        CREATE TABLE IF NOT EXISTS widget_consent_decisions (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            widget_id       TEXT    NOT NULL,
+            scope           TEXT    NOT NULL,
+            decision        TEXT    NOT NULL,
+            remembered      INTEGER NOT NULL DEFAULT 0,
+            risk_level      TEXT    NOT NULL DEFAULT 'low',
+            source          TEXT    NOT NULL DEFAULT 'runtime_prompt',
+            granted_at      TEXT,
+            revoked_at      TEXT,
+            UNIQUE(widget_id, scope)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_widget_consent_decisions_widget
+            ON widget_consent_decisions(widget_id);
+
+        CREATE TABLE IF NOT EXISTS widget_access_audit (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            widget_id       TEXT    NOT NULL,
+            scope           TEXT    NOT NULL,
+            request_type    TEXT    NOT NULL,
+            decision        TEXT    NOT NULL,
+            resource_hint   TEXT    NOT NULL DEFAULT '',
+            payload_class   TEXT    NOT NULL DEFAULT '',
+            occurred_at     TEXT    NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_widget_access_audit_widget_time
+            ON widget_access_audit(widget_id, occurred_at DESC);
+
+        CREATE TABLE IF NOT EXISTS widget_network_domain_rules (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            widget_id       TEXT    NOT NULL,
+            domain_pattern  TEXT    NOT NULL,
+            decision        TEXT    NOT NULL,
+            policy_source   TEXT    NOT NULL DEFAULT 'user',
+            created_at      TEXT    NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_widget_network_domain_rules_widget
+            ON widget_network_domain_rules(widget_id);
+
+        CREATE TABLE IF NOT EXISTS widget_runtime_health (
+            widget_id       TEXT    PRIMARY KEY,
+            host_id         TEXT,
+            memory_used_mb  INTEGER NOT NULL DEFAULT 0,
+            cpu_used_ms     INTEGER NOT NULL DEFAULT 0,
+            last_heartbeat_at TEXT,
+            status          TEXT    NOT NULL DEFAULT 'unknown'
+        );
+
+        CREATE TABLE IF NOT EXISTS widget_runtime_crashes (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            widget_id       TEXT    NOT NULL,
+            host_id         TEXT,
+            error           TEXT    NOT NULL,
+            stack_hint      TEXT    NOT NULL DEFAULT '',
+            occurred_at     TEXT    NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_widget_runtime_crashes_widget_time
+            ON widget_runtime_crashes(widget_id, occurred_at DESC);
+
+        CREATE TABLE IF NOT EXISTS widget_stream_sessions (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            widget_id       TEXT    NOT NULL,
+            stream_type     TEXT    NOT NULL,
+            resource_hint   TEXT    NOT NULL DEFAULT '',
+            started_at      TEXT    NOT NULL,
+            ended_at        TEXT,
+            status          TEXT    NOT NULL DEFAULT 'active'
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_widget_stream_sessions_widget
+            ON widget_stream_sessions(widget_id);
+        ",
+    )?;
+    Ok(())
+}
+
 /// The ordered list of all migrations.
 const MIGRATIONS: &[Migration] = &[
     Migration::new(1, "baseline_schema", migration_001_baseline),
@@ -1075,6 +1180,11 @@ const MIGRATIONS: &[Migration] = &[
     Migration::new(9, "profile_settings", migration_009_profile_settings),
     Migration::new(10, "compressed_archive", migration_010_compressed_archive),
     Migration::new(11, "widget_runtime_v220", migration_011_widget_runtime_v220),
+    Migration::new(
+        12,
+        "widget_runtime_rewrite",
+        migration_012_widget_runtime_rewrite,
+    ),
 ];
 
 /// Returns the highest migration version defined.

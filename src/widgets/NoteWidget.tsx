@@ -5,6 +5,7 @@ import { listen } from "@tauri-apps/api/event";
 import { Plus, Save, Trash2, X, Check, RotateCcw, Droplet } from "lucide-react";
 import clsx from "clsx";
 import { useWidgetErrorReporter } from "@/hooks/useWidgetErrorReporter";
+import { useWidgetClient } from "@/hooks/useWidgetClient";
 
 interface Props {
   widgetId: string;
@@ -15,6 +16,9 @@ interface NoteItem {
   content: string;
   updatedAt: string;
 }
+
+const STATE_KEY = "notes";
+const BACKUP_KEY = "notes_backup";
 
 function makeNote(content = ""): NoteItem {
   return {
@@ -39,36 +43,19 @@ function parseNotes(raw: string | null): NoteItem[] {
   }
 }
 
+function serializeNotes(notes: NoteItem[]): string {
+  return JSON.stringify(notes);
+}
+
 export default function NoteWidget({ widgetId }: Props) {
   const { t } = useTranslation(["widgets", "common"]);
   useWidgetErrorReporter(widgetId);
-  const storageKey = `${widgetId}-notes`;
-  const backupKey = `${widgetId}-notes-backup`;
+  const client = useWidgetClient({ widgetId, widgetType: "note" });
 
-  const [notes, setNotes] = useState<NoteItem[]>(() => {
-    const existing = parseNotes(localStorage.getItem(storageKey));
-    if (existing.length > 0) return existing;
-
-    const backup = parseNotes(localStorage.getItem(backupKey));
-    if (backup.length > 0) {
-      localStorage.setItem(storageKey, JSON.stringify(backup));
-      return backup;
-    }
-
-    // Backward-compat: migrate old single-note storage.
-    const legacy = localStorage.getItem(`${widgetId}-note`) ?? "";
-    if (legacy.trim()) {
-      const migrated = [makeNote(legacy)];
-      localStorage.setItem(storageKey, JSON.stringify(migrated));
-      localStorage.setItem(backupKey, JSON.stringify(migrated));
-      localStorage.removeItem(`${widgetId}-note`);
-      return migrated;
-    }
-    return [];
-  });
-
-  const [selectedId, setSelectedId] = useState<string>(() => notes[0]?.id ?? "");
-  const [draft, setDraft] = useState<string>(() => notes[0]?.content ?? "");
+  const [notes, setNotes] = useState<NoteItem[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [selectedId, setSelectedId] = useState<string>("");
+  const [draft, setDraft] = useState<string>("");
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [showRecovered, setShowRecovered] = useState(false);
   const [autoBlur, setAutoBlur] = useState(() => {
@@ -80,6 +67,54 @@ export default function NoteWidget({ widgetId }: Props) {
   });
   const [isFocused, setIsFocused] = useState(true);
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Load notes from gateway state on mount, migrating legacy localStorage if needed.
+  useEffect(() => {
+    let disposed = false;
+    const load = async () => {
+      try {
+        const [raw, backupRaw] = await Promise.all([
+          client.getState(STATE_KEY),
+          client.getState(BACKUP_KEY),
+        ]);
+        let parsed = parseNotes(raw);
+        if (parsed.length === 0) {
+          parsed = parseNotes(backupRaw);
+        }
+        // Migrate legacy localStorage data once.
+        if (parsed.length === 0) {
+          const legacyKey = `${widgetId}-notes`;
+          const legacyBackupKey = `${widgetId}-notes-backup`;
+          const legacy = parseNotes(localStorage.getItem(legacyKey));
+          const legacyBackup = parseNotes(localStorage.getItem(legacyBackupKey));
+          const legacySingle = localStorage.getItem(`${widgetId}-note`) ?? "";
+          parsed = legacy.length > 0
+            ? legacy
+            : legacyBackup.length > 0
+              ? legacyBackup
+              : legacySingle.trim()
+                ? [makeNote(legacySingle)]
+                : [];
+          if (parsed.length > 0) {
+            await client.setState(STATE_KEY, serializeNotes(parsed));
+            await client.setState(BACKUP_KEY, serializeNotes(parsed));
+          }
+        }
+        if (!disposed) {
+          setNotes(parsed);
+          setSelectedId(parsed[0]?.id ?? "");
+          setDraft(parsed[0]?.content ?? "");
+          setLoaded(true);
+        }
+      } catch {
+        if (!disposed) setLoaded(true);
+      }
+    };
+    void load();
+    return () => {
+      disposed = true;
+    };
+  }, [client, widgetId]);
 
   useEffect(() => {
     let unlisten: (() => void) | undefined;
@@ -114,21 +149,27 @@ export default function NoteWidget({ widgetId }: Props) {
     [notes, selectedId]
   );
 
-  const persist = useCallback((nextNotes: NoteItem[]) => {
+  const persist = useCallback(async (nextNotes: NoteItem[]) => {
     setNotes(nextNotes);
-    localStorage.setItem(storageKey, JSON.stringify(nextNotes));
-    localStorage.setItem(backupKey, JSON.stringify(nextNotes));
-    setLastSavedAt(new Date());
-  }, [storageKey, backupKey]);
+    try {
+      await Promise.all([
+        client.setState(STATE_KEY, serializeNotes(nextNotes)),
+        client.setState(BACKUP_KEY, serializeNotes(nextNotes)),
+      ]);
+      setLastSavedAt(new Date());
+    } catch {
+      // Keep local state even if gateway write fails.
+    }
+  }, [client]);
 
   useEffect(() => {
-    const onNoteCaptured = (e: Event | { content?: string }) => {
+    const onNoteCaptured = async (e: Event | { content?: string }) => {
       const content = "detail" in e
         ? (e as CustomEvent<{ content?: string }>).detail?.content
         : (e as { content?: string }).content;
       if (!content) return;
       const next = [makeNote(content), ...notes];
-      persist(next);
+      await persist(next);
       setSelectedId(next[0].id);
       setDraft(content);
     };
@@ -138,7 +179,7 @@ export default function NoteWidget({ widgetId }: Props) {
     const setup = async () => {
       try {
         unlisten = await listen<{ content?: string }>("timelens-notes-changed", (event) => {
-          onNoteCaptured(event.payload);
+          void onNoteCaptured(event.payload);
         });
       } catch {
         // ignore
@@ -162,7 +203,7 @@ export default function NoteWidget({ widgetId }: Props) {
           ? { ...n, content: draft, updatedAt: new Date().toISOString() }
           : n
       );
-      persist(next);
+      void persist(next);
     }, 800);
     return () => {
       if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
@@ -170,17 +211,29 @@ export default function NoteWidget({ widgetId }: Props) {
   }, [draft, selectedNote, notes, persist]);
 
   useEffect(() => {
-    const backup = parseNotes(localStorage.getItem(backupKey));
-    if (backup.length > 0 && notes.length === 0) {
-      setShowRecovered(true);
-      const hideTimer = setTimeout(() => setShowRecovered(false), 4000);
-      return () => clearTimeout(hideTimer);
-    }
-  }, [backupKey, notes.length]);
+    if (!loaded) return;
+    const recover = async () => {
+      try {
+        const backupRaw = await client.getState(BACKUP_KEY);
+        const backup = parseNotes(backupRaw);
+        if (backup.length > 0 && notes.length === 0) {
+          setShowRecovered(true);
+          await persist(backup);
+          setSelectedId(backup[0]?.id ?? "");
+          setDraft(backup[0]?.content ?? "");
+          const hideTimer = setTimeout(() => setShowRecovered(false), 4000);
+          return () => clearTimeout(hideTimer);
+        }
+      } catch {
+        // ignore
+      }
+    };
+    void recover();
+  }, [loaded, notes.length, client, persist]);
 
-  const addNote = () => {
+  const addNote = async () => {
     const next = [makeNote(""), ...notes];
-    persist(next);
+    await persist(next);
     setSelectedId(next[0].id);
     setDraft("");
   };
@@ -192,33 +245,38 @@ export default function NoteWidget({ widgetId }: Props) {
     setDraft(note.content);
   };
 
-  const saveCurrent = () => {
+  const saveCurrent = async () => {
     if (!selectedNote) return;
     const next = notes.map((n) =>
       n.id === selectedNote.id
         ? { ...n, content: draft, updatedAt: new Date().toISOString() }
         : n
     );
-    persist(next);
+    await persist(next);
   };
 
-  const deleteCurrent = () => {
+  const deleteCurrent = async () => {
     if (!selectedNote) return;
     const next = notes.filter((n) => n.id !== selectedNote.id);
-    persist(next);
+    await persist(next);
     const fallback = next[0] ?? null;
     setSelectedId(fallback?.id ?? "");
     setDraft(fallback?.content ?? "");
   };
 
-  const restoreFromBackup = () => {
-    const backup = parseNotes(localStorage.getItem(backupKey));
-    if (backup.length > 0) {
-      persist(backup);
-      setSelectedId(backup[0]?.id ?? "");
-      setDraft(backup[0]?.content ?? "");
-      setShowRecovered(true);
-      setTimeout(() => setShowRecovered(false), 3000);
+  const restoreFromBackup = async () => {
+    try {
+      const backupRaw = await client.getState(BACKUP_KEY);
+      const backup = parseNotes(backupRaw);
+      if (backup.length > 0) {
+        await persist(backup);
+        setSelectedId(backup[0]?.id ?? "");
+        setDraft(backup[0]?.content ?? "");
+        setShowRecovered(true);
+        setTimeout(() => setShowRecovered(false), 3000);
+      }
+    } catch {
+      // ignore
     }
   };
 
@@ -235,9 +293,9 @@ export default function NoteWidget({ widgetId }: Props) {
       <div data-tauri-drag-region className="flex items-center justify-between mb-3">
         <span className="text-text-muted text-xs">{t("note.title")}</span>
         <div className="flex items-center gap-2">
-          {notes.length === 0 && localStorage.getItem(backupKey) && (
+          {notes.length === 0 && loaded && (
             <button
-              onClick={restoreFromBackup}
+              onClick={() => void restoreFromBackup()}
               className="text-text-muted hover:text-accent-blue transition-colors"
               title={t("note.restore")}
               aria-label={t("note.restore")}
@@ -246,7 +304,7 @@ export default function NoteWidget({ widgetId }: Props) {
             </button>
           )}
           <button
-            onClick={addNote}
+            onClick={() => void addNote()}
             className="text-text-muted hover:text-accent-blue transition-colors"
             title={t("note.add")}
             aria-label={t("note.add")}
@@ -265,7 +323,7 @@ export default function NoteWidget({ widgetId }: Props) {
             <Droplet size={13} />
           </button>
           <button
-            onClick={deleteCurrent}
+            onClick={() => void deleteCurrent()}
             className="text-text-muted hover:text-accent-red transition-colors"
             title={t("note.delete")}
             aria-label={t("note.delete")}
@@ -295,25 +353,28 @@ export default function NoteWidget({ widgetId }: Props) {
         <div className="min-h-0 rounded-xl border border-surface-border bg-surface-hover/40 p-2.5 flex flex-col">
           <div className="text-xs text-text-muted px-1 pb-2">{t("note.titleList")}</div>
           <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain space-y-1.5 pr-1">
-            {notes.length === 0 && (
+            {!loaded ? (
+              <div className="text-xs text-text-muted text-center py-4">{t("loading")}</div>
+            ) : notes.length === 0 ? (
               <div className="text-xs text-text-muted text-center py-4">{t("note.empty")}</div>
+            ) : (
+              notes.map((note) => (
+                <button
+                  key={note.id}
+                  onClick={() => openNote(note.id)}
+                  className={`w-full text-left px-2.5 py-2 rounded-lg border transition-colors ${
+                    note.id === selectedId
+                      ? "border-accent-blue/60 bg-accent-blue/10"
+                      : "border-surface-border hover:border-accent-blue/30"
+                  }`}
+                >
+                  <div className="text-sm text-text-primary truncate">{summarize(note.content)}</div>
+                  <div className="text-[11px] text-text-muted mt-0.5">
+                    {t("note.lastEdited")}: {new Date(note.updatedAt).toLocaleTimeString()}
+                  </div>
+                </button>
+              ))
             )}
-            {notes.map((note) => (
-              <button
-                key={note.id}
-                onClick={() => openNote(note.id)}
-                className={`w-full text-left px-2.5 py-2 rounded-lg border transition-colors ${
-                  note.id === selectedId
-                    ? "border-accent-blue/60 bg-accent-blue/10"
-                    : "border-surface-border hover:border-accent-blue/30"
-                }`}
-              >
-                <div className="text-sm text-text-primary truncate">{summarize(note.content)}</div>
-                <div className="text-[11px] text-text-muted mt-0.5">
-                  {t("note.lastEdited")}: {new Date(note.updatedAt).toLocaleTimeString()}
-                </div>
-              </button>
-            ))}
           </div>
         </div>
 
@@ -334,7 +395,7 @@ export default function NoteWidget({ widgetId }: Props) {
                     : t("note.unsaved")}
                 </span>
                 <button
-                  onClick={saveCurrent}
+                  onClick={() => void saveCurrent()}
                   className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
                 >
                   <Save size={12} />

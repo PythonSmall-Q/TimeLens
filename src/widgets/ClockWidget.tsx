@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { X, RotateCcw, Focus } from "lucide-react";
 import { pad2, formatDuration, todayString } from "@/utils/format";
-import * as api from "@/services/tauriApi";
+import { useWidgetClient } from "@/hooks/useWidgetClient";
 import type { FocusSession } from "@/types";
 import clsx from "clsx";
 
@@ -14,6 +14,7 @@ interface Props {
 
 export default function ClockWidget({ widgetId, isBlurred = false }: Props) {
   const { t } = useTranslation(["widgets", "common"]);
+  const client = useWidgetClient({ widgetId, widgetType: "clock" });
   const [time, setTime] = useState(new Date());
   const [is24h, setIs24h] = useState(() => localStorage.getItem(`${widgetId}-24h`) !== "false");
   const [isAnalog, setIsAnalog] = useState(
@@ -34,12 +35,12 @@ export default function ClockWidget({ widgetId, isBlurred = false }: Props) {
     const today = todayString();
     const load = async () => {
       try {
-        const [active, sessions] = await Promise.all([
-          api.getFocusModeActive(),
-          api.listFocusSessions(`${today}T00:00:00`, `${today}T23:59:59`),
-        ]);
+        const { active, active_session: session } = await client.query<{
+          active: boolean;
+          active_session: FocusSession | null;
+        }>("focus", { start_at: `${today}T00:00:00`, end_at: `${today}T23:59:59` });
         setFocusActive(active);
-        setActiveSession(sessions.find((s) => !s.ended_at) ?? null);
+        setActiveSession(session ?? null);
       } catch {
         // Keep current state on error.
       }
@@ -47,7 +48,7 @@ export default function ClockWidget({ widgetId, isBlurred = false }: Props) {
     void load();
     const timer = setInterval(() => void load(), 10000);
     return () => clearInterval(timer);
-  }, []);
+  }, [client]);
 
   const focusSeconds = useMemo(() => {
     if (!activeSession) return 0;

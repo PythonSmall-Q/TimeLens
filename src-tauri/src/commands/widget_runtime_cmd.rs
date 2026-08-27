@@ -1,3 +1,7 @@
+#![allow(dead_code)]
+// Transitional allowance: legacy helper functions remain visible to unit tests
+// while the Tauri commands route through WidgetKernel/WidgetGateway.
+
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -7,12 +11,16 @@ use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::commands::storage_cmd::DbState;
 use crate::db::{self, WidgetErrorLogEntry};
-use crate::models::{AppUsageSummary, CategoryUsageSummary, GoalProgress, UsageGoal};
+use crate::models::{AppUsageSummary, CategoryUsageSummary, GoalProgress, UsageGoal, WidgetGatewayRequest, WidgetGatewayRequestType, WidgetGatewayResponse};
+use crate::widget_kernel::WidgetKernel;
 
 // ── Resource quotas ───────────────────────────────────────────
 
+#[cfg(test)]
 const MAX_WIDGET_STATE_ENTRIES: i64 = 100;
+#[cfg(test)]
 const MAX_WIDGET_STATE_VALUE_BYTES: usize = 64 * 1024;
+#[cfg(test)]
 const MAX_CHANNEL_CALLS_PER_MIN: u32 = 60;
 const MAX_EVENTS_PER_MIN: u32 = 60;
 const SUSPEND_FAILURE_THRESHOLD: i64 = 5;
@@ -66,8 +74,9 @@ pub struct WidgetQueryRequest {
 /// Permission required for each query namespace.
 fn namespace_permission(namespace: &str) -> Option<&'static str> {
     match namespace {
-        "metrics" | "sessions" | "categories" | "projects" | "tags" | "goals" | "rules"
+        "metrics" | "sessions" | "categories" | "projects" | "tags" | "goals" | "rules" | "focus"
             => Some("screen-time:read"),
+        "todos" => Some("todo:read"),
         _ => None,
     }
 }
@@ -81,6 +90,8 @@ fn namespace_display(namespace: &str) -> String {
         "tags" => "usage tags".to_string(),
         "goals" => "usage goals".to_string(),
         "rules" => "focus rules".to_string(),
+        "focus" => "focus state".to_string(),
+        "todos" => "todo list".to_string(),
         _ => namespace.to_string(),
     }
 }
@@ -218,6 +229,40 @@ fn query_rules(conn: &rusqlite::Connection, _payload: &Option<Value>) -> Result<
     Ok(serde_json::to_value(rules).unwrap_or(Value::Array(vec![])))
 }
 
+fn query_todos(conn: &rusqlite::Connection, _payload: &Option<Value>) -> Result<Value, String> {
+    let todos = db::get_all_todos(conn).map_err(|e| e.to_string())?;
+    Ok(serde_json::to_value(todos).unwrap_or(Value::Array(vec![])))
+}
+
+#[derive(serde::Serialize)]
+struct FocusStateResult {
+    active: bool,
+    active_session: Option<crate::models::FocusSession>,
+}
+
+fn query_focus(conn: &rusqlite::Connection, payload: &Option<Value>) -> Result<Value, String> {
+    let today_str = today();
+    let start_at = payload
+        .as_ref()
+        .and_then(|p| p.get("start_at"))
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+    let end_at = payload
+        .as_ref()
+        .and_then(|p| p.get("end_at"))
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+
+    let start = start_at.unwrap_or_else(|| format!("{}T00:00:00", today_str));
+    let end = end_at.unwrap_or_else(|| format!("{}T23:59:59", today_str));
+
+    let active = db::get_bool_setting(conn, "focus_mode_active", false).unwrap_or(false);
+    let sessions = db::list_focus_sessions(conn, Some(&start), Some(&end)).map_err(|e| e.to_string())?;
+    let active_session = sessions.into_iter().find(|s| s.ended_at.is_none());
+
+    Ok(serde_json::to_value(FocusStateResult { active, active_session }).unwrap_or(Value::Null))
+}
+
 fn dispatch_query(
     conn: &rusqlite::Connection,
     namespace: &str,
@@ -231,6 +276,8 @@ fn dispatch_query(
         "tags" => query_tags(conn, payload),
         "goals" => query_goals(conn, payload),
         "rules" => query_rules(conn, payload),
+        "focus" => query_focus(conn, payload),
+        "todos" => query_todos(conn, payload),
         _ => Err(format!("unknown widget query namespace: {}", namespace)),
     }
 }
@@ -240,33 +287,29 @@ fn widget_query_inner(
     db: &DbState,
     rate_limiter: &WidgetCallRateLimiter,
 ) -> Result<Value, String> {
-    if !rate_limiter.check(&request.widget_id, MAX_CHANNEL_CALLS_PER_MIN) {
-        return Err("widget query rate limit exceeded".to_string());
+    let kernel = WidgetKernel::new(db.clone(), rate_limiter.clone());
+    let response = kernel.query(&request.widget_id, &request.namespace, request.payload.clone());
+    match response.status {
+        crate::models::WidgetGatewayStatus::Success => {
+            Ok(response.payload.unwrap_or(serde_json::Value::Null))
+        }
+        _ => Err(response.error.map(|e| e.message).unwrap_or_else(|| "widget query failed".to_string())),
     }
-
-    let conn = db.lock().map_err(|e| e.to_string())?;
-
-    if db::is_widget_suspended(&conn, &request.widget_id).unwrap_or(false) {
-        return Err("widget is suspended due to repeated failures".to_string());
-    }
-
-    require_permission(&conn, &request.widget_id, &request.namespace)?;
-    let result = dispatch_query(&conn, &request.namespace, &request.payload);
-
-    if result.is_ok() {
-        let _ = db::reset_widget_consecutive_failures(&conn, &request.widget_id);
-    }
-    result
 }
 
 /// Run a namespaced query for a widget after checking permissions and resource limits.
 #[tauri::command]
 pub fn widget_query(
     request: WidgetQueryRequest,
-    db: State<'_, DbState>,
-    rate_limiter: State<'_, WidgetCallRateLimiter>,
+    kernel: State<'_, WidgetKernel>,
 ) -> Result<Value, String> {
-    widget_query_inner(request, &db, &rate_limiter)
+    let response = kernel.query(&request.widget_id, &request.namespace, request.payload.clone());
+    match response.status {
+        crate::models::WidgetGatewayStatus::Success => {
+            Ok(response.payload.unwrap_or(serde_json::Value::Null))
+        }
+        _ => Err(response.error.map(|e| e.message).unwrap_or_else(|| "widget query failed".to_string())),
+    }
 }
 
 // ── Subscriptions ─────────────────────────────────────────────
@@ -276,31 +319,85 @@ fn widget_subscribe_inner(
     events: Vec<String>,
     db: &DbState,
 ) -> Result<(), String> {
-    let allowed: Vec<String> = events
-        .into_iter()
-        .filter(|e| is_known_widget_event(e))
-        .collect();
-    let conn = db.lock().map_err(|e| e.to_string())?;
-    db::set_widget_subscriptions(&conn, &widget_id, &allowed).map_err(|e| e.to_string())
+    let kernel = WidgetKernel::new(db.clone(), WidgetCallRateLimiter::new());
+    let payload = Some(serde_json::Value::Array(
+        events.into_iter().map(serde_json::Value::String).collect(),
+    ));
+    let request = WidgetGatewayRequest {
+        widget_id,
+        request_id: uuid::Uuid::new_v4().to_string(),
+        scope: "subscribe".to_string(),
+        request_type: WidgetGatewayRequestType::Subscribe,
+        payload,
+        resource_hint: None,
+        occurred_at: None,
+    };
+    let response = kernel.handle_request(request);
+    match response.status {
+        crate::models::WidgetGatewayStatus::Success => Ok(()),
+        _ => Err(response.error.map(|e| e.message).unwrap_or_else(|| "subscribe failed".to_string())),
+    }
 }
 
 fn widget_unsubscribe_inner(widget_id: String, db: &DbState) -> Result<(), String> {
-    let conn = db.lock().map_err(|e| e.to_string())?;
-    db::clear_widget_subscriptions(&conn, &widget_id).map_err(|e| e.to_string())
+    let kernel = WidgetKernel::new(db.clone(), WidgetCallRateLimiter::new());
+    let request = WidgetGatewayRequest {
+        widget_id,
+        request_id: uuid::Uuid::new_v4().to_string(),
+        scope: "unsubscribe".to_string(),
+        request_type: WidgetGatewayRequestType::Unsubscribe,
+        payload: None,
+        resource_hint: None,
+        occurred_at: None,
+    };
+    let response = kernel.handle_request(request);
+    match response.status {
+        crate::models::WidgetGatewayStatus::Success => Ok(()),
+        _ => Err(response.error.map(|e| e.message).unwrap_or_else(|| "unsubscribe failed".to_string())),
+    }
 }
 
 #[tauri::command]
 pub fn widget_subscribe(
     widget_id: String,
     events: Vec<String>,
-    db: State<'_, DbState>,
+    kernel: State<'_, WidgetKernel>,
 ) -> Result<(), String> {
-    widget_subscribe_inner(widget_id, events, &db)
+    let payload = Some(serde_json::Value::Array(
+        events.into_iter().map(serde_json::Value::String).collect(),
+    ));
+    let request = WidgetGatewayRequest {
+        widget_id,
+        request_id: uuid::Uuid::new_v4().to_string(),
+        scope: "subscribe".to_string(),
+        request_type: WidgetGatewayRequestType::Subscribe,
+        payload,
+        resource_hint: None,
+        occurred_at: None,
+    };
+    let response = kernel.handle_request(request);
+    match response.status {
+        crate::models::WidgetGatewayStatus::Success => Ok(()),
+        _ => Err(response.error.map(|e| e.message).unwrap_or_else(|| "subscribe failed".to_string())),
+    }
 }
 
 #[tauri::command]
-pub fn widget_unsubscribe(widget_id: String, db: State<'_, DbState>) -> Result<(), String> {
-    widget_unsubscribe_inner(widget_id, &db)
+pub fn widget_unsubscribe(widget_id: String, kernel: State<'_, WidgetKernel>) -> Result<(), String> {
+    let request = WidgetGatewayRequest {
+        widget_id,
+        request_id: uuid::Uuid::new_v4().to_string(),
+        scope: "unsubscribe".to_string(),
+        request_type: WidgetGatewayRequestType::Unsubscribe,
+        payload: None,
+        resource_hint: None,
+        occurred_at: None,
+    };
+    let response = kernel.handle_request(request);
+    match response.status {
+        crate::models::WidgetGatewayStatus::Success => Ok(()),
+        _ => Err(response.error.map(|e| e.message).unwrap_or_else(|| "unsubscribe failed".to_string())),
+    }
 }
 
 fn is_known_widget_event(event: &str) -> bool {
@@ -352,14 +449,43 @@ pub fn emit_widget_event(
 
 // ── Scoped state persistence ──────────────────────────────────
 
+fn make_state_request(
+    widget_id: String,
+    request_type: WidgetGatewayRequestType,
+    key: String,
+    value: Option<String>,
+) -> WidgetGatewayRequest {
+    let mut payload = serde_json::Map::new();
+    payload.insert("key".to_string(), serde_json::Value::String(key));
+    if let Some(v) = value {
+        payload.insert("value".to_string(), serde_json::Value::String(v));
+    }
+    WidgetGatewayRequest {
+        widget_id,
+        request_id: uuid::Uuid::new_v4().to_string(),
+        scope: "state".to_string(),
+        request_type,
+        payload: Some(serde_json::Value::Object(payload)),
+        resource_hint: None,
+        occurred_at: None,
+    }
+}
+
 #[tauri::command]
 pub fn get_widget_state(
     widget_id: String,
     key: String,
-    db: State<'_, DbState>,
+    kernel: State<'_, WidgetKernel>,
 ) -> Result<Option<String>, String> {
-    let conn = db.lock().map_err(|e| e.to_string())?;
-    db::get_widget_state(&conn, &widget_id, &key).map_err(|e| e.to_string())
+    let request = make_state_request(widget_id, WidgetGatewayRequestType::StateRead, key, None);
+    let response = kernel.handle_request(request);
+    match response.status {
+        crate::models::WidgetGatewayStatus::Success => {
+            let value = response.payload.and_then(|p| p.as_str().map(String::from));
+            Ok(value)
+        }
+        _ => Err(response.error.map(|e| e.message).unwrap_or_else(|| "get_state failed".to_string())),
+    }
 }
 
 fn set_widget_state_inner(
@@ -368,21 +494,13 @@ fn set_widget_state_inner(
     value: String,
     db: &DbState,
 ) -> Result<(), String> {
-    if value.len() > MAX_WIDGET_STATE_VALUE_BYTES {
-        return Err(format!(
-            "widget state value exceeds {} byte limit",
-            MAX_WIDGET_STATE_VALUE_BYTES
-        ));
+    let kernel = WidgetKernel::new(db.clone(), WidgetCallRateLimiter::new());
+    let request = make_state_request(widget_id, WidgetGatewayRequestType::StateWrite, key, Some(value));
+    let response = kernel.handle_request(request);
+    match response.status {
+        crate::models::WidgetGatewayStatus::Success => Ok(()),
+        _ => Err(response.error.map(|e| e.message).unwrap_or_else(|| "set_state failed".to_string())),
     }
-    let conn = db.lock().map_err(|e| e.to_string())?;
-    let count = db::count_widget_state_entries(&conn, &widget_id).map_err(|e| e.to_string())?;
-    if count >= MAX_WIDGET_STATE_ENTRIES {
-        return Err(format!(
-            "widget state exceeds {} entry limit",
-            MAX_WIDGET_STATE_ENTRIES
-        ));
-    }
-    db::set_widget_state(&conn, &widget_id, &key, &value).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -390,19 +508,28 @@ pub fn set_widget_state(
     widget_id: String,
     key: String,
     value: String,
-    db: State<'_, DbState>,
+    kernel: State<'_, WidgetKernel>,
 ) -> Result<(), String> {
-    set_widget_state_inner(widget_id, key, value, &db)
+    let request = make_state_request(widget_id, WidgetGatewayRequestType::StateWrite, key, Some(value));
+    let response = kernel.handle_request(request);
+    match response.status {
+        crate::models::WidgetGatewayStatus::Success => Ok(()),
+        _ => Err(response.error.map(|e| e.message).unwrap_or_else(|| "set_state failed".to_string())),
+    }
 }
 
 #[tauri::command]
 pub fn delete_widget_state(
     widget_id: String,
     key: String,
-    db: State<'_, DbState>,
+    kernel: State<'_, WidgetKernel>,
 ) -> Result<(), String> {
-    let conn = db.lock().map_err(|e| e.to_string())?;
-    db::delete_widget_state(&conn, &widget_id, &key).map_err(|e| e.to_string())
+    let request = make_state_request(widget_id, WidgetGatewayRequestType::StateDelete, key, None);
+    let response = kernel.handle_request(request);
+    match response.status {
+        crate::models::WidgetGatewayStatus::Success => Ok(()),
+        _ => Err(response.error.map(|e| e.message).unwrap_or_else(|| "delete_state failed".to_string())),
+    }
 }
 
 // ── Lifecycle events ──────────────────────────────────────────
@@ -416,18 +543,9 @@ pub struct WidgetLifecycleEvent {
 #[tauri::command]
 pub fn emit_widget_lifecycle(
     request: WidgetLifecycleEvent,
-    db: State<'_, DbState>,
+    kernel: State<'_, WidgetKernel>,
 ) -> Result<(), String> {
-    let known = ["mount", "foreground", "background", "suspend", "resume", "uninstall"];
-    if !known.contains(&request.event.as_str()) {
-        return Err(format!("unknown lifecycle event: {}", request.event));
-    }
-
-    let conn = db.lock().map_err(|e| e.to_string())?;
-    if request.event == "uninstall" {
-        db::clear_widget_runtime_data(&conn, &request.widget_id).map_err(|e| e.to_string())?;
-    }
-    Ok(())
+    kernel.lifecycle_event(&request.widget_id, &request.event)
 }
 
 // ── Error logs and runtime control ────────────────────────────
@@ -462,9 +580,9 @@ pub fn record_widget_error(
     widget_id: String,
     error: String,
     recovery_hint: Option<String>,
-    db: State<'_, DbState>,
+    kernel: State<'_, WidgetKernel>,
 ) -> Result<(), String> {
-    record_widget_error_inner(widget_id, error, recovery_hint, &db)
+    kernel.record_error(&widget_id, &error, recovery_hint.as_deref())
 }
 
 #[tauri::command]
@@ -490,23 +608,63 @@ pub fn clear_widget_error_log(
 pub fn set_widget_paused(
     widget_id: String,
     paused: bool,
-    db: State<'_, DbState>,
+    kernel: State<'_, WidgetKernel>,
 ) -> Result<(), String> {
-    let conn = db.lock().map_err(|e| e.to_string())?;
-    db::set_widget_paused(&conn, &widget_id, paused).map_err(|e| e.to_string())
+    kernel.set_paused(&widget_id, paused)
 }
 
 #[tauri::command]
 pub fn reset_widget_permissions_and_state(
     widget_id: String,
     actor: Option<String>,
-    db: State<'_, DbState>,
+    kernel: State<'_, WidgetKernel>,
 ) -> Result<(), String> {
-    let conn = db.lock().map_err(|e| e.to_string())?;
-    db::revoke_all_widget_permissions(&conn, &widget_id, actor.as_deref())
-        .map_err(|e| e.to_string())?;
-    db::clear_widget_runtime_data(&conn, &widget_id).map_err(|e| e.to_string())?;
-    Ok(())
+    kernel.reset_permissions_and_state(&widget_id, actor.as_deref())
+}
+
+// ── New gateway-facing commands ───────────────────────────────
+
+#[tauri::command]
+pub fn widget_gateway_request(
+    request: WidgetGatewayRequest,
+    kernel: State<'_, WidgetKernel>,
+) -> WidgetGatewayResponse {
+    kernel.handle_request(request)
+}
+
+#[tauri::command]
+pub fn widget_grant_consent(
+    widget_id: String,
+    scope: String,
+    remembered: bool,
+    risk_level: String,
+    kernel: State<'_, WidgetKernel>,
+) -> Result<(), String> {
+    kernel
+        .gateway()
+        .record_consent(&widget_id, &scope, true, remembered, &risk_level, "runtime_prompt")
+}
+
+#[tauri::command]
+pub fn widget_deny_consent(
+    widget_id: String,
+    scope: String,
+    remembered: bool,
+    risk_level: String,
+    kernel: State<'_, WidgetKernel>,
+) -> Result<(), String> {
+    kernel
+        .gateway()
+        .record_consent(&widget_id, &scope, false, remembered, &risk_level, "runtime_prompt")
+}
+
+#[tauri::command]
+pub fn widget_revoke_consent(
+    widget_id: String,
+    scope: String,
+    kernel: State<'_, WidgetKernel>,
+) -> Result<(), String> {
+    kernel.gateway().revoke_consent(&widget_id, &scope)
 }
 
 // ── Helpers used by other backend modules ─────────────────────

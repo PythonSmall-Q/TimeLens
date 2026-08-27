@@ -2,9 +2,9 @@ import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { X, Target, TrendingUp, TrendingDown } from "lucide-react";
-import * as api from "@/services/tauriApi";
 import type { GoalProgress, UsageGoal } from "@/types";
 import { formatDuration } from "@/utils/format";
+import { useWidgetClient } from "@/hooks/useWidgetClient";
 import clsx from "clsx";
 
 interface Props {
@@ -18,17 +18,18 @@ function goalLabel(goal: UsageGoal, t: (key: string, params?: Record<string, unk
   return `${scope} · ${operator} ${formatDuration(goal.target_seconds)} ${period}`;
 }
 
-export default function GoalProgressWidget({ widgetId: _widgetId }: Props) {
+export default function GoalProgressWidget({ widgetId }: Props) {
   const { t } = useTranslation(["widgets", "common"]);
+  const client = useWidgetClient({ widgetId, widgetType: "goal-progress" });
   const [goals, setGoals] = useState<UsageGoal[]>([]);
   const [progress, setProgress] = useState<GoalProgress[]>([]);
 
   useEffect(() => {
     const load = async () => {
       try {
-        const [g, p] = await Promise.all([api.getUsageGoals(), api.getGoalProgress(1)]);
-        setGoals(g.filter((goal) => goal.enabled));
-        setProgress(p);
+        const result = await client.query<{ goals: UsageGoal[]; progress: GoalProgress[] }>("goals");
+        setGoals(result.goals.filter((goal) => goal.enabled));
+        setProgress(result.progress);
       } catch {
         // Keep current state on error.
       }
@@ -36,7 +37,7 @@ export default function GoalProgressWidget({ widgetId: _widgetId }: Props) {
     void load();
     const timer = setInterval(() => void load(), 30000);
     return () => clearInterval(timer);
-  }, []);
+  }, [client]);
 
   const progressByGoalId = new Map<number, GoalProgress>();
   progress.forEach((p) => {

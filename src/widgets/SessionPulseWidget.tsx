@@ -5,14 +5,16 @@ import { X, Activity } from "lucide-react";
 import * as api from "@/services/tauriApi";
 import type { FocusSession, HourlyDistribution, InterruptionPeriod } from "@/types";
 import { todayString } from "@/utils/format";
+import { useWidgetClient } from "@/hooks/useWidgetClient";
 import clsx from "clsx";
 
 interface Props {
   widgetId: string;
 }
 
-export default function SessionPulseWidget({ widgetId: _widgetId }: Props) {
+export default function SessionPulseWidget({ widgetId }: Props) {
   const { t } = useTranslation(["widgets", "common"]);
+  const client = useWidgetClient({ widgetId, widgetType: "session-pulse" });
   const today = todayString();
   const [sessions, setSessions] = useState<FocusSession[]>([]);
   const [hourly, setHourly] = useState<HourlyDistribution[]>([]);
@@ -22,7 +24,7 @@ export default function SessionPulseWidget({ widgetId: _widgetId }: Props) {
     const load = async () => {
       try {
         const [s, h, i] = await Promise.all([
-          api.listFocusSessions(`${today}T00:00:00`, `${today}T23:59:59`),
+          client.query<FocusSession[]>("sessions", { start_at: `${today}T00:00:00`, end_at: `${today}T23:59:59` }),
           api.getTodayHourly(),
           api.getInterruptionPeriods(today),
         ]);
@@ -36,7 +38,7 @@ export default function SessionPulseWidget({ widgetId: _widgetId }: Props) {
     void load();
     const timer = setInterval(() => void load(), 30000);
     return () => clearInterval(timer);
-  }, [today]);
+  }, [client, today]);
 
   const maxHourly = useMemo(
     () => Math.max(1, ...hourly.map((h) => h.seconds)),

@@ -70,6 +70,8 @@ import type {
   WidgetQueryRequest,
   WidgetErrorLogEntry,
   WidgetLifecycleEvent,
+  WidgetGatewayRequest,
+  WidgetGatewayResponse,
 } from "@/types";
 
 let localApiBaseUrl = "http://127.0.0.1:49152";
@@ -672,6 +674,29 @@ export const resetWidgetPermissionsAndState = (
   widgetId: string,
   actor?: string
 ): Promise<void> => invoke("reset_widget_permissions_and_state", { widgetId, actor });
+
+export const widgetGatewayRequest = (
+  request: WidgetGatewayRequest
+): Promise<WidgetGatewayResponse> => invoke("widget_gateway_request", { request });
+
+export const widgetGrantConsent = (
+  widgetId: string,
+  scope: string,
+  remembered = false,
+  riskLevel = "low"
+): Promise<void> =>
+  invoke("widget_grant_consent", { widgetId, scope, remembered, riskLevel });
+
+export const widgetDenyConsent = (
+  widgetId: string,
+  scope: string,
+  remembered = false,
+  riskLevel = "low"
+): Promise<void> =>
+  invoke("widget_deny_consent", { widgetId, scope, remembered, riskLevel });
+
+export const widgetRevokeConsent = (widgetId: string, scope: string): Promise<void> =>
+  invoke("widget_revoke_consent", { widgetId, scope });
 
 export const issueWidgetApiToken = (
   widgetId: string,

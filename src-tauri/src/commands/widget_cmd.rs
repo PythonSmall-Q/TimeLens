@@ -303,6 +303,27 @@ pub async fn create_widget(
 
     build_widget_window(&app, &config)?;
 
+    // Grant default permissions derived from official widget capabilities.
+    if let Some(item) = get_widget_by_type(&app, &widget_type) {
+        let default_permissions: Vec<String> = item
+            .capabilities
+            .iter()
+            .flat_map(|cap| crate::widget_registry::expand_capability_to_permissions(cap))
+            .map(|s| s.to_string())
+            .collect::<std::collections::HashSet<_>>()
+            .into_iter()
+            .collect();
+        if !default_permissions.is_empty() {
+            let conn = db.lock().map_err(|e| e.to_string())?;
+            let _ = crate::db::set_widget_permissions(
+                &conn,
+                &id,
+                &default_permissions,
+                Some("widget-create"),
+            );
+        }
+    }
+
     Ok(config)
 }
 

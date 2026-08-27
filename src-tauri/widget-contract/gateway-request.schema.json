@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://timelens.example/schemas/widget-gateway-request.json",
+  "title": "TimeLens Widget Gateway Request",
+  "description": "Normalized request sent from a widget runtime host to the Widget Gateway.",
+  "type": "object",
+  "required": ["widget_id", "request_id", "scope", "request_type"],
+  "properties": {
+    "widget_id": { "type": "string" },
+    "request_id": { "type": "string" },
+    "scope": { "type": "string" },
+    "request_type": {
+      "type": "string",
+      "enum": [
+        "query",
+        "subscribe",
+        "unsubscribe",
+        "state_read",
+        "state_write",
+        "state_delete",
+        "media_load",
+        "network_fetch",
+        "local_api_call",
+        "notification_send",
+        "focus_mode_write",
+        "runtime_info"
+      ]
+    },
+    "payload": {},
+    "resource_hint": { "type": "string" },
+    "occurred_at": { "type": "string", "format": "date-time" }
+  }
+}

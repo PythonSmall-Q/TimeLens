@@ -1,0 +1,87 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://timelens.example/schemas/widget-manifest-v4.json",
+  "title": "TimeLens Widget Manifest v4",
+  "description": "Manifest format for widgets running on the rewritten TimeLens widget runtime.",
+  "type": "object",
+  "required": [
+    "manifest_version",
+    "widget_type",
+    "name",
+    "publisher",
+    "runtime",
+    "ui",
+    "capabilities"
+  ],
+  "properties": {
+    "manifest_version": {
+      "type": "string",
+      "const": "v4"
+    },
+    "widget_type": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9_-]+$"
+    },
+    "name": { "type": "string" },
+    "description": { "type": "string" },
+    "publisher": { "type": "string" },
+    "sdk_version": { "type": "string" },
+    "signature": { "type": "string" },
+    "publisher_verification": { "type": "string" },
+    "default_size": {
+      "type": "object",
+      "properties": {
+        "width": { "type": "number" },
+        "height": { "type": "number" }
+      },
+      "required": ["width", "height"]
+    },
+    "runtime": {
+      "type": "object",
+      "required": ["language", "version", "entry"],
+      "properties": {
+        "language": {
+          "type": "string",
+          "enum": ["javascript", "typescript", "java"]
+        },
+        "version": { "type": "string" },
+        "entry": { "type": "string" },
+        "memory_budget_mb": { "type": "integer", "minimum": 16 },
+        "cpu_budget_ms": { "type": "integer", "minimum": 10 },
+        "stream_limit": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "ui": {
+      "type": "object",
+      "required": ["model"],
+      "properties": {
+        "model": {
+          "type": "string",
+          "enum": ["web-sandbox", "host-block"]
+        }
+      }
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9_.]+$"
+      }
+    },
+    "capability_justifications": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "network_domains_requested": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "media_sources_requested": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "migration_from": {
+      "type": "string"
+    }
+  }
+}
