@@ -6,7 +6,6 @@ import {
   Sparkles,
   Send,
   Loader2,
-  RotateCcw,
   AlertCircle,
   Bot,
   User,
@@ -554,74 +553,78 @@ export default function LlmInsights() {
 
       {/* Main chat */}
       <div className="flex-1 flex flex-col min-w-0">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-surface-border">
-          <div>
+        <div className="flex items-center justify-between gap-4 px-6 py-4 border-b border-surface-border">
+          <div className="min-w-0 flex-shrink-0">
             <h1 className="text-xl font-bold text-text-primary flex items-center gap-2">
-              <Sparkles size={20} className="text-accent-blue" />
+              <Sparkles size={20} className="text-accent-blue flex-shrink-0" />
               {t("llm:pageTitle")}
             </h1>
             <p className="text-text-muted text-xs mt-0.5">{t("llm:pageSubtitle")}</p>
           </div>
-          <div className="flex items-center gap-2">
-            <select
-              value={range}
-              onChange={(e) => setRange(e.target.value as AnalysisRange)}
-              className="ui-field text-xs py-1.5 pr-7"
-              disabled={loading}
-            >
-              {(
-                [
-                  ["today", t("llm:rangeToday")],
-                  ["yesterday", t("llm:rangeYesterday")],
-                  ["last_7_days", t("llm:rangeLast7Days")],
-                  ["last_30_days", t("llm:rangeLast30Days")],
-                  ["this_week", t("llm:rangeThisWeek")],
-                  ["last_week", t("llm:rangeLastWeek")],
-                  ["custom", t("llm:rangeCustom")],
-                ] as [AnalysisRange, string][]
-              ).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
+          <div className="flex items-center flex-wrap justify-end gap-2">
+            <div className="flex items-center gap-2">
+              <select
+                value={range}
+                onChange={(e) => setRange(e.target.value as AnalysisRange)}
+                className="ui-field text-xs h-8 py-0 pr-7"
+                disabled={loading}
+              >
+                {(
+                  [
+                    ["today", t("llm:rangeToday")],
+                    ["yesterday", t("llm:rangeYesterday")],
+                    ["last_7_days", t("llm:rangeLast7Days")],
+                    ["last_30_days", t("llm:rangeLast30Days")],
+                    ["this_week", t("llm:rangeThisWeek")],
+                    ["last_week", t("llm:rangeLastWeek")],
+                    ["custom", t("llm:rangeCustom")],
+                  ] as [AnalysisRange, string][]
+                ).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
 
-            {range === "custom" && (
-              <div className="flex items-center gap-1.5">
-                <input
-                  type="date"
-                  value={customRange.start}
-                  max={customRange.end}
-                  onChange={(e) =>
-                    setCustomRange((prev) => ({ ...prev, start: e.target.value }))
-                  }
-                  disabled={loading}
-                  className="ui-field text-xs py-1.5 px-2"
-                  title={t("llm:startDate")}
-                />
-                <span className="text-text-muted text-xs">-</span>
-                <input
-                  type="date"
-                  value={customRange.end}
-                  min={customRange.start}
-                  onChange={(e) =>
-                    setCustomRange((prev) => ({ ...prev, end: e.target.value }))
-                  }
-                  disabled={loading}
-                  className="ui-field text-xs py-1.5 px-2"
-                  title={t("llm:endDate")}
-                />
-              </div>
-            )}
+              {range === "custom" && (
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="date"
+                    value={customRange.start}
+                    max={customRange.end}
+                    onChange={(e) =>
+                      setCustomRange((prev) => ({ ...prev, start: e.target.value }))
+                    }
+                    disabled={loading}
+                    className="ui-field text-xs h-8 py-0 px-2"
+                    title={t("llm:startDate")}
+                  />
+                  <span className="text-text-muted text-xs">-</span>
+                  <input
+                    type="date"
+                    value={customRange.end}
+                    min={customRange.start}
+                    onChange={(e) =>
+                      setCustomRange((prev) => ({ ...prev, end: e.target.value }))
+                    }
+                    disabled={loading}
+                    className="ui-field text-xs h-8 py-0 px-2"
+                    title={t("llm:endDate")}
+                  />
+                </div>
+              )}
+            </div>
 
             <div ref={selectorRef} className="relative">
               <button
                 onClick={() => setSelectorOpen((v) => !v)}
                 disabled={providerIds.length === 0}
-                className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border border-surface-border text-text-secondary hover:bg-surface-hover hover:border-surface-border/80 transition-colors disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 text-xs h-8 px-2.5 rounded-lg border border-surface-border text-text-secondary hover:bg-surface-hover hover:border-surface-border/80 transition-colors disabled:opacity-50"
               >
-                {activeProvider ? providerDisplayLabel(activeProvider) : t("llm:noProvider")}
-                <ChevronDown size={13} className={clsx("transition-transform", selectorOpen && "rotate-180")} />
+                <span className="truncate max-w-[120px]">
+                  {activeProvider ? providerDisplayLabel(activeProvider) : t("llm:noProvider")}
+                </span>
+                <ChevronDown size={13} className={clsx("flex-shrink-0 transition-transform", selectorOpen && "rotate-180")} />
               </button>
 
               {selectorOpen && (
@@ -659,7 +662,7 @@ export default function LlmInsights() {
               <button
                 onClick={() => void handleSummarize()}
                 disabled={loading}
-                className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 text-xs h-8 px-3 rounded-xl border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors disabled:opacity-50 whitespace-nowrap"
                 title={t("llm:summarizeTitle")}
               >
                 <FoldVertical size={13} />
@@ -670,12 +673,10 @@ export default function LlmInsights() {
             <button
               onClick={() => void runAnalysis()}
               disabled={loading}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium
+              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-xl text-xs font-medium
                          bg-gradient-to-r from-accent-blue to-accent-purple text-white
-                         shadow-[0_4px_14px_rgba(108,142,191,0.35)]
-                         hover:shadow-[0_6px_20px_rgba(108,142,191,0.48)] hover:-translate-y-0.5
-                         active:translate-y-0 disabled:opacity-60 disabled:cursor-not-allowed
-                         transition-all duration-200"
+                         hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed
+                         transition-opacity whitespace-nowrap"
             >
               {loading && !visibleMessages.some((m) => m.role === "assistant") ? (
                 <Loader2 size={14} className="animate-spin" />
@@ -801,21 +802,6 @@ export default function LlmInsights() {
             aria-label={t("llm:send")}
           >
             {loading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-          </button>
-          <button
-            onClick={() => {
-              setConversation((prev) => (prev ? { ...prev, messages: [] } : prev));
-              if (conversation) {
-                const cleared: LlmConversation = { ...conversation, messages: [], updated_at: new Date().toISOString() };
-                void saveConversation(cleared);
-              }
-            }}
-            disabled={loading || !conversation || conversation.messages.length === 0}
-            className="p-2 rounded-xl border border-surface-border text-text-secondary hover:bg-surface-hover disabled:opacity-50 transition-colors"
-            title={t("llm:newAnalysis")}
-            aria-label={t("llm:newAnalysis")}
-          >
-            <RotateCcw size={16} />
           </button>
         </div>
       </div>

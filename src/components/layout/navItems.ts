@@ -14,6 +14,7 @@ import {
 
 export const NAV_ITEMS = [
   { to: "/dashboard", icon: LayoutDashboard, labelKey: "dashboard:title" },
+  { to: "/llm-insights", icon: Bot, labelKey: "llm:navTitle" },
   { to: "/dashboard-insights", icon: Sparkles, labelKey: "dashboard:insightWorkspace.title" },
   { to: "/widgets", icon: Layers, labelKey: "widgets:widgetCenter" },
   { to: "/limits", icon: Bell, labelKey: "limits:title" },
@@ -22,6 +23,5 @@ export const NAV_ITEMS = [
   { to: "/categories", icon: Tag, labelKey: "categories:title" },
   { to: "/goals", icon: Target, labelKey: "goals:title" },
   { to: "/focus", icon: Focus, labelKey: "focus:title" },
-  { to: "/llm-insights", icon: Bot, labelKey: "llm:navTitle" },
   { to: "/settings", icon: Settings, labelKey: "settings:title" },
 ] as const;
