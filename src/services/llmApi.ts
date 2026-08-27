@@ -21,6 +21,14 @@ export async function getLlmConfigPath(): Promise<string> {
   return invoke<string>("get_llm_config_path");
 }
 
+export async function openLlmConfigFile(): Promise<void> {
+  return invoke("open_llm_config_file");
+}
+
+export async function openLlmConfigDir(): Promise<void> {
+  return invoke("open_llm_config_dir");
+}
+
 export async function getLlmConversations(
   includeArchived = false
 ): Promise<LlmConversationSummary[]> {

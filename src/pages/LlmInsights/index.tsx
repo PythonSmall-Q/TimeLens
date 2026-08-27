@@ -90,7 +90,23 @@ export default function LlmInsights() {
   const activeProvider = config.active_provider_id
     ? config.providers[config.active_provider_id]
     : undefined;
-  const providerIds = Object.keys(config.providers);
+  const providerIds = useMemo(() => {
+    const ids = Object.keys(config.providers);
+    ids.sort((a, b) => {
+      const la = providerDisplayLabel(config.providers[a]).toLowerCase();
+      const lb = providerDisplayLabel(config.providers[b]).toLowerCase();
+      return la.localeCompare(lb);
+    });
+    // Keep the active provider at the top so it is easy to find.
+    if (config.active_provider_id) {
+      const activeIdx = ids.indexOf(config.active_provider_id);
+      if (activeIdx > 0) {
+        ids.splice(activeIdx, 1);
+        ids.unshift(config.active_provider_id);
+      }
+    }
+    return ids;
+  }, [config.providers, config.active_provider_id]);
 
   // Load conversations and config on mount.
   useEffect(() => {
@@ -148,8 +164,8 @@ export default function LlmInsights() {
         setSelectorOpen(false);
       }
     };
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
+    document.addEventListener("click", handleClick);
+    return () => document.removeEventListener("click", handleClick);
   }, [selectorOpen]);
 
   useEffect(() => {

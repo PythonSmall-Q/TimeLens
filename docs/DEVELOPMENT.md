@@ -45,6 +45,7 @@ This starts the Vite dev server on `http://localhost:1420` and opens the Tauri w
 │  │  (tokio task)│  │  app_usage           │ │
 │  │  Win32/      │  │  todos               │ │
 │  │  AppleScript │  │  widget_configs      │ │
+│  │              │  │  llm_conversations   │ │
 │  └──────┬───────┘  └──────────┬───────────┘ │
 │         │  emit events        │ queries      │
 │  ┌──────▼───────────────────┐ │             │
@@ -52,7 +53,15 @@ This starts the Vite dev server on `http://localhost:1420` and opens the Tauri w
 │  │  monitor_cmd.rs          │               │
 │  │  storage_cmd.rs          │               │
 │  │  widget_cmd.rs           │               │
+│  │  llm_cmd.rs              │               │
+│  │  llm_conversation_cmd.rs │               │
 │  └──────┬───────────────────┘               │
+│         │                                    │
+│  ┌──────▼──────┐                             │
+│  │  llm/       │  local TOML config          │
+│  │  config.rs  │  + OpenAI-compatible        │
+│  │  mod.rs     │  provider streaming         │
+│  └─────────────┘                             │
 └─────────│─────────────────────────────────-─┘
           │ IPC (invoke / emit)
 ┌─────────▼────────────────────────────────────┐
@@ -65,8 +74,10 @@ This starts the Vite dev server on `http://localhost:1420` and opens the Tauri w
 │    "timer-*" → WidgetWindow<Timer>            │
 │                                               │
 │  stores/  → Zustand (statsStore, widgetStore, │
-│             settingsStore)                    │
-│  services/ → tauriApi.ts wrappers            │
+│             settingsStore, llmStore,          │
+│             llmConversationStore)             │
+│  services/ → tauriApi.ts + llmApi.ts         │
+│  pages/   → LlmInsights                       │
 └──────────────────────────────────────────────┘
 ```
 
@@ -79,8 +90,13 @@ This starts the Vite dev server on `http://localhost:1420` and opens the Tauri w
 | `src-tauri/src/lib.rs` | App setup, DB init, tray, monitor start, window restore |
 | `src-tauri/src/monitor/mod.rs` | Background window polling + DB writes |
 | `src-tauri/src/db/mod.rs` | All SQLite schema + queries |
+| `src-tauri/src/llm/mod.rs` | LLM config path, TOML load/save, config watcher |
+| `src-tauri/src/llm/config.rs` | Provider, data sharing, and analysis range models |
 | `src/App.tsx` | Window label → component routing |
 | `src/MainApp.tsx` | Main dashboard shell + event listeners |
+| `src/pages/LlmInsights/index.tsx` | AI Insights chat UI |
+| `src/stores/llmStore.ts` | LLM provider and data-sharing settings store |
+| `src/stores/llmConversationStore.ts` | LLM conversation list and active chat store |
 | `src/i18n/config.ts` | i18next init; add languages here |
 
 ---
@@ -120,6 +136,10 @@ npm run lint         # ESLint
 npm run typecheck    # tsc --noEmit
 npm run format       # Prettier write
 npm run test         # Vitest (when tests are added)
+
+# Rust / backend checks (run from src-tauri/)
+cargo check          # Rust compile check
+cargo test           # Rust unit tests
 ```
 
 ---

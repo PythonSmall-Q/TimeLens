@@ -17,6 +17,8 @@
   "apiKey": "API 密钥",
   "apiKeyPlaceholder": "输入你的 API 密钥",
   "apiKeyWarning": "API 密钥以明文保存在本地 llm_config.toml 中，请妥善保管该文件。",
+  "openConfigFile": "打开配置文件",
+  "openConfigDir": "打开配置文件夹",
   "baseUrl": "自定义接口地址",
   "testConnection": "测试连接",
   "testMissingFields": "测试前请填写 API 密钥、接口地址和模型。",

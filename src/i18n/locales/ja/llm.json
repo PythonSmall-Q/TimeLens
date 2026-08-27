@@ -17,6 +17,8 @@
   "apiKey": "API key",
   "apiKeyPlaceholder": "Enter your API key",
   "apiKeyWarning": "Your API key is stored locally in llm_config.toml. Keep the file safe.",
+  "openConfigFile": "Open config file",
+  "openConfigDir": "Open config folder",
   "baseUrl": "Custom base URL",
   "testConnection": "Test connection",
   "testMissingFields": "Please fill in the API key, base URL, and model before testing.",

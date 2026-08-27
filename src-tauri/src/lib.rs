@@ -1253,6 +1253,8 @@ pub fn run() {
             commands::get_llm_config,
             commands::set_llm_config,
             commands::get_llm_config_path,
+            commands::open_llm_config_file,
+            commands::open_llm_config_dir,
             commands::list_llm_conversations,
             commands::get_llm_conversation,
             commands::save_llm_conversation,

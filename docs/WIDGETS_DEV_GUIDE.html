@@ -1,344 +1,55 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>小组件开发指南 · TimeLens 文档</title>
+  <title>Widget Development Guide · TimeLens</title>
   <link rel="icon" type="image/png" href="assets/icon.png" />
   <link rel="stylesheet" href="styles.css" />
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 </head>
 <body>
-  <nav class="navbar">
-    <div class="nav-container">
-      <a href="index.html" class="nav-brand">
-        <img src="assets/icon.svg" alt="TimeLens" class="nav-icon" />
-        <span class="nav-title">TimeLens</span>
-      </a>
-      <div class="nav-links">
-        <a href="index.html#features" class="nav-link">功能</a>
-        <a href="index.html#showcase" class="nav-link">展示</a>
-        <a href="index.html#ecosystem" class="nav-link">生态</a>
-        <a href="index.html#quickstart" class="nav-link">快速开始</a>
-        <a href="index.html#docs" class="nav-link">文档</a>
-        <a href="https://github.com/PythonSmall-Q/TimeLens" class="nav-link" target="_blank" rel="noopener">
-          <svg class="github-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
-          GitHub
-        </a>
-      </div>
-      <button class="nav-toggle" id="navToggle" aria-label="切换导航"><span></span><span></span><span></span></button>
-    </div>
-  </nav>
-
-  <div class="content-wrapper">
-    <aside class="sidebar">
-      <ul class="sidebar-nav">
-        <li><a href="index.html">← 返回首页</a></li>
-        <li><a href="DEVELOPMENT.html">开发指南</a></li>
-        <li><a href="ARCHITECTURE.html">架构文档</a></li>
-        <li><a href="API_REFERENCE.html">API 参考</a></li>
-        <li><a href="ADD_LANGUAGE.html">添加语言</a></li>
-        <li><a href="WIDGETS_DEV_GUIDE.zh-CN.html">中文小组件指南</a></li>
-        <li><a href="browser-extension/index.html">浏览器扩展</a></li>
-        <li><a href="vscode-extension/index.html">VS Code 扩展</a></li>
-        <li><a href="help/index.html">帮助文档</a></li>
-      </ul>
-    </aside>
-
+  <nav class="navbar"><div class="nav-container"><a href="index.html" class="nav-brand"><img src="assets/icon.svg" alt="TimeLens" class="nav-icon" /><span class="nav-title">TimeLens</span></a><div class="nav-links"><a href="index.html#docs" class="nav-link">Docs</a><a href="WIDGETS_DEV_GUIDE.zh-CN.html" class="nav-link">中文</a><a href="https://github.com/PythonSmall-Q/TimeLens" class="nav-link" target="_blank" rel="noopener">GitHub</a></div><button class="nav-toggle" id="navToggle" aria-label="Toggle navigation"><span></span><span></span><span></span></button></div></nav>
+  <div class="content-wrapper"><aside class="sidebar"><ul class="sidebar-nav"><li><a href="index.html">← Home</a></li><li><a href="DEVELOPMENT.html">Development</a></li><li><a href="ARCHITECTURE.html">Architecture</a></li><li><a href="API_REFERENCE.html">API Reference</a></li><li><a href="WIDGETS_DEV_GUIDE.zh-CN.html">中文小组件指南</a></li></ul></aside>
     <main class="content-main">
-      <nav class="breadcrumb">
-        <a href="index.html">文档首页</a>
-        <span>/</span>
-        <span>小组件开发指南</span>
-      </nav>
-
-      <h1>Widget Development Guide</h1>
-      <p>This guide explains how to build third-party JavaScript widgets for TimeLens v2.0.1.</p>
-
-      <hr />
-
-      <h2 id="scope">Scope (v1.1.0)</h2>
-      <p><strong>Supported:</strong></p>
-      <ul>
-        <li>Local directory loading (<code>manifest.json</code> + JS entry)</li>
-        <li>Runtime registry discovery from app data <code>widgets</code> directory</li>
-        <li>Render contract: <code>createWidget()</code> or <code>mount()</code> export</li>
-        <li>Read-focused data APIs (screen time, active window, etc.)</li>
-        <li>Permission-based access control</li>
-      </ul>
-
-      <p><strong>Not included yet:</strong></p>
-      <ul>
-        <li>Remote marketplace / cloud distribution</li>
-        <li>Signature verification</li>
-        <li>Auto-update mechanism</li>
-      </ul>
-
-      <h2 id="directory">Directory Layout</h2>
-      <p>Each third-party widget lives in its own folder under the app data widgets directory:</p>
-
-      <pre><code>%APPDATA%\com.timelens.app\widgets\
+      <nav class="breadcrumb"><a href="index.html">Docs</a><span>/</span><span>Widget Development</span></nav>
+      <h1>Widget Development Guide</h1><p>This guide documents the current third-party runtime after the Kernel and Gateway rewrite.</p><hr />
+      <h2>Current scope</h2><p>The first supported host is sandboxed JavaScript or TypeScript. Local packages, ESM entries, <code>createWidget()</code>/<code>mount()</code>, Gateway queries, todo writes, widget state, subscriptions, local API calls, consent prompts, revocation, throttling, lifecycle events, and audit records are supported. v1/v2 manifests remain available through the compatibility adapter.</p><p>Remote distribution, Java hosting, and complete network/media proxies are not available yet. <code>client.fetch()</code> and <code>client.loadMedia()</code> are reserved APIs and currently report unimplemented.</p>
+      <h2>Package and manifest v4</h2><pre><code>widgets/
   my-widget/
     manifest.json
     index.js
-    assets/
-      icon.png
-      styles.css</code></pre>
-
-      <h2 id="manifest">manifest.json</h2>
-      <p>The manifest describes your widget to the TimeLens registry.</p>
-
-      <pre><code>{
+    assets/</code></pre><pre><code>{
+  "manifest_version": "v4",
   "widget_type": "sample_hello",
   "name": "Sample Hello Widget",
-  "description": "Minimal third-party widget example",
-  "version": "1.0.0",
-  "author": "Your Name",
+  "publisher": "Example Publisher",
   "entry": "index.js",
-  "default_size": {
-    "width": 360,
-    "height": 240
-  },
-  "permissions": [
-    "screen-time:read",
-    "active-window:subscribe"
-  ]
-}</code></pre>
-
-      <h3>Required Fields</h3>
-      <table>
-        <thead>
-          <tr><th>Field</th><th>Type</th><th>Description</th></tr>
-        </thead>
-        <tbody>
-          <tr><td><code>widget_type</code></td><td>string</td><td>Unique identifier (<code>[a-zA-Z0-9_-]+</code>)</td></tr>
-          <tr><td><code>name</code></td><td>string</td><td>Display name in widget center</td></tr>
-          <tr><td><code>entry</code></td><td>string</td><td>Entry JS file path (relative to manifest folder)</td></tr>
-        </tbody>
-      </table>
-
-      <h3>Optional Fields</h3>
-      <table>
-        <thead>
-          <tr><th>Field</th><th>Type</th><th>Description</th></tr>
-        </thead>
-        <tbody>
-          <tr><td><code>description</code></td><td>string</td><td>Short description</td></tr>
-          <tr><td><code>version</code></td><td>string</td><td>Semver version</td></tr>
-          <tr><td><code>author</code></td><td>string</td><td>Author name or email</td></tr>
-          <tr><td><code>icon</code></td><td>string</td><td>Icon path (relative)</td></tr>
-          <tr><td><code>default_size.width</code></td><td>number</td><td>Default window width</td></tr>
-          <tr><td><code>default_size.height</code></td><td>number</td><td>Default window height</td></tr>
-          <tr><td><code>permissions</code></td><td>string[]</td><td>Required permissions (see below)</td></tr>
-        </tbody>
-      </table>
-
-      <h2 id="permissions">Permission System</h2>
-      <p>Third-party widgets run in a sandboxed iframe. They must declare required permissions in the manifest. Users are prompted to grant them when the widget is first created.</p>
-
-      <table>
-        <thead>
-          <tr><th>Permission</th><th>Access</th></tr>
-        </thead>
-        <tbody>
-          <tr><td><code>screen-time:read</code></td><td>Read screen time statistics (today, hourly, trends)</td></tr>
-          <tr><td><code>active-window:subscribe</code></td><td>Subscribe to active window change events</td></tr>
-          <tr><td><code>goals:read</code></td><td>Read usage goals and progress</td></tr>
-          <tr><td><code>focus:read</code></td><td>Read focus session status</td></tr>
-          <tr><td><code>widgets:read</code></td><td>Read widget registry information</td></tr>
-        </tbody>
-      </table>
-
-      <h2 id="render">Render Interface Contract</h2>
-      <p>TimeLens loads your entry as an ESM module. Two export patterns are supported:</p>
-
-      <h3>Pattern A — createWidget() factory</h3>
-      <pre><code>export function createWidget() {
+  "runtime": { "language": "javascript", "version": "ES2022", "entry": "index.js" },
+  "ui": { "model": "web-sandbox" },
+  "capabilities": ["metrics.summary.read"]
+}</code></pre><p>v4 requires the version, unique type, name, publisher, runtime language/version/entry, UI model, and capabilities. The current JavaScript loader also requires the top-level <code>entry</code>, which should match <code>runtime.entry</code>. Optional fields include size, icon, signature, CSP, budgets, capability justifications, requested domains, and media sources.</p>
+      <h2>Capabilities and consent</h2><p>Privileged calls go through the Widget Gateway. A missing grant returns a recoverable denial; the host shows a consent prompt and retries once only after the user accepts. Users can revoke one scope or all scopes in Widget Center.</p><table><thead><tr><th>Scope</th><th>Access</th></tr></thead><tbody><tr><td><code>screen-time:read</code></td><td>Usage, focus, goals, categories, sessions, and related queries</td></tr><tr><td><code>todo:read</code> / <code>todo:write</code></td><td>Read or mutate todos</td></tr><tr><td><code>browser:read</code></td><td>Browser activity query</td></tr><tr><td><code>settings:write</code></td><td>Focus-mode writes</td></tr><tr><td><code>local-api:call</code></td><td>Scoped local TimeLens API calls</td></tr></tbody></table>
+      <h2>Entry and context</h2><pre><code>export function createWidget() {
   let root;
-
   return {
-    mount(container, context) {
+    async mount(container, context) {
       root = document.createElement("div");
       root.textContent = `Hello from ${context.widgetType}`;
       container.appendChild(root);
+      console.log(await context.client.query("metrics"));
     },
-    unmount() {
-      if (root && root.parentNode) {
-        root.parentNode.removeChild(root);
-      }
-    },
+    unmount() { root?.remove(); root = null; },
   };
-}</code></pre>
-
-      <h3>Pattern B — direct mount() export</h3>
-      <pre><code>let root;
-
-export function mount(container, context) {
-  root = document.createElement("div");
-  root.innerHTML = `
-    <style>
-      .my-widget { padding: 16px; color: #e6edf3; }
-    </style>
-    <div class="my-widget">
-      <h3>${context.displayName}</h3>
-      <p>Type: ${context.widgetType}</p>
-    </div>
-  `;
-  container.appendChild(root);
-}
-
-export function unmount() {
-  if (root && root.parentNode) {
-    root.parentNode.removeChild(root);
-  }
-}</code></pre>
-
-      <h3>Context Object</h3>
-      <table>
-        <thead>
-          <tr><th>Property</th><th>Type</th><th>Description</th></tr>
-        </thead>
-        <tbody>
-          <tr><td><code>widgetType</code></td><td>string</td><td>Widget type identifier</td></tr>
-          <tr><td><code>displayName</code></td><td>string</td><td>Human-readable name</td></tr>
-          <tr><td><code>widgetId</code></td><td>string</td><td>Unique instance ID</td></tr>
-          <tr><td><code>permissions</code></td><td>string[]</td><td>Granted permissions</td></tr>
-        </tbody>
-      </table>
-
-      <h2 id="data-channel">Data Channel API</h2>
-      <p>Widgets communicate with TimeLens core via the <code>window.parent.postMessage</code> API. The parent window provides a request/response bridge.</p>
-
-      <h3>Request Format</h3>
-      <pre><code>window.parent.postMessage({
-  type: "timelens:request",
-  id: "req-123",           // unique request ID
-  method: "getTodayAppTotals",
-  params: {}
-}, "*");</code></pre>
-
-      <h3>Response Format</h3>
-      <pre><code>window.addEventListener("message", (e) => {
-  if (e.data.type === "timelens:response" && e.data.id === "req-123") {
-    console.log(e.data.result);   // success
-    console.log(e.data.error);    // if failed
-  }
-});</code></pre>
-
-      <h3>Available Methods</h3>
-      <p>All methods from <a href="API_REFERENCE.html">API Reference</a> with <code>read</code> permissions are available via the data channel. Common methods:</p>
-      <ul>
-        <li><code>getTodayAppTotals</code> — Today's app usage summary</li>
-        <li><code>getTodayHourly</code> — Hourly distribution for today</li>
-        <li><code>getRecentDailyTotals</code> — Daily totals for last N days</li>
-        <li><code>getMonitorStatus</code> — Current monitoring status</li>
-        <li><code>getGoalProgress</code> — Goal progress list</li>
-      </ul>
-
-      <h2 id="styling">Styling Guidelines</h2>
-      <p>Widgets run inside an iframe with a transparent background. Follow these guidelines for visual consistency:</p>
-      <ul>
-        <li>Use <code>background: rgba(22, 27, 34, 0.8)</code> with <code>backdrop-filter: blur(10px)</code> for glassmorphism.</li>
-        <li>Primary text color: <code>#e6edf3</code></li>
-        <li>Secondary text color: <code>#8b949e</code></li>
-        <li>Accent color: <code>#58a6ff</code></li>
-        <li>Border radius: <code>8px</code> or <code>12px</code></li>
-        <li>Font family: <code>Inter, system-ui, sans-serif</code></li>
-      </ul>
-
-      <h2 id="example">Complete Example</h2>
-      <p>See <code>examples/third-party-widget-template/</code> for a working starter template.</p>
-
-      <pre><code>// index.js
-export function createWidget() {
-  let root;
-  let interval;
-
-  return {
-    mount(container, context) {
-      root = document.createElement("div");
-      root.style.cssText = `
-        padding: 16px;
-        color: #e6edf3;
-        font-family: Inter, system-ui, sans-serif;
-      `;
-      root.innerHTML = `<h3>${context.displayName}</h3><div id="stats">Loading...</div>`;
-      container.appendChild(root);
-
-      // Fetch data every 30s
-      const fetchData = async () => {
-        const reqId = "req-" + Date.now();
-        window.parent.postMessage({
-          type: "timelens:request",
-          id: reqId,
-          method: "getTodayAppTotals",
-          params: {}
-        }, "*");
-      };
-
-      const handler = (e) => {
-        if (e.data.type === "timelens:response") {
-          const list = e.data.result?.slice(0, 3) || [];
-          const html = list.map(s =>
-            `<div>${s.app_name}: ${Math.round(s.total_seconds / 60)}m</div>`
-          ).join("");
-          const el = root.querySelector("#stats");
-          if (el) el.innerHTML = html || "No data";
-        }
-      };
-      window.addEventListener("message", handler);
-
-      fetchData();
-      interval = setInterval(fetchData, 30000);
-    },
-
-    unmount() {
-      clearInterval(interval);
-      if (root && root.parentNode) {
-        root.parentNode.removeChild(root);
-      }
-    }
-  };
-}</code></pre>
-
-      <h2 id="debugging">Debugging Tips</h2>
-      <ul>
-        <li>Open DevTools on the widget window (right-click → Inspect) to debug JavaScript.</li>
-        <li>Check <code>Widget Center</code> → permissions tab if data requests fail.</li>
-        <li>Verify <code>manifest.json</code> syntax with any JSON validator.</li>
-        <li>Widget logs appear in the main window DevTools console when using <code>postMessage</code>.</li>
-      </ul>
-
-      <hr />
-      <p style="color: var(--text-muted); font-size: 0.85rem;">最后更新：2026-07-18 · TimeLens v2.0.1</p>
+}</code></pre><p>Direct <code>mount(container, context)</code> plus optional <code>unmount()</code> is also supported. Context contains <code>widgetId</code>, <code>widgetType</code>, the new <code>client</code>, the legacy <code>channel</code>, and lifecycle callbacks. New widgets should use <code>client</code>; <code>channel</code> is for migration.</p>
+      <h2>WidgetClient</h2><pre><code>const metrics = await context.client.query("metrics", { start, end });
+const value = await context.client.getState("selected-range");
+await context.client.setState("selected-range", "today");
+const todo = await context.client.addTodo("Review screen time");
+const handle = await context.client.subscribe("focus-started", console.log);
+await context.client.unsubscribe(handle);</code></pre><p>Namespaces are <code>metrics</code>, <code>sessions</code>, <code>categories</code>, <code>projects</code>, <code>tags</code>, <code>goals</code>, <code>rules</code>, <code>focus</code>, <code>todos</code>, and <code>browser</code>. Local API calls remain available through <code>context.channel.localApiCall({ method, path, scopes })</code>.</p>
+      <h2>Errors, lifecycle, and testing</h2><p>Gateway statuses include <code>success</code>, <code>denied</code>, <code>revoked</code>, <code>throttled</code>, <code>timed_out</code>, <code>degraded</code>, and <code>error</code>. <code>WidgetGatewayError</code> exposes <code>code</code>, <code>scope</code>, and <code>recoverable</code>; use <code>isConsentRequired()</code> for consent failures. Release subscriptions during <code>unmount</code>. The current limit is 60 channel calls per minute per instance.</p><p>Copy the package into the app data <code>widgets</code> directory, start development mode, add it from Widget Center, and exercise the consent and permission matrix flows. The development-only Widget Dev Harness can mock Gateway responses and reload local entries.</p>
+      <p><a href="WIDGETS_DEV_GUIDE.zh-CN.html">阅读中文指南</a> · See <a href="WIDGET_SDK_v2_MIGRATION.md">v1/v2 migration notes</a> and the <code>src-tauri/widget-contract/manifest-v4.schema.json</code> schema.</p><hr /><p style="color: var(--text-muted); font-size: 0.85rem;">Last updated: 2026-08-27 · TimeLens widget runtime rewrite</p>
     </main>
-  </div>
-
-  <script>
-    const navToggle = document.getElementById('navToggle');
-    const navLinks = document.querySelector('.nav-links');
-    navToggle.addEventListener('click', () => navLinks.classList.toggle('open'));
-  </script>
-
-  <!-- Footer -->
-  <footer class="footer">
-    <div class="footer-container">
-      <div class="footer-brand">
-        <img src="assets/icon.svg" alt="TimeLens" class="footer-icon" />
-        <span>TimeLens</span>
-      </div>
-      <p class="footer-copy">MIT License · Built with Tauri & React · 由社区驱动</p>
-      <div class="footer-links">
-        <a href="https://github.com/PythonSmall-Q/TimeLens" target="_blank" rel="noopener">GitHub</a>
-        <a href="https://github.com/PythonSmall-Q/TimeLens/releases" target="_blank" rel="noopener">Releases</a>
-        <a href="https://github.com/PythonSmall-Q/TimeLens/blob/main/README.md" target="_blank" rel="noopener">README</a>
-        <a href="https://github.com/PythonSmall-Q/TimeLens/blob/main/CHANGELOG.md" target="_blank" rel="noopener">Changelog</a>
-        <a href="https://github.com/PythonSmall-Q/TimeLens/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener">Contributing</a>
-        <a href="https://github.com/PythonSmall-Q/TimeLens/blob/main/PRIVACY_POLICY.md" target="_blank" rel="noopener">Privacy</a>
-      </div>
-    </div>
-  </footer>
+  </div><script>const navToggle=document.getElementById('navToggle');const navLinks=document.querySelector('.nav-links');navToggle.addEventListener('click',()=>navLinks.classList.toggle('open'));</script>
 </body>
 </html>

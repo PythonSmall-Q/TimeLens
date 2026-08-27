@@ -1,8 +1,8 @@
 import { useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { ExternalLink, Check, AlertCircle, Loader2, Plus, Trash2, ChevronDown, ChevronUp, Sparkles } from "lucide-react";
+import { ExternalLink, Check, AlertCircle, Loader2, Plus, Trash2, ChevronDown, ChevronUp, Sparkles, FileText, FolderOpen } from "lucide-react";
 import { useLlmStore } from "@/stores/llmStore";
-import { streamChatCompletion } from "@/services/llmApi";
+import { streamChatCompletion, openLlmConfigFile, openLlmConfigDir } from "@/services/llmApi";
 import type { LlmProvider, LlmDataSharing, AnalysisRange } from "@/types/llm";
 import clsx from "clsx";
 
@@ -49,7 +49,15 @@ export default function LlmSettings() {
   const [testMessage, setTestMessage] = useState<Record<string, string>>({});
 
   const activeId = config.active_provider_id;
-  const providerIds = useMemo(() => Object.keys(config.providers), [config.providers]);
+  const providerIds = useMemo(() => {
+    const ids = Object.keys(config.providers);
+    ids.sort((a, b) => {
+      const la = providerDisplayLabel(config.providers[a]).toLowerCase();
+      const lb = providerDisplayLabel(config.providers[b]).toLowerCase();
+      return la.localeCompare(lb);
+    });
+    return ids;
+  }, [config.providers]);
 
   const nicknameExists = (nickname: string, excludeId?: string) => {
     const trimmed = nickname.trim();
@@ -132,6 +140,11 @@ export default function LlmSettings() {
     const label = providerDisplayLabel(provider);
     const confirmed = window.confirm(t("llm:deleteModelConfirm", { name: label }));
     if (!confirmed) return;
+    if (editingId === id) {
+      setEditingId(null);
+      setForm(emptyForm());
+      setFormError(null);
+    }
     await removeProvider(id);
   };
 
@@ -178,6 +191,7 @@ export default function LlmSettings() {
       <div className="space-y-3">
         {providerIds.map((id) => {
           const provider = config.providers[id];
+          if (!provider) return null;
           const isActive = activeId === id;
           const isEditing = editingId === id;
           const status = testStatus[id] ?? "idle";
@@ -464,7 +478,27 @@ export default function LlmSettings() {
         )}
       </div>
 
-      <p className="text-xs text-text-muted">{t("llm:apiKeyWarning")}</p>
+      <div className="rounded-xl border border-surface-border bg-surface-hover/40 px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <p className="text-xs text-text-muted">{t("llm:apiKeyWarning")}</p>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => void openLlmConfigFile()}
+            className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
+            title={t("llm:openConfigFile")}
+          >
+            <FileText size={13} />
+            {t("llm:openConfigFile")}
+          </button>
+          <button
+            onClick={() => void openLlmConfigDir()}
+            className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
+            title={t("llm:openConfigDir")}
+          >
+            <FolderOpen size={13} />
+            {t("llm:openConfigDir")}
+          </button>
+        </div>
+      </div>
 
       <div className="rounded-2xl border border-surface-border bg-surface-hover/40 p-4 space-y-4">
         <div>

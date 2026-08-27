@@ -122,6 +122,7 @@ npm run dev</code></pre>
 │  │  (tokio task)│  │  app_usage               │  │
 │  │  Win32/      │  │  todos                   │  │
 │  │  AppleScript │  │  widget_configs          │  │
+│  │              │  │  llm_conversations       │  │
 │  └──────┬───────┘  └──────────┬───────────────┘  │
 │         │  emit events        │ queries          │
 │  ┌──────▼───────────────────┐ │                  │
@@ -129,7 +130,15 @@ npm run dev</code></pre>
 │  │  monitor_cmd.rs          │                    │
 │  │  storage_cmd.rs          │                    │
 │  │  widget_cmd.rs           │                    │
+│  │  llm_cmd.rs              │                    │
+│  │  llm_conversation_cmd.rs │                    │
 │  └──────┬───────────────────┘                    │
+│         │                                        │
+│  ┌──────▼──────┐                                 │
+│  │  llm/       │  本地 TOML 配置                 │
+│  │  config.rs  │  + OpenAI 兼容流式调用          │
+│  │  mod.rs     │                                 │
+│  └─────────────┘                                 │
 └─────────│───────────────────────────────────────┘
           │ IPC (invoke / emit)
 ┌─────────▼────────────────────────────────────────┐
@@ -142,8 +151,10 @@ npm run dev</code></pre>
 │    "timer-*" → WidgetWindow<Timer>                │
 │                                                   │
 │  stores/  → Zustand (statsStore, widgetStore,     │
-│             settingsStore)                        │
-│  services/ → tauriApi.ts wrappers                │
+│             settingsStore, llmStore,              │
+│             llmConversationStore)                 │
+│  services/ → tauriApi.ts + llmApi.ts 封装        │
+│  pages/   → LlmInsights                           │
 └───────────────────────────────────────────────────┘</code></pre>
 
       <h2 id="key-files">关键文件速查</h2>
@@ -155,8 +166,13 @@ npm run dev</code></pre>
           <tr><td><code>src-tauri/src/lib.rs</code></td><td>应用初始化、数据库初始化、系统托盘、监控启动、窗口恢复</td></tr>
           <tr><td><code>src-tauri/src/monitor/mod.rs</code></td><td>后台窗口轮询 + 数据库写入</td></tr>
           <tr><td><code>src-tauri/src/db/mod.rs</code></td><td>SQLite 表结构定义与所有查询</td></tr>
+          <tr><td><code>src-tauri/src/llm/mod.rs</code></td><td>LLM 配置路径、TOML 读写、文件变更监听</td></tr>
+          <tr><td><code>src-tauri/src/llm/config.rs</code></td><td>Provider、数据共享、分析范围模型</td></tr>
           <tr><td><code>src/App.tsx</code></td><td>窗口标签路由（main vs widget）</td></tr>
           <tr><td><code>src/MainApp.tsx</code></td><td>主仪表盘壳 + 全局事件监听</td></tr>
+          <tr><td><code>src/pages/LlmInsights/index.tsx</code></td><td>AI Insights 对话界面</td></tr>
+          <tr><td><code>src/stores/llmStore.ts</code></td><td>LLM Provider 与数据共享设置 store</td></tr>
+          <tr><td><code>src/stores/llmConversationStore.ts</code></td><td>LLM 会话列表与当前聊天 store</td></tr>
           <tr><td><code>src/services/tauriApi.ts</code></td><td>所有 invoke 调用的前端封装</td></tr>
           <tr><td><code>src/i18n/config.ts</code></td><td>i18next 初始化配置、语言列表</td></tr>
         </tbody>
@@ -200,6 +216,8 @@ RUST_LOG=debug npm run tauri:dev</code></pre>
           <tr><td><code>npm run typecheck</code></td><td>TypeScript 类型检查（不输出文件）</td></tr>
           <tr><td><code>npm run format</code></td><td>Prettier 格式化</td></tr>
           <tr><td><code>npm run test</code></td><td>Vitest 单元测试</td></tr>
+          <tr><td><code>cargo check</code>（在 <code>src-tauri/</code> 下）</td><td>Rust 编译检查</td></tr>
+          <tr><td><code>cargo test</code>（在 <code>src-tauri/</code> 下）</td><td>Rust 单元测试</td></tr>
         </tbody>
       </table>
 

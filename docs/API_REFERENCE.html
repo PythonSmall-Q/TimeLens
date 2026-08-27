@@ -170,6 +170,70 @@ unlisten();</code></pre>
         </tbody>
       </table>
 
+      <h2 id="llm">LLM / AI Insights</h2>
+      <table>
+        <thead>
+          <tr><th>Command</th><th>参数</th><th>返回</th><th>说明</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>get_llm_config</code></td><td>—</td><td><code>LlmConfig</code></td><td>从本地 TOML 读取 LLM 配置</td></tr>
+          <tr><td><code>set_llm_config</code></td><td><code>config: LlmConfig</code></td><td><code>void</code></td><td>保存 LLM 配置到本地 TOML，并触发 <code>llm-config-changed</code></td></tr>
+          <tr><td><code>get_llm_config_path</code></td><td>—</td><td><code>string</code></td><td>LLM 配置文件绝对路径</td></tr>
+          <tr><td><code>list_llm_conversations</code></td><td><code>includeArchived: boolean</code></td><td><code>LlmConversationSummary[]</code></td><td>列出会话，默认不包含归档</td></tr>
+          <tr><td><code>get_llm_conversation</code></td><td><code>id: string</code></td><td><code>LlmConversation | null</code></td><td>获取单个会话完整消息</td></tr>
+          <tr><td><code>save_llm_conversation</code></td><td><code>conversation: LlmConversation</code></td><td><code>void</code></td><td>新增或更新会话</td></tr>
+          <tr><td><code>delete_llm_conversation</code></td><td><code>id: string</code></td><td><code>void</code></td><td>永久删除会话</td></tr>
+          <tr><td><code>archive_llm_conversation</code></td><td><code>id: string, archived: boolean</code></td><td><code>void</code></td><td>归档 / 取消归档会话</td></tr>
+          <tr><td><code>pin_llm_conversation</code></td><td><code>id: string, pinned: boolean</code></td><td><code>void</code></td><td>置顶 / 取消置顶会话</td></tr>
+        </tbody>
+      </table>
+
+      <h3>事件监听</h3>
+      <pre><code>import { listen } from "@tauri-apps/api/event";
+
+const unlisten = await listen("llm-config-changed", () =&gt; {
+  console.log("LLM 配置文件已变更");
+});
+
+unlisten();</code></pre>
+
+      <h3>数据表 <code>llm_conversations</code></h3>
+      <table>
+        <thead>
+          <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>id</code></td><td>TEXT</td><td>主键</td></tr>
+          <tr><td><code>title</code></td><td>TEXT</td><td>会话标题</td></tr>
+          <tr><td><code>created_at</code></td><td>TEXT</td><td>创建时间</td></tr>
+          <tr><td><code>updated_at</code></td><td>TEXT</td><td>最后更新时间</td></tr>
+          <tr><td><code>archived</code></td><td>INTEGER</td><td>是否归档</td></tr>
+          <tr><td><code>pinned</code></td><td>INTEGER</td><td>是否置顶</td></tr>
+          <tr><td><code>messages</code></td><td>TEXT</td><td>JSON 消息数组</td></tr>
+          <tr><td><code>summary</code></td><td>TEXT</td><td>可选摘要</td></tr>
+        </tbody>
+      </table>
+
+      <h3>前端调用示例</h3>
+      <pre><code>import * as api from "@/services/llmApi";
+
+<span class="code-comment">// 读取配置</span>
+const config = await api.getLlmConfig();
+
+<span class="code-comment">// 创建新会话</span>
+const conv = await api.createConversation([], "分析今日屏幕时间");
+
+<span class="code-comment">// 流式请求选中的 Provider</span>
+await api.streamChatCompletion({
+  baseUrl: provider.base_url,
+  apiKey: provider.api_key,
+  model: provider.model,
+  messages: contextMessages,
+  onChunk: (chunk) =&gt; { /* 追加到 UI */ },
+  onDone: () =&gt; { /* 保存最终消息 */ },
+  onError: (err) =&gt; { /* 显示错误 */ },
+});</code></pre>
+
       <h2 id="todos">待办事项</h2>
       <table>
         <thead>

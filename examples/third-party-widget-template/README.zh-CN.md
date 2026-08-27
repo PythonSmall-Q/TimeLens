@@ -4,32 +4,28 @@
 
 ## 文件说明
 
-- `manifest.json`：小组件元数据与注册声明（Widget SDK v2）
+- `manifest.json`：小组件元数据与 v4 运行时声明
 - `index.js`：ESM 入口，需实现 `createWidget().mount/unmount`
 - `index.ts`：同一小组件的 TypeScript 源码（可选）
 - `package.json`：构建脚本；运行 `npm install && npm run build` 可将 `index.ts` 编译为 `dist/index.js`
 - `tsconfig.json`：TypeScript 编译选项
 
-## Manifest v2
+## Manifest v4
 
 ```json
 {
-  "manifest_version": 2,
+  "manifest_version": "v4",
   "widget_type": "sample_hello",
   "name": "Sample Hello Widget",
+  "publisher": "TimeLens Example",
   "entry": "index.js",
-  "capabilities": ["read_metrics", "automation_trigger"]
+  "runtime": { "language": "javascript", "version": "ES2022", "entry": "index.js" },
+  "ui": { "model": "web-sandbox" },
+  "capabilities": ["screen-time:read", "active-window:subscribe"]
 }
 ```
 
-### 能力（Capabilities）
-
-| 能力 | 授予的运行时权限 |
-|---|---|
-| `read_metrics` | `screen-time:read`、`todo:read` |
-| `write_data` | `todo:write`、`settings:write` |
-| `automation_trigger` | `active-window:subscribe` |
-| `local_api_call` | `local-api:call` |
+v4 中 capability 字符串就是运行时 Scope，只声明小组件真正需要的 Scope。当前 JavaScript 加载器要求顶层 `entry` 与 `runtime.entry` 一致。
 
 ## 测试步骤
 
@@ -49,5 +45,6 @@
 
 - `widget_type` 必须在本地已安装小组件中唯一。
 - 入口文件必须是有效 ESM，且导出 `createWidget()` 或 `mount()`。
-- 通过 `context.channel.localApiCall({ method, path, scopes })` 调用 TimeLens 本地 HTTP API。
-- 从 v1 清单迁移请参考 `docs/WIDGET_SDK_v2_MIGRATION.md`。
+- 新小组件通过 `context.client.query(...)` 使用 Gateway 数据接口。
+- 仅在兼容旧 API 时使用 `context.channel.localApiCall({ method, path, scopes })`。
+- 当前运行时指南见 `docs/WIDGETS_DEV_GUIDE.zh-CN.md`，v1/v2 迁移见 `docs/WIDGET_SDK_v2_MIGRATION.md`。

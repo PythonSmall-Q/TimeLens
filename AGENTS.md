@@ -19,7 +19,7 @@ Always run these after non-trivial changes:
 
 ```bash
 npm run typecheck      # TypeScript check
-npm run lint           # ESLint (expect 9 pre-existing warnings)
+npm run lint           # ESLint (expect 8 pre-existing warnings)
 npm run test           # Frontend unit tests
 ```
 
@@ -46,7 +46,9 @@ npm run tauri:build
 - `src/hooks/` — Shared React hooks
 - `src/stores/` — Zustand state stores
 - `src/services/tauriApi.ts` — All Tauri command wrappers
+- `src/services/llmApi.ts` — LLM streaming and screen-time context builder
 - `src/types/index.ts` — Shared TypeScript types
+- `src/types/llm.ts` — LLM provider, config, conversation types
 - `src/i18n/locales/` — Translation JSON files (`en`, `zh-CN`, `zh-TW`, `ja`, `ko`, `de`, `fr`, `es`)
 - `src/styles/globals.css` — Tailwind entry + custom glassmorphism utilities
 
@@ -54,6 +56,8 @@ npm run tauri:build
 
 - `commands/` — Tauri command handlers
 - `db/` — SQLite schema, migrations, and query helpers
+- `db/llm_conversations.rs` — Persisted AI conversation storage
+- `llm/` — Local LLM config (TOML) and provider model
 - `models/` — Shared Rust data models
 - `monitor/` — Active window / screen-time monitoring
 - `widget_registry.rs` — Widget manifest loading and normalization
@@ -111,7 +115,7 @@ When adding user-facing text:
 2. Add key to `src/i18n/locales/zh-CN/<namespace>.json`
 3. Add English stub to `src/i18n/locales/{es,de,fr,ko,ja,zh-TW}/<namespace>.json`
 
-Namespaces include: `common`, `dashboard`, `widgets`, `settings`, `limits`, `categories`, `goals`, `focus`, `browserUsage`.
+Namespaces include: `common`, `dashboard`, `widgets`, `settings`, `limits`, `categories`, `goals`, `focus`, `browserUsage`, `llm`.
 
 ## Version Bumps
 
@@ -134,6 +138,9 @@ The `src/version.ts` file re-exports `package.json` version, so it does not need
 - **Widget window events**: Each widget is its own window; use Tauri `emit`/`listen` for cross-widget communication.
 - **Focus rules**: Frontend `FocusRule` does not include `created_at`; the backend model must keep it optional to avoid deserialization failures.
 - **Cargo lockfile**: After editing `Cargo.toml`, run `cargo update -p timelens` instead of a full `cargo update` to avoid unnecessary dependency churn.
+- **LLM config**: Provider settings live in `llm_config.toml` in the app data directory. API keys are stored locally in plain text; never log or expose them.
+- **LLM conversations**: Conversations are persisted in SQLite (`llm_conversations` table, migration 013). New tables need a migration in `src-tauri/src/db/migrations.rs`.
+- **Analysis context**: `buildScreenTimeContext` respects `LlmDataSharing` flags and `AnalysisRange`. When adding new data sources, expose them through both the data-sharing toggle and the context builder.
 
 ## Release Notes
 

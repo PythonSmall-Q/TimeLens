@@ -4,41 +4,35 @@ This template demonstrates the minimum files required to run a third-party JS wi
 
 ## Files
 
-- `manifest.json`: widget metadata and registry declaration (Widget SDK v2)
+- `manifest.json`: widget metadata and v4 runtime declaration
 - `index.js`: ESM widget entry implementing `createWidget().mount/unmount`
 - `index.ts`: TypeScript source for the same widget (optional)
 - `types.d.ts`: TypeScript declarations describing the widget context API
 - `package.json`: build scripts; run `npm install && npm run build` to compile `index.ts` to `dist/index.js`
 - `tsconfig.json`: TypeScript compiler options
 
-## Manifest v2
+## Manifest v4
 
 ```json
 {
-  "manifest_version": "v2",
+  "manifest_version": "v4",
   "widget_type": "sample_hello",
   "name": "Sample Hello Widget",
+  "publisher": "TimeLens Example",
   "entry": "index.js",
+  "runtime": { "language": "javascript", "version": "ES2022", "entry": "index.js" },
+  "ui": { "model": "web-sandbox" },
   "capabilities": [
-    { "capability": "read_metrics", "permission": "screen-time:read" },
-    { "capability": "automation_trigger", "permission": "active-window:subscribe" },
-    { "capability": "local_api_call", "permission": "local-api:call" }
+    "screen-time:read",
+    "active-window:subscribe",
+    "local-api:call"
   ]
 }
 ```
 
-### Capabilities
-
-| Capability | Default runtime permissions granted |
-|---|---|
-| `read_metrics` | `screen-time:read`, `todo:read` |
-| `write_data` | `todo:write`, `settings:write` |
-| `automation_trigger` | `active-window:subscribe` |
-| `local_api_call` | `local-api:call` |
-
-You can also declare capabilities as plain strings; in that case TimeLens expands
-each capability to its default permissions. Use the object form when you want to
-request only a specific permission from a capability group.
+In v4, capability strings are runtime scopes. Declare only the scopes required by
+the widget. The top-level `entry` must match `runtime.entry` for the current
+JavaScript loader.
 
 ## How to test
 
@@ -58,5 +52,6 @@ For faster iteration, use the Widget Dev Harness (dev mode only):
 
 - Keep `widget_type` unique across all installed widgets.
 - The entry file must be valid ESM and export `createWidget()` or `mount()`.
-- Use `context.channel.localApiCall({ method, path, scopes })` to call the TimeLens local HTTP API.
-- See `docs/WIDGET_SDK_v2_MIGRATION.md` for migration from v1 manifests.
+- Use `context.client.query(...)` for new Gateway-mediated data access.
+- Use `context.channel.localApiCall({ method, path, scopes })` only for the compatibility API.
+- See `docs/WIDGETS_DEV_GUIDE.md` for the current runtime guide and `docs/WIDGET_SDK_v2_MIGRATION.md` for v1/v2 migration.

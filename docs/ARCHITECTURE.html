@@ -117,6 +117,7 @@
           <tr><td><code>settings</code></td><td>应用级设置（启动项、快捷键、语言等）</td></tr>
           <tr><td><code>browser_sessions</code></td><td>浏览器扩展同步的网页访问记录</td></tr>
           <tr><td><code>browser_domain_limits</code></td><td>网页域名使用限额</td></tr>
+          <tr><td><code>llm_conversations</code></td><td>AI Insights 会话记录（消息、归档、置顶、摘要）</td></tr>
         </tbody>
       </table>
 
@@ -133,6 +134,8 @@
           <tr><td><code>app_cmd.rs</code></td><td>应用设置、系统通知、安装渠道检测</td></tr>
           <tr><td><code>browser_cmd.rs</code></td><td>浏览器扩展数据、域名统计与限额</td></tr>
           <tr><td><code>productivity_cmd.rs</code></td><td>生产力评分、中断时段分析</td></tr>
+          <tr><td><code>llm_cmd.rs</code></td><td>LLM Provider 配置读取与保存</td></tr>
+          <tr><td><code>llm_conversation_cmd.rs</code></td><td>AI Insights 会话的增删改查、归档、置顶</td></tr>
           <tr><td><code>widget_permissions.rs</code></td><td>第三方小组件权限管理</td></tr>
         </tbody>
       </table>
@@ -166,11 +169,12 @@
         <li><strong>Categories</strong> — 应用分类管理与智能推荐</li>
         <li><strong>Goals</strong> — 使用目标设定与追踪</li>
         <li><strong>FocusMode</strong> — 专注模式开关与历史</li>
-        <li><strong>Settings</strong> — 全局设置（语言、主题、快捷键等）</li>
+        <li><strong>LlmInsights</strong> — AI Insights 屏幕时间分析对话</li>
+        <li><strong>Settings</strong> — 全局设置（语言、主题、快捷键、AI 助手等）</li>
       </ul>
 
       <h3 id="stores">状态管理</h3>
-      <p>使用 Zustand 创建了 4 个全局 store：</p>
+      <p>使用 Zustand 创建了 6 个全局 store：</p>
       <table>
         <thead>
           <tr><th>Store</th><th>数据</th><th>持久化</th></tr>
@@ -180,6 +184,8 @@
           <tr><td><code>widgetStore</code></td><td>小组件配置列表、可见性状态</td><td>Rust DB</td></tr>
           <tr><td><code>settingsStore</code></td><td>主题、语言、监控设置等</td><td>Rust DB + localStorage 缓存</td></tr>
           <tr><td><code>dashboardLayoutStore</code></td><td>仪表盘卡片顺序、显隐</td><td>localStorage</td></tr>
+          <tr><td><code>llmStore</code></td><td>LLM Provider、数据共享、默认分析范围</td><td>本地 TOML 配置文件</td></tr>
+          <tr><td><code>llmConversationStore</code></td><td>会话列表、当前会话、消息持久化</td><td>Rust DB + localStorage（活跃会话缓存）</td></tr>
         </tbody>
       </table>
 
@@ -222,6 +228,46 @@ Dashboard Charts & Lists</code></pre>
 
       <h3>第三方小组件</h3>
       <p>TimeLens 支持加载第三方 JavaScript 小组件。详细开发指南参见 <a href="WIDGETS_DEV_GUIDE.html">小组件开发指南</a>。</p>
+
+      <h2 id="ai-assistant">AI Assistant / LLM</h2>
+      <p>TimeLens 内置 AI 助手（AI Insights），用于基于本地屏幕时间数据生成可对话的分析。所有配置与数据均保存在本地，对话历史不会上传云端。</p>
+
+      <h3>后端模块</h3>
+      <ul>
+        <li><code>src-tauri/src/llm/config.rs</code> — Provider 配置模型，包括 <code>LlmProvider</code>（name / nickname / base_url / model / api_key / builtin / referral_url）、<code>LlmDataSharing</code>（total_time / top_apps / categories / focus_time / goals / interruptions）和 <code>AnalysisRange</code>（today / yesterday / last_7_days / last_30_days / this_week / last_week / custom）。</li>
+        <li><code>src-tauri/src/llm/mod.rs</code> — 解析本地 TOML 配置文件路径（<code>llm_config.toml</code>），提供原子化读写与文件变更轮询，并通过 <code>llm-config-changed</code> 事件通知前端刷新。</li>
+        <li><code>src-tauri/src/commands/llm_cmd.rs</code> — <code>get_llm_config</code> / <code>set_llm_config</code> / <code>get_llm_config_path</code>。</li>
+        <li><code>src-tauri/src/commands/llm_conversation_cmd.rs</code> — <code>list_llm_conversations</code> / <code>get_llm_conversation</code> / <code>save_llm_conversation</code> / <code>delete_llm_conversation</code> / <code>archive_llm_conversation</code> / <code>pin_llm_conversation</code>。</li>
+        <li><code>src-tauri/src/db/llm_conversations.rs</code> — 会话的 SQLite CRUD 与 <code>message_count</code> 汇总查询。</li>
+      </ul>
+
+      <h3>数据表 <code>llm_conversations</code></h3>
+      <table>
+        <thead>
+          <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>id</code></td><td>TEXT</td><td>主键，会话唯一标识</td></tr>
+          <tr><td><code>title</code></td><td>TEXT</td><td>会话标题</td></tr>
+          <tr><td><code>created_at</code></td><td>TEXT</td><td>创建时间</td></tr>
+          <tr><td><code>updated_at</code></td><td>TEXT</td><td>最后更新时间</td></tr>
+          <tr><td><code>archived</code></td><td>INTEGER</td><td>是否归档</td></tr>
+          <tr><td><code>pinned</code></td><td>INTEGER</td><td>是否置顶</td></tr>
+          <tr><td><code>messages</code></td><td>TEXT</td><td>JSON 消息数组</td></tr>
+          <tr><td><code>summary</code></td><td>TEXT</td><td>可选摘要文本</td></tr>
+        </tbody>
+      </table>
+
+      <h3>前端实现</h3>
+      <ul>
+        <li><code>src/pages/LlmInsights/index.tsx</code> — AI Insights 页面，左侧会话列表支持归档 / 置顶 / 删除，右侧对话区支持时间范围选择、Provider 选择、基于屏幕时间上下文的 <code>analyze</code> 与追问，以及对话历史 <code>summarize</code> 压缩。</li>
+        <li><code>src/stores/llmStore.ts</code> — 管理 Provider 选择、数据共享开关、默认分析范围，监听 <code>llm-config-changed</code> 以同步外部 TOML 修改。</li>
+        <li><code>src/stores/llmConversationStore.ts</code> — 管理会话列表、当前会话、消息追加与摘要替换；活跃会话 ID 通过 Zustand persist 缓存在 localStorage。</li>
+        <li><code>src/services/llmApi.ts</code> — 封装所有 LLM 相关 invoke，并提供 <code>streamChatCompletion</code> 实现 OpenAI 兼容的 SSE 流式请求。</li>
+      </ul>
+
+      <h3>隐私与数据共享</h3>
+      <p>用户在 <strong>Settings → AI Assistant</strong>（设置页第 3 个入口）中可逐条控制 AI 可见的数据维度：总时长、Top 应用、分类、专注时间、目标、中断次数。分析请求仅将用户授权的数据作为 system 上下文发送给选中的 OpenAI 兼容端点，API key 与配置保存在本地 TOML 文件中。</p>
 
       <h2 id="i18n">国际化架构</h2>
       <p>使用 i18next + react-i18next 实现多语言支持。</p>
