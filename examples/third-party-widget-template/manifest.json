@@ -1,17 +1,28 @@
 {
-  "manifest_version": "v2",
+  "manifest_version": "v4",
   "widget_type": "sample_hello",
   "name": "Sample Hello Widget",
-  "description": "A minimal third-party widget template for TimeLens v2",
-  "entry": "index.js",
+  "description": "A complete TypeScript WidgetClient API showcase",
+  "publisher": "TimeLens Example",
+  "entry": "dist/index.js",
   "default_size": {
     "width": 360,
     "height": 240
   },
+  "runtime": {
+    "language": "typescript",
+    "version": "5.0",
+    "entry": "dist/index.js"
+  },
+  "ui": { "model": "web-sandbox" },
   "capabilities": [
-    { "capability": "read_metrics", "permission": "screen-time:read" },
-    { "capability": "automation_trigger", "permission": "active-window:subscribe" },
-    { "capability": "local_api_call", "permission": "local-api:call" }
+    "screen-time:read",
+    "todo:read",
+    "todo:write",
+    "browser:read",
+    "settings:write",
+    "local-api:call",
+    "active-window:subscribe"
   ],
-  "sdk_version": "2.0.0"
+  "sdk_version": "4.0.0"
 }

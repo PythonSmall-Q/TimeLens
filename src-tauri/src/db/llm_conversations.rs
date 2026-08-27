@@ -6,6 +6,8 @@ use serde::{Deserialize, Serialize};
 pub struct StoredChatMessage {
     pub role: String,
     pub content: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hidden: Option<bool>,
 }
 
 /// Full conversation record.

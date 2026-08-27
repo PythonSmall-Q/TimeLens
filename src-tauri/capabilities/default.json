@@ -33,6 +33,8 @@
     "global-shortcut:default",
     "notification:default",
     "shell:allow-open",
+    "opener:allow-open-path",
+    "opener:allow-reveal-item-in-dir",
     "updater:default",
     "dialog:allow-open",
     "dialog:allow-save",

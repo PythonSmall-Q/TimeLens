@@ -1,12 +1,12 @@
 # 第三方小组件模板
 
-该模板演示了在 TimeLens 中运行第三方 JS 小组件所需的最小文件集。
+该模板是一个完整的 TypeScript 小组件示例，展示重写后的 TimeLens 运行时。组件包含按钮，可调用当前 WidgetClient、兼容 channel、同意、本地 API，以及网络/媒体预留接口。
 
 ## 文件说明
 
 - `manifest.json`：小组件元数据与 v4 运行时声明
-- `index.js`：ESM 入口，需实现 `createWidget().mount/unmount`
-- `index.ts`：同一小组件的 TypeScript 源码（可选）
+- `index.ts`：TypeScript ESM 入口和完整 API 展示
+- `dist/index.js`：TimeLens 实际加载的编译产物
 - `package.json`：构建脚本；运行 `npm install && npm run build` 可将 `index.ts` 编译为 `dist/index.js`
 - `tsconfig.json`：TypeScript 编译选项
 
@@ -18,18 +18,29 @@
   "widget_type": "sample_hello",
   "name": "Sample Hello Widget",
   "publisher": "TimeLens Example",
-  "entry": "index.js",
-  "runtime": { "language": "javascript", "version": "ES2022", "entry": "index.js" },
+  "entry": "dist/index.js",
+  "runtime": { "language": "typescript", "version": "5.0", "entry": "dist/index.js" },
   "ui": { "model": "web-sandbox" },
-  "capabilities": ["screen-time:read", "active-window:subscribe"]
+  "capabilities": [
+    "screen-time:read", "todo:read", "todo:write", "browser:read",
+    "settings:write", "local-api:call", "active-window:subscribe"
+  ]
 }
 ```
 
-v4 中 capability 字符串就是运行时 Scope，只声明小组件真正需要的 Scope。当前 JavaScript 加载器要求顶层 `entry` 与 `runtime.entry` 一致。
+v4 中 capability 字符串就是运行时 Scope。示例声明全部已实现的 Scope，因为它会展示所有接口。网络和媒体调用仅用于展示当前尚未实现的返回结果。
+
+## 构建
+
+```bash
+npm install
+npm run build
+```
 
 ## 测试步骤
 
-1. 将本目录复制到本机 TimeLens 应用数据 widgets 目录，例如：
+1. 先构建，确保生成 `dist/index.js`。
+2. 将本目录复制到本机 TimeLens 应用数据 widgets 目录，例如：
    - `widgets/sample_hello/`
 2. 启动 TimeLens。
 3. 打开小组件中心 → 添加小组件。
@@ -47,4 +58,9 @@ v4 中 capability 字符串就是运行时 Scope，只声明小组件真正需�
 - 入口文件必须是有效 ESM，且导出 `createWidget()` 或 `mount()`。
 - 新小组件通过 `context.client.query(...)` 使用 Gateway 数据接口。
 - 仅在兼容旧 API 时使用 `context.channel.localApiCall({ method, path, scopes })`。
+- “Client queries/state” 会调用所有查询命名空间、浏览器活动和状态接口。
+- “Todo write lifecycle” 会新增、切换、排序并删除一个临时待办。
+- “Legacy read channel” 会调用兼容读取接口。
+- “Focus/settings writes”和“Local API call”需要对应 Scope。
+- “Test reserved network/media”预期会显示 Provider 尚未实现。
 - 当前运行时指南见 `docs/WIDGETS_DEV_GUIDE.zh-CN.md`，v1/v2 迁移见 `docs/WIDGET_SDK_v2_MIGRATION.md`。

@@ -36,6 +36,7 @@ export interface LlmConfig {
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
   content: string;
+  hidden?: boolean;
 }
 
 export interface StreamChatOptions {

@@ -80,6 +80,10 @@ export default function LlmInsights() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [range, setRange] = useState<AnalysisRange>(config.default_range || "today");
+  const [customRange, setCustomRange] = useState<{ start: string; end: string }>(() => {
+    const today = new Date().toISOString().split("T")[0];
+    return { start: today, end: today };
+  });
   const [selectorOpen, setSelectorOpen] = useState(false);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
@@ -181,7 +185,7 @@ export default function LlmInsights() {
   }, [menuOpenId]);
 
   const gatherContext = useCallback(async (): Promise<ChatMessage[]> => {
-    const { start, end, label } = getRangeDates(range);
+    const { start, end, label } = getRangeDates(range, range === "custom" ? customRange : undefined);
     const startAt = `${start}T00:00:00`;
     const endAt = `${end}T23:59:59`;
 
@@ -230,7 +234,7 @@ export default function LlmInsights() {
       dataSharing: config.data_sharing,
       rangeLabel: label,
     });
-  }, [range, sidebarTodaySeconds, currentLanguage, config.data_sharing]);
+  }, [range, customRange, sidebarTodaySeconds, currentLanguage, config.data_sharing]);
 
   const ensureConversation = async (): Promise<LlmConversation> => {
     if (conversation) return conversation;
@@ -396,6 +400,7 @@ export default function LlmInsights() {
       {
         role: "system",
         content: `Earlier context summary: ${summary}`,
+        hidden: true,
       },
     ];
     const updated = await summarizeConversation(conversation.id, summaryMessages);
@@ -414,15 +419,18 @@ export default function LlmInsights() {
     });
   }, [conversations, showArchived]);
 
+  const visibleMessages = useMemo(
+    () => conversation?.messages.filter((m) => !m.hidden) ?? [],
+    [conversation?.messages]
+  );
+
   const analysisDone =
-    conversation &&
-    conversation.messages.length > 0 &&
-    conversation.messages[conversation.messages.length - 1].role === "assistant";
+    visibleMessages.length > 0 && visibleMessages[visibleMessages.length - 1].role === "assistant";
 
   return (
     <div className="h-full flex animate-fade-in">
       {/* Sidebar */}
-      <div className="w-60 border-r border-surface-border bg-surface-hover/30 flex flex-col">
+      <div className="w-60 border-r border-surface-border bg-surface-light flex flex-col">
         <div className="p-4 border-b border-surface-border flex items-center justify-between">
           <h2 className="text-sm font-semibold text-text-primary flex items-center gap-2">
             <MessageSquare size={16} />
@@ -569,6 +577,7 @@ export default function LlmInsights() {
                   ["last_30_days", t("llm:rangeLast30Days")],
                   ["this_week", t("llm:rangeThisWeek")],
                   ["last_week", t("llm:rangeLastWeek")],
+                  ["custom", t("llm:rangeCustom")],
                 ] as [AnalysisRange, string][]
               ).map(([value, label]) => (
                 <option key={value} value={value}>
@@ -576,6 +585,34 @@ export default function LlmInsights() {
                 </option>
               ))}
             </select>
+
+            {range === "custom" && (
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="date"
+                  value={customRange.start}
+                  max={customRange.end}
+                  onChange={(e) =>
+                    setCustomRange((prev) => ({ ...prev, start: e.target.value }))
+                  }
+                  disabled={loading}
+                  className="ui-field text-xs py-1.5 px-2"
+                  title={t("llm:startDate")}
+                />
+                <span className="text-text-muted text-xs">-</span>
+                <input
+                  type="date"
+                  value={customRange.end}
+                  min={customRange.start}
+                  onChange={(e) =>
+                    setCustomRange((prev) => ({ ...prev, end: e.target.value }))
+                  }
+                  disabled={loading}
+                  className="ui-field text-xs py-1.5 px-2"
+                  title={t("llm:endDate")}
+                />
+              </div>
+            )}
 
             <div ref={selectorRef} className="relative">
               <button
@@ -640,7 +677,7 @@ export default function LlmInsights() {
                          active:translate-y-0 disabled:opacity-60 disabled:cursor-not-allowed
                          transition-all duration-200"
             >
-              {loading && !conversation?.messages.some((m) => m.role === "assistant") ? (
+              {loading && !visibleMessages.some((m) => m.role === "assistant") ? (
                 <Loader2 size={14} className="animate-spin" />
               ) : (
                 <Sparkles size={14} />
@@ -654,7 +691,7 @@ export default function LlmInsights() {
           ref={scrollRef}
           className="flex-1 min-h-0 overflow-y-auto rounded-2xl border border-surface-border bg-surface-card/25 p-4 space-y-4 m-4 mb-0"
         >
-          {!conversation || conversation.messages.length === 0 ? (
+          {visibleMessages.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-text-muted gap-3">
               <Bot size={40} className="opacity-40" />
               <p className="text-sm">{t("llm:emptyState")}</p>
@@ -670,7 +707,7 @@ export default function LlmInsights() {
               </button>
             </div>
           ) : (
-            conversation.messages.map((message, idx) => (
+            visibleMessages.map((message, idx) => (
               <div
                 key={idx}
                 className={clsx(
@@ -724,7 +761,7 @@ export default function LlmInsights() {
             ))
           )}
 
-          {loading && conversation && conversation.messages.length > 0 && conversation.messages[conversation.messages.length - 1].role === "user" && (
+          {loading && visibleMessages.length > 0 && visibleMessages[visibleMessages.length - 1].role === "user" && (
             <div className="flex gap-3">
               <div className="w-7 h-7 rounded-full bg-accent-purple/20 text-accent-purple flex items-center justify-center flex-shrink-0">
                 <Bot size={14} />

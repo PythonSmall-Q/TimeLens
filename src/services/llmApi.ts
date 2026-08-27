@@ -69,7 +69,7 @@ export async function streamChatCompletion(options: StreamChatOptions): Promise<
       },
       body: JSON.stringify({
         model,
-        messages,
+        messages: stripHiddenFlag(messages),
         stream: true,
         temperature: 0.7,
       }),
@@ -128,7 +128,15 @@ function formatDate(d: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-function getRangeDates(range: AnalysisRange): { start: string; end: string; label: string } {
+export interface CustomRange {
+  start: string;
+  end: string;
+}
+
+function getRangeDates(
+  range: AnalysisRange,
+  custom?: CustomRange
+): { start: string; end: string; label: string } {
   const now = new Date();
   const today = formatDate(now);
 
@@ -168,6 +176,10 @@ function getRangeDates(range: AnalysisRange): { start: string; end: string; labe
       return { start: formatDate(start), end: formatDate(end), label: "last week" };
     }
     case "custom":
+      if (custom?.start && custom?.end) {
+        return { start: custom.start, end: custom.end, label: `${custom.start} to ${custom.end}` };
+      }
+      return { start: today, end: today, label: "today" };
     default:
       return { start: today, end: today, label: "today" };
   }
@@ -240,9 +252,13 @@ export function buildScreenTimeContext(options: ScreenTimeContextOptions): ChatM
   parts.push("\nPlease analyze my screen time and suggest 2-3 ways I could improve my focus or balance.");
 
   return [
-    { role: "system", content: systemContent },
-    { role: "user", content: parts.join("\n") },
+    { role: "system", content: systemContent, hidden: true },
+    { role: "user", content: parts.join("\n"), hidden: true },
   ];
+}
+
+export function stripHiddenFlag(messages: ChatMessage[]): { role: string; content: string }[] {
+  return messages.map(({ role, content }) => ({ role, content }));
 }
 
 export { getRangeDates };

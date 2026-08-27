@@ -1,6 +1,6 @@
 use crate::llm::{self, config::LlmConfig};
-use tauri::{AppHandle, Emitter, Manager};
-use tauri_plugin_shell::ShellExt;
+use tauri::{AppHandle, Emitter};
+use tauri_plugin_opener::OpenerExt;
 
 /// Load the LLM configuration from the local TOML file.
 #[tauri::command]
@@ -32,8 +32,8 @@ pub fn get_llm_config_path(app_handle: AppHandle) -> Result<String, String> {
 pub async fn open_llm_config_file(app_handle: AppHandle) -> Result<(), String> {
     let path = llm::config_path(&app_handle)?;
     app_handle
-        .shell()
-        .open(path.to_string_lossy(), None)
+        .opener()
+        .open_path(path.to_string_lossy(), None::<&str>)
         .map_err(|e| e.to_string())
 }
 
@@ -43,7 +43,7 @@ pub async fn open_llm_config_dir(app_handle: AppHandle) -> Result<(), String> {
     let path = llm::config_path(&app_handle)?;
     let dir = path.parent().ok_or("Failed to resolve config directory")?;
     app_handle
-        .shell()
-        .open(dir.to_string_lossy(), None)
+        .opener()
+        .open_path(dir.to_string_lossy(), None::<&str>)
         .map_err(|e| e.to_string())
 }
