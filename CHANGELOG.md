@@ -5,6 +5,33 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [2.1.0] - 2026-08-27
+
+### Added
+
+- **AI Insights (LLM-powered screen-time analysis)** — new page that lets you ask an AI to analyze your screen-time data and focus habits.
+  - Supports multiple configurable LLM providers with nicknames; add, delete, and switch providers from Settings.
+  - Built-in presets for OpenAI, Groq, OpenRouter, and OrcaRouter, including a referral link for OrcaRouter.
+  - Custom provider support with arbitrary base URL, model, and API key.
+  - Real-time streaming responses with Markdown rendering.
+  - Conversation sidebar with pin, archive, delete, and new-conversation actions.
+  - Summarize conversation history to condense context and save tokens.
+  - Choose which screen-time data is shared with AI (total time, top apps, categories, focus time, goals, interruptions).
+  - Select analysis range: today, yesterday, last 7/30 days, this/last week, or a custom date range.
+  - Persisted conversation history with full context for follow-up questions.
+- **Open LLM config from Settings** — added buttons to open `llm_config.toml` and its containing folder with the system default app/file explorer.
+
+### Changed
+
+- **Navigation order** — AI Insights is now the second item in the left sidebar, right below Dashboard.
+- **AI chat UX** — the system prompt and raw screen-time summary are no longer shown as chat bubbles; they remain in context sent to the model. Removed the bottom-right "New analysis" rotate button.
+
+### Fixed
+
+- **AI Insights header layout** — aligned all header controls to the same height and allowed wrapping on narrow windows for a cleaner toolbar.
+
+---
+
 ## [2.0.5] - 2026-08-26
 
 ### Added

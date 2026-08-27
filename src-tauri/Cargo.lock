@@ -4796,7 +4796,7 @@ dependencies = [
 
 [[package]]
 name = "timelens"
-version = "2.0.5"
+version = "2.1.0"
 dependencies = [
  "aes-gcm",
  "argon2",
