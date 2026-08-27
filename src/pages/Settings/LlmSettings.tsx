@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { ExternalLink, Check, AlertCircle, Loader2, Plus, Trash2, ChevronDown, ChevronUp, Sparkles } from "lucide-react";
 import { useLlmStore } from "@/stores/llmStore";
 import { streamChatCompletion } from "@/services/llmApi";
-import type { LlmProvider } from "@/types/llm";
+import type { LlmProvider, LlmDataSharing, AnalysisRange } from "@/types/llm";
 import clsx from "clsx";
 
 interface ProviderFormData {
@@ -37,6 +37,8 @@ export default function LlmSettings() {
     removeProvider,
     setActiveProvider,
     saveConfig,
+    setDataSharing,
+    setDefaultRange,
     loading,
   } = useLlmStore();
 
@@ -463,6 +465,69 @@ export default function LlmSettings() {
       </div>
 
       <p className="text-xs text-text-muted">{t("llm:apiKeyWarning")}</p>
+
+      <div className="rounded-2xl border border-surface-border bg-surface-hover/40 p-4 space-y-4">
+        <div>
+          <h3 className="text-sm font-medium text-text-primary">{t("llm:dataSharingTitle")}</h3>
+          <p className="text-xs text-text-muted mt-0.5">{t("llm:dataSharingSubtitle")}</p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {(
+            [
+              ["total_time", t("llm:shareTotalTime")],
+              ["top_apps", t("llm:shareTopApps")],
+              ["categories", t("llm:shareCategories")],
+              ["focus_time", t("llm:shareFocusTime")],
+              ["goals", t("llm:shareGoals")],
+              ["interruptions", t("llm:shareInterruptions")],
+            ] as [keyof LlmDataSharing, string][]
+          ).map(([key, label]) => (
+            <label
+              key={key}
+              className="flex items-center gap-2.5 p-2.5 rounded-xl border border-surface-border bg-surface-card/40 cursor-pointer hover:bg-surface-hover transition-colors"
+            >
+              <input
+                type="checkbox"
+                checked={config.data_sharing[key]}
+                onChange={(e) =>
+                  void setDataSharing({ ...config.data_sharing, [key]: e.target.checked })
+                }
+                disabled={loading}
+                className="ui-checkbox"
+              />
+              <span className="text-sm text-text-secondary">{label}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-surface-border bg-surface-hover/40 p-4 space-y-3">
+        <div>
+          <h3 className="text-sm font-medium text-text-primary">{t("llm:defaultRangeTitle")}</h3>
+          <p className="text-xs text-text-muted mt-0.5">{t("llm:defaultRangeSubtitle")}</p>
+        </div>
+        <select
+          value={config.default_range}
+          onChange={(e) => void setDefaultRange(e.target.value as AnalysisRange)}
+          disabled={loading}
+          className="ui-field w-full"
+        >
+          {(
+            [
+              ["today", t("llm:rangeToday")],
+              ["yesterday", t("llm:rangeYesterday")],
+              ["last_7_days", t("llm:rangeLast7Days")],
+              ["last_30_days", t("llm:rangeLast30Days")],
+              ["this_week", t("llm:rangeThisWeek")],
+              ["last_week", t("llm:rangeLastWeek")],
+            ] as [AnalysisRange, string][]
+          ).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </div>
 
       <div className="flex items-center gap-3 pt-2">
         <button

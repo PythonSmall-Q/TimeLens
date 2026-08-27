@@ -1,7 +1,12 @@
 import { create } from "zustand";
 import { listen } from "@tauri-apps/api/event";
 import * as api from "@/services/llmApi";
-import type { LlmConfig, LlmProvider } from "@/types/llm";
+import type {
+  LlmConfig,
+  LlmProvider,
+  LlmDataSharing,
+  AnalysisRange,
+} from "@/types/llm";
 
 interface LlmState {
   config: LlmConfig;
@@ -15,6 +20,8 @@ interface LlmState {
   updateProvider: (providerId: string, patch: Partial<LlmProvider>) => Promise<void>;
   addProvider: (provider: LlmProvider) => Promise<string>;
   removeProvider: (providerId: string) => Promise<void>;
+  setDataSharing: (dataSharing: LlmDataSharing) => Promise<void>;
+  setDefaultRange: (range: AnalysisRange) => Promise<void>;
 }
 
 const defaultConfig: LlmConfig = {
@@ -57,6 +64,15 @@ const defaultConfig: LlmConfig = {
       builtin: false,
     },
   },
+  data_sharing: {
+    total_time: true,
+    top_apps: true,
+    categories: true,
+    focus_time: true,
+    goals: true,
+    interruptions: true,
+  },
+  default_range: "today",
 };
 
 function generateProviderId(config: LlmConfig, preferred?: string): string {
@@ -148,9 +164,20 @@ export const useLlmStore = create<LlmState>((set, get) => ({
         : config.active_provider_id;
 
     await saveConfig({
+      ...config,
       active_provider_id: newActiveId,
       providers: remaining,
     });
+  },
+
+  setDataSharing: async (dataSharing) => {
+    const { config, saveConfig } = get();
+    await saveConfig({ ...config, data_sharing: dataSharing });
+  },
+
+  setDefaultRange: async (range) => {
+    const { config, saveConfig } = get();
+    await saveConfig({ ...config, default_range: range });
   },
 }));
 

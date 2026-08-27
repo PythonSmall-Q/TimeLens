@@ -2,6 +2,7 @@ use chrono::Timelike;
 use rusqlite::{params, Connection, OptionalExtension, Result};
 use std::path::Path;
 
+pub mod llm_conversations;
 pub mod migrations;
 
 const SYSTEM_INTERACTIVE_EXE_WHITELIST_SQL: &str = "

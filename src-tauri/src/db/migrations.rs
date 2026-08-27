@@ -1155,6 +1155,31 @@ fn migration_012_widget_runtime_rewrite(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
+/// Migration 013: persist LLM assistant conversations and optional summaries.
+fn migration_013_llm_conversations(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        "
+        CREATE TABLE IF NOT EXISTS llm_conversations (
+            id          TEXT    PRIMARY KEY,
+            title       TEXT    NOT NULL,
+            created_at  TEXT    NOT NULL,
+            updated_at  TEXT    NOT NULL,
+            archived    INTEGER NOT NULL DEFAULT 0,
+            pinned      INTEGER NOT NULL DEFAULT 0,
+            messages    TEXT    NOT NULL,
+            summary     TEXT
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_llm_conversations_updated
+            ON llm_conversations(updated_at DESC);
+
+        CREATE INDEX IF NOT EXISTS idx_llm_conversations_pinned
+            ON llm_conversations(pinned, updated_at DESC);
+        ",
+    )?;
+    Ok(())
+}
+
 /// The ordered list of all migrations.
 const MIGRATIONS: &[Migration] = &[
     Migration::new(1, "baseline_schema", migration_001_baseline),
@@ -1184,6 +1209,11 @@ const MIGRATIONS: &[Migration] = &[
         12,
         "widget_runtime_rewrite",
         migration_012_widget_runtime_rewrite,
+    ),
+    Migration::new(
+        13,
+        "llm_conversations",
+        migration_013_llm_conversations,
     ),
 ];
 

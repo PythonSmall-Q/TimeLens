@@ -745,6 +745,7 @@ export default function Settings() {
   }> = [
     { key: "general", title: t("general"), description: t("generalDesc"), icon: Sun, keywords: [t("language")] },
     { key: "appearance", title: t("appearance"), description: t("appearanceDesc"), icon: Moon, keywords: [t("theme.label")] },
+    { key: "aiAssistant", title: t("aiAssistant.title"), description: t("aiAssistant.description"), icon: Sparkles, keywords: [t("aiAssistant.provider"), t("aiAssistant.apiKey"), "llm", "ai"] },
     { key: "trayIcon", title: t("trayIconStyle.label"), description: t("trayIconDesc"), icon: PanelsTopLeft, keywords: [t("trayIconStyle.auto"), t("trayIconStyle.color"), t("trayIconStyle.black"), t("trayIconStyle.white")] },
     { key: "privacyCenter", title: t("privacyCenter.title"), description: t("privacyCenterDesc"), icon: Lock, keywords: [t("privacyCenter.subtitle"), t("apiSecurity.title"), t("backup.title"), t("transparency.title")] },
     { key: "tracking", title: t("tracking.title"), description: t("trackingDesc"), icon: Activity, keywords: [t("tracking.active"), t("tracking.samplingInterval"), t("tracking.idleTimePolicy")] },
@@ -759,7 +760,6 @@ export default function Settings() {
     { key: "encryption", title: t("encryption.title"), description: t("encryptionDesc"), icon: Shield, keywords: [t("encryption.status"), t("encryption.enable")] },
     { key: "transparency", title: t("transparency.title"), description: t("transparencyDesc"), icon: Info, keywords: [t("transparency.active"), t("transparency.fields")] },
     { key: "extensionBridge", title: t("extensionBridge.title"), description: t("extensionBridgeDesc"), icon: Lock, keywords: [t("extensionBridge.key"), "bridge", "extension"] },
-    { key: "aiAssistant", title: t("aiAssistant.title"), description: t("aiAssistant.description"), icon: Sparkles, keywords: [t("aiAssistant.provider"), t("aiAssistant.apiKey"), "llm", "ai"] },
     { key: "about", title: t("about.title"), description: t("aboutDesc"), icon: Info, keywords: [t("about.version"), "github"] },
   ];
   const settingSearchLower = settingSearch.trim().toLowerCase();

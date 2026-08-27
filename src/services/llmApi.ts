@@ -1,5 +1,13 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { LlmConfig, StreamChatOptions, ChatMessage } from "@/types/llm";
+import type {
+  LlmConfig,
+  StreamChatOptions,
+  ChatMessage,
+  LlmDataSharing,
+  AnalysisRange,
+  LlmConversation,
+  LlmConversationSummary,
+} from "@/types/llm";
 
 export async function getLlmConfig(): Promise<LlmConfig> {
   return invoke<LlmConfig>("get_llm_config");
@@ -11,6 +19,32 @@ export async function setLlmConfig(config: LlmConfig): Promise<void> {
 
 export async function getLlmConfigPath(): Promise<string> {
   return invoke<string>("get_llm_config_path");
+}
+
+export async function getLlmConversations(
+  includeArchived = false
+): Promise<LlmConversationSummary[]> {
+  return invoke<LlmConversationSummary[]>("list_llm_conversations", { includeArchived });
+}
+
+export async function getLlmConversation(id: string): Promise<LlmConversation | null> {
+  return invoke<LlmConversation | null>("get_llm_conversation", { id });
+}
+
+export async function saveLlmConversation(conversation: LlmConversation): Promise<void> {
+  return invoke("save_llm_conversation", { conversation });
+}
+
+export async function deleteLlmConversation(id: string): Promise<void> {
+  return invoke("delete_llm_conversation", { id });
+}
+
+export async function archiveLlmConversation(id: string, archived: boolean): Promise<void> {
+  return invoke("archive_llm_conversation", { id, archived });
+}
+
+export async function pinLlmConversation(id: string, pinned: boolean): Promise<void> {
+  return invoke("pin_llm_conversation", { id, pinned });
 }
 
 export async function streamChatCompletion(options: StreamChatOptions): Promise<void> {
@@ -79,7 +113,59 @@ export async function streamChatCompletion(options: StreamChatOptions): Promise<
   }
 }
 
-export function buildScreenTimeContext(options: {
+function formatDate(d: Date): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getRangeDates(range: AnalysisRange): { start: string; end: string; label: string } {
+  const now = new Date();
+  const today = formatDate(now);
+
+  switch (range) {
+    case "today":
+      return { start: today, end: today, label: "today" };
+    case "yesterday": {
+      const d = new Date(now);
+      d.setDate(d.getDate() - 1);
+      const y = formatDate(d);
+      return { start: y, end: y, label: "yesterday" };
+    }
+    case "last_7_days": {
+      const d = new Date(now);
+      d.setDate(d.getDate() - 6);
+      return { start: formatDate(d), end: today, label: "the last 7 days" };
+    }
+    case "last_30_days": {
+      const d = new Date(now);
+      d.setDate(d.getDate() - 29);
+      return { start: formatDate(d), end: today, label: "the last 30 days" };
+    }
+    case "this_week": {
+      const d = new Date(now);
+      const dayOfWeek = d.getDay();
+      const diff = d.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+      d.setDate(diff);
+      return { start: formatDate(d), end: today, label: "this week" };
+    }
+    case "last_week": {
+      const end = new Date(now);
+      const dayOfWeek = end.getDay();
+      const mondayDiff = end.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+      end.setDate(mondayDiff - 1);
+      const start = new Date(end);
+      start.setDate(start.getDate() - 6);
+      return { start: formatDate(start), end: formatDate(end), label: "last week" };
+    }
+    case "custom":
+    default:
+      return { start: today, end: today, label: "today" };
+  }
+}
+
+export interface ScreenTimeContextOptions {
   todaySeconds: number;
   topApps: { name: string; seconds: number }[];
   categories: { name: string; seconds: number }[];
@@ -87,42 +173,68 @@ export function buildScreenTimeContext(options: {
   goals: { name: string; progress: number }[];
   interruptions: number;
   language?: string;
-}): ChatMessage[] {
-  const topAppsText = options.topApps
-    .slice(0, 5)
-    .map((a) => `${a.name}: ${Math.round(a.seconds / 60)}m`)
-    .join("\n") || "No app data";
+  dataSharing: LlmDataSharing;
+  rangeLabel: string;
+}
 
-  const categoriesText = options.categories
-    .map((c) => `${c.name}: ${Math.round(c.seconds / 60)}m`)
-    .join("\n") || "No category data";
+export function buildScreenTimeContext(options: ScreenTimeContextOptions): ChatMessage[] {
+  const {
+    dataSharing,
+    rangeLabel,
+    language,
+    todaySeconds,
+    topApps,
+    categories,
+    focusMinutes,
+    goals,
+    interruptions,
+  } = options;
 
-  const goalsText = options.goals
-    .map((g) => `${g.name}: ${Math.round(g.progress * 100)}%`)
-    .join("\n") || "No goals";
+  const lang = language && language !== "en" ? language : "the user's language";
 
-  const language = options.language && options.language !== "en" ? options.language : "the user's language";
-  const systemContent = `You are a productivity assistant inside TimeLens, a local screen-time tracker. Analyze the user's screen-time data and provide concise, actionable insights. Be helpful, non-judgmental, and focus on one or two concrete suggestions. When the user asks follow-up questions, answer based on the data provided or ask for clarification. Respond in ${language}. You may use Markdown formatting (lists, bold, code blocks) to make the answer readable.`;
+  const systemContent = `You are a productivity assistant inside TimeLens, a local screen-time tracker. Analyze the user's screen-time data and provide concise, actionable insights. Be helpful, non-judgmental, and focus on one or two concrete suggestions. When the user asks follow-up questions, answer based on the data provided or ask for clarification. Respond in ${lang}. You may use Markdown formatting (lists, bold, code blocks) to make the answer readable.`;
 
-  const userContent = `Here is my screen-time summary for today:
+  const parts: string[] = [];
+  parts.push(`Here is my screen-time summary for ${rangeLabel}:`);
 
-- Total active time: ${Math.round(options.todaySeconds / 60)} minutes
-- Focus time: ${Math.round(options.focusMinutes)} minutes
-- Interruptions: ${options.interruptions}
+  if (dataSharing.total_time) {
+    parts.push(`- Total active time: ${Math.round(todaySeconds / 60)} minutes`);
+  }
+  if (dataSharing.focus_time) {
+    parts.push(`- Focus time: ${Math.round(focusMinutes)} minutes`);
+  }
+  if (dataSharing.interruptions) {
+    parts.push(`- Interruptions: ${interruptions}`);
+  }
 
-Top apps:
-${topAppsText}
+  if (dataSharing.top_apps && topApps.length > 0) {
+    const text = topApps
+      .slice(0, 5)
+      .map((a) => `${a.name}: ${Math.round(a.seconds / 60)}m`)
+      .join("\n");
+    parts.push(`\nTop apps:\n${text}`);
+  }
 
-Categories:
-${categoriesText}
+  if (dataSharing.categories && categories.length > 0) {
+    const text = categories
+      .map((c) => `${c.name}: ${Math.round(c.seconds / 60)}m`)
+      .join("\n");
+    parts.push(`\nCategories:\n${text}`);
+  }
 
-Goals:
-${goalsText}
+  if (dataSharing.goals && goals.length > 0) {
+    const text = goals
+      .map((g) => `${g.name}: ${Math.round(g.progress * 100)}%`)
+      .join("\n");
+    parts.push(`\nGoals:\n${text}`);
+  }
 
-Please analyze my day and suggest 2-3 ways I could improve my focus or balance.`;
+  parts.push("\nPlease analyze my screen time and suggest 2-3 ways I could improve my focus or balance.");
 
   return [
     { role: "system", content: systemContent },
-    { role: "user", content: userContent },
+    { role: "user", content: parts.join("\n") },
   ];
 }
+
+export { getRangeDates };

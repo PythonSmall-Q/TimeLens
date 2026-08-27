@@ -4,12 +4,59 @@ use std::collections::HashMap;
 /// Unique identifier for a built-in or custom provider.
 pub type ProviderId = String;
 
+/// Which screen-time data the user allows the AI assistant to see.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct LlmDataSharing {
+    pub total_time: bool,
+    pub top_apps: bool,
+    pub categories: bool,
+    pub focus_time: bool,
+    pub goals: bool,
+    pub interruptions: bool,
+}
+
+impl Default for LlmDataSharing {
+    fn default() -> Self {
+        Self {
+            total_time: true,
+            top_apps: true,
+            categories: true,
+            focus_time: true,
+            goals: true,
+            interruptions: true,
+        }
+    }
+}
+
+/// Default time range used when the AI assistant builds the screen-time context.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum AnalysisRange {
+    Today,
+    Yesterday,
+    Last7Days,
+    Last30Days,
+    ThisWeek,
+    LastWeek,
+    Custom,
+}
+
+impl Default for AnalysisRange {
+    fn default() -> Self {
+        Self::Today
+    }
+}
+
 /// A single LLM provider configuration.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
 pub struct LlmProvider {
     /// Human-readable name shown in the UI.
     pub name: String,
+    /// User-defined nickname for this provider. Falls back to `name` when empty.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nickname: Option<String>,
     /// OpenAI-compatible API base URL.
     pub base_url: String,
     /// Default model ID. Users can override per request.
@@ -30,6 +77,7 @@ impl Default for LlmProvider {
     fn default() -> Self {
         Self {
             name: "Custom".to_string(),
+            nickname: None,
             base_url: String::new(),
             model: String::new(),
             api_key: None,
@@ -43,6 +91,7 @@ impl LlmProvider {
     pub fn with_referral(name: &str, base_url: &str, model: &str, referral_url: &str) -> Self {
         Self {
             name: name.to_string(),
+            nickname: Some(name.to_string()),
             base_url: base_url.to_string(),
             model: model.to_string(),
             api_key: None,
@@ -54,6 +103,7 @@ impl LlmProvider {
     pub fn builtin(name: &str, base_url: &str, model: &str) -> Self {
         Self {
             name: name.to_string(),
+            nickname: Some(name.to_string()),
             base_url: base_url.to_string(),
             model: model.to_string(),
             api_key: None,
@@ -71,6 +121,10 @@ pub struct LlmConfig {
     pub active_provider_id: Option<ProviderId>,
     /// All configured providers, keyed by ID.
     pub providers: HashMap<ProviderId, LlmProvider>,
+    /// Which data the user allows the AI to see.
+    pub data_sharing: LlmDataSharing,
+    /// Default analysis range for new conversations.
+    pub default_range: AnalysisRange,
 }
 
 impl Default for LlmConfig {
@@ -109,6 +163,7 @@ impl Default for LlmConfig {
             "custom".to_string(),
             LlmProvider {
                 name: "Custom".to_string(),
+                nickname: Some("Custom".to_string()),
                 ..Default::default()
             },
         );
@@ -116,6 +171,8 @@ impl Default for LlmConfig {
         Self {
             active_provider_id: Some("orcarouter".to_string()),
             providers,
+            data_sharing: LlmDataSharing::default(),
+            default_range: AnalysisRange::default(),
         }
     }
 }

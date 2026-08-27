@@ -185,4 +185,6 @@ MIT © 2026 TimeLens Contributors
 
 ---
 
+LLM Supported by OrcaRouter！
+
 [![Powered by OrcaRouter](https://img.shields.io/badge/Powered_by-OrcaRouter-2563eb)](https://www.orcarouter.ai/ref/ref_2bd137bce0d730edcd93)
