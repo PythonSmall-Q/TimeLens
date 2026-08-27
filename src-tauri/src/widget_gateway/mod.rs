@@ -299,6 +299,70 @@ impl WidgetGateway {
                 db::set_bool_setting(&conn, "focus_mode_active", active).map_err(|e| e.to_string())?;
                 Ok(Value::Null)
             }
+            WidgetGatewayRequestType::TodoWrite => {
+                let action = request
+                    .payload
+                    .as_ref()
+                    .and_then(|p| p.get("action"))
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| "todo_write requires action".to_string())?;
+                match action {
+                    "add" => {
+                        let content = request
+                            .payload
+                            .as_ref()
+                            .and_then(|p| p.get("content"))
+                            .and_then(|v| v.as_str())
+                            .ok_or_else(|| "todo_write add requires content".to_string())?;
+                        let max_order = db::get_all_todos(&conn)
+                            .map_err(|e| e.to_string())?
+                            .into_iter()
+                            .map(|t| t.order_index)
+                            .max()
+                            .unwrap_or(0);
+                        let id = db::insert_todo(&conn, content, max_order + 1).map_err(|e| e.to_string())?;
+                        let todos = db::get_all_todos(&conn).map_err(|e| e.to_string())?;
+                        let item = todos.into_iter().find(|t| t.id == Some(id))
+                            .ok_or_else(|| "failed to retrieve created todo".to_string())?;
+                        Ok(serde_json::to_value(item).unwrap_or(Value::Null))
+                    }
+                    "toggle" => {
+                        let id = request
+                            .payload
+                            .as_ref()
+                            .and_then(|p| p.get("id"))
+                            .and_then(|v| v.as_i64())
+                            .ok_or_else(|| "todo_write toggle requires id".to_string())?;
+                        db::toggle_todo(&conn, id).map_err(|e| e.to_string())?;
+                        Ok(Value::Null)
+                    }
+                    "delete" => {
+                        let id = request
+                            .payload
+                            .as_ref()
+                            .and_then(|p| p.get("id"))
+                            .and_then(|v| v.as_i64())
+                            .ok_or_else(|| "todo_write delete requires id".to_string())?;
+                        db::delete_todo(&conn, id).map_err(|e| e.to_string())?;
+                        Ok(Value::Null)
+                    }
+                    "reorder" => {
+                        let ids = request
+                            .payload
+                            .as_ref()
+                            .and_then(|p| p.get("ids"))
+                            .and_then(|v| v.as_array())
+                            .ok_or_else(|| "todo_write reorder requires ids".to_string())?;
+                        for (index, id_value) in ids.iter().enumerate() {
+                            let id = id_value.as_i64()
+                                .ok_or_else(|| "todo_write reorder ids must be integers".to_string())?;
+                            db::reorder_todo(&conn, id, index as i64).map_err(|e| e.to_string())?;
+                        }
+                        Ok(Value::Null)
+                    }
+                    _ => Err(format!("unknown todo_write action: {}", action)),
+                }
+            }
             WidgetGatewayRequestType::NotificationSend => {
                 // Phase D: gate through native notification service.
                 Err("notification_send not yet implemented in gateway".to_string())

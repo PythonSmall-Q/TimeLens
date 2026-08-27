@@ -23,8 +23,10 @@ const VsCodeInsights = lazy(() => import("./pages/VsCodeInsights"));
 const DashboardInsights = lazy(() => import("./pages/DashboardInsights"));
 const InterruptionDetail = lazy(() => import("./pages/InterruptionDetail"));
 const WidgetDevHarness = lazy(() => import("./pages/WidgetDevHarness"));
+const LlmInsights = lazy(() => import("./pages/LlmInsights"));
 import { useStatsStore } from "./stores/statsStore";
 import { useSettingsStore } from "./stores/settingsStore";
+import { initLlmConfigWatcher } from "./stores/llmStore";
 import type { ActiveWindowInfo, AppLimit, GoalRiskAlert } from "./types";
 import * as api from "@/services/tauriApi";
 import { formatDuration } from "@/utils/format";
@@ -248,6 +250,9 @@ export default function MainApp() {
     fetchWeekly();
     fetchMonitorStatus();
 
+    // Initialize LLM config watcher (loads config and listens for TOML changes).
+    const llmWatcherPromise = initLlmConfigWatcher();
+
     // Refresh monitor state every 30 s, and refresh daily stats only when viewing today.
     const interval = setInterval(() => {
       fetchTodaySummary();
@@ -300,6 +305,7 @@ export default function MainApp() {
       unlistenMonitor.then((u) => u());
       unlistenDomainLimit.then((u) => u());
       unlistenGoalRisk.then((u) => u());
+      llmWatcherPromise.then((u) => u());
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [checkLimits, fetchMonitorStatus, fetchToday, fetchTodaySummary, periodMode, selectedDate]);
@@ -530,6 +536,7 @@ export default function MainApp() {
             <Route path="/browser" element={<BrowserUsage />} />
             <Route path="/interruptions/detail" element={<InterruptionDetail />} />
             <Route path="/widget-dev-harness" element={<WidgetDevHarness />} />
+            <Route path="/llm-insights" element={<LlmInsights />} />
           </Routes>
         </Suspense>
       </MainLayout>

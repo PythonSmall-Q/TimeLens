@@ -20,6 +20,12 @@
   "extensionBridgeDesc": "Local API and extension authentication",
   "aboutDesc": "Version, logs, and updates",
   "privacyCenterDesc": "Unified privacy and permission overview",
+  "aiAssistant": {
+    "title": "AI Assistant",
+    "description": "Large language model integration and insights",
+    "provider": "Provider",
+    "apiKey": "API key"
+  },
   "general": "General",
   "appearance": "Apariencia",
   "language": "Idioma",

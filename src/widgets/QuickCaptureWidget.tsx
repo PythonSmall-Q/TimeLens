@@ -3,8 +3,8 @@ import { useTranslation } from "react-i18next";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { emit } from "@tauri-apps/api/event";
 import { X, Check, StickyNote, ListTodo } from "lucide-react";
-import * as api from "@/services/tauriApi";
 import { useWidgetErrorReporter } from "@/hooks/useWidgetErrorReporter";
+import { useWidgetClient } from "@/hooks/useWidgetClient";
 import clsx from "clsx";
 
 interface Props {
@@ -24,6 +24,7 @@ function saveQuickCaptureNote(widgetId: string, text: string) {
 export default function QuickCaptureWidget({ widgetId }: Props) {
   const { t } = useTranslation(["widgets", "common"]);
   useWidgetErrorReporter(widgetId);
+  const client = useWidgetClient({ widgetId, widgetType: "quick-capture" });
   const [mode, setMode] = useState<CaptureMode>("todo");
   const [text, setText] = useState("");
   const [saved, setSaved] = useState(false);
@@ -42,7 +43,7 @@ export default function QuickCaptureWidget({ widgetId }: Props) {
     if (!content) return;
     try {
       if (mode === "todo") {
-        await api.addTodo(content);
+        await client.addTodo(content);
         window.dispatchEvent(new CustomEvent("timelens-todos-changed"));
         await emit("timelens-todos-changed", { source: widgetId });
       } else {
@@ -56,7 +57,7 @@ export default function QuickCaptureWidget({ widgetId }: Props) {
     } catch (err) {
       console.error(err);
     }
-  }, [mode, text, widgetId, flashSaved]);
+  }, [mode, text, widgetId, flashSaved, client]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {

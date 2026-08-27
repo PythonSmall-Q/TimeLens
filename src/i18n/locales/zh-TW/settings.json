@@ -20,6 +20,12 @@
   "extensionBridgeDesc": "本機 API 與擴充功能認證",
   "aboutDesc": "版本、紀錄與更新",
   "privacyCenterDesc": "隱私與權限統一概覽",
+  "aiAssistant": {
+    "title": "AI Assistant",
+    "description": "Large language model integration and insights",
+    "provider": "Provider",
+    "apiKey": "API key"
+  },
   "general": "通用",
   "appearance": "外觀",
   "language": "語言",

@@ -4,7 +4,7 @@ import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { X, Play, Square, Target, Zap, AlertCircle } from "lucide-react";
 import * as api from "@/services/tauriApi";
 import type { FocusSession } from "@/types";
-import { formatDuration, todayString } from "@/utils/format";
+import { formatDuration, todayString, localDateTimeString } from "@/utils/format";
 import { useWidgetErrorReporter } from "@/hooks/useWidgetErrorReporter";
 import { useWidgetClient } from "@/hooks/useWidgetClient";
 import clsx from "clsx";
@@ -110,7 +110,7 @@ export default function FocusCoachWidget({ widgetId }: Props) {
       } else {
         const reason = t("focusCoach.manualReason");
         const id = await api.startFocusSession(reason, "manual");
-        const startedAt = new Date().toISOString();
+        const startedAt = localDateTimeString();
         setActiveSession({
           id,
           started_at: startedAt,

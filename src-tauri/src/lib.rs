@@ -2,6 +2,7 @@ pub mod api_server;
 pub mod commands;
 pub mod db;
 pub mod db_encryption;
+pub mod llm;
 pub mod models;
 pub mod monitor;
 pub mod widget_gateway;
@@ -1046,6 +1047,17 @@ pub fn run() {
                 });
             }
 
+            // ── LLM config watcher ────────────────────────────
+            {
+                let llm_path = crate::llm::config_path(app.handle())?;
+                if !llm_path.exists() {
+                    if let Err(e) = crate::llm::save_config(&llm_path, &crate::llm::LlmConfig::default()) {
+                        log::warn!("Failed to create default LLM config: {}", e);
+                    }
+                }
+                crate::llm::spawn_config_watcher(app.handle().clone());
+            }
+
             // ── System tray ───────────────────────────────────
             let tray_icon_style = {
                 let db_state = app.state::<DbState>();
@@ -1237,6 +1249,10 @@ pub fn run() {
             // Widget runtime v2.2.0
             commands::widget_query,
             commands::widget_subscribe,
+            // LLM integration
+            commands::get_llm_config,
+            commands::set_llm_config,
+            commands::get_llm_config_path,
             commands::widget_unsubscribe,
             commands::get_widget_state,
             commands::set_widget_state,

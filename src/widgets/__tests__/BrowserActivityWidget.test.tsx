@@ -9,8 +9,11 @@ describe("BrowserActivityWidget", () => {
   });
 
   it("renders disconnected state", async () => {
-    mockTauriApi.getBrowserDomainStats.mockResolvedValue([]);
-    mockTauriApi.getBrowserExtensionStatus.mockResolvedValue({ connected: false });
+    mockTauriApi.widgetGatewayRequest.mockResolvedValue({
+      request_id: "r1",
+      status: "success",
+      payload: { domains: [], status: { connected: false } },
+    });
     renderWithProviders(<BrowserActivityWidget widgetId="browser-test" />);
 
     expect(screen.getByText("Browser Activity")).toBeInTheDocument();
@@ -23,10 +26,14 @@ describe("BrowserActivityWidget", () => {
   });
 
   it("renders connected state with domains", async () => {
-    mockTauriApi.getBrowserDomainStats.mockResolvedValue([
-      { host: "example.com", total_seconds: 300, visit_count: 5 },
-    ]);
-    mockTauriApi.getBrowserExtensionStatus.mockResolvedValue({ connected: true, last_browser_name: "Chrome" });
+    mockTauriApi.widgetGatewayRequest.mockResolvedValue({
+      request_id: "r1",
+      status: "success",
+      payload: {
+        domains: [{ host: "example.com", total_seconds: 300, visit_count: 5 }],
+        status: { connected: true, last_browser_name: "Chrome" },
+      },
+    });
     renderWithProviders(<BrowserActivityWidget widgetId="browser-test" />);
 
     await waitFor(() => {

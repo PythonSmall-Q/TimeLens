@@ -26,8 +26,12 @@ describe("QuickCaptureWidget", () => {
     });
   });
 
-  it("adds a quick todo", async () => {
-    mockTauriApi.addTodo.mockResolvedValue({ id: 1, content: "Quick task", done: false });
+  it("adds a quick todo through gateway", async () => {
+    mockTauriApi.widgetGatewayRequest.mockResolvedValue({
+      request_id: "r1",
+      status: "success",
+      payload: { id: 1, content: "Quick task", done: false },
+    });
     renderWithProviders(<QuickCaptureWidget widgetId="capture-test" />);
 
     const textarea = screen.getByPlaceholderText("Add a quick task…");
@@ -35,7 +39,14 @@ describe("QuickCaptureWidget", () => {
     await userEvent.click(screen.getByRole("button", { name: "Add todo" }));
 
     await waitFor(() => {
-      expect(mockTauriApi.addTodo).toHaveBeenCalledWith("Quick task");
+      expect(mockTauriApi.widgetGatewayRequest).toHaveBeenCalled();
+    });
+    const request = mockTauriApi.widgetGatewayRequest.mock.calls.find(
+      (call) => call[0].request_type === "todo_write"
+    )?.[0];
+    expect(request).toMatchObject({
+      scope: "todo:write",
+      payload: { action: "add", content: "Quick task" },
     });
   });
 });

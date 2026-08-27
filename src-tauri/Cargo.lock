@@ -4799,6 +4799,7 @@ dependencies = [
  "tauri-plugin-updater",
  "tokio",
  "tokio-tungstenite 0.21.0",
+ "toml 0.8.2",
  "tower-http 0.5.2",
  "uuid",
  "windows 0.58.0",

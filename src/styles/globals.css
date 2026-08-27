@@ -290,6 +290,30 @@ body {
   background: var(--surface-card);
 }
 
+/* ── Buttons ───────────────────────────────────────────────── */
+.btn-primary {
+  @apply inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium;
+  background: linear-gradient(135deg, #6c8ebf, #8b6cbf);
+  color: white;
+  box-shadow: 0 4px 14px rgba(108, 142, 191, 0.35);
+  transition: transform 160ms ease, box-shadow 200ms ease, filter 200ms ease;
+}
+
+.btn-primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(108, 142, 191, 0.48);
+  filter: brightness(1.06);
+}
+
+.btn-primary:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 /* ── Widget window chrome ──────────────────────────────────── */
 .widget-root {
   background: transparent;

@@ -11,6 +11,7 @@ import enCategories from "./locales/en/categories.json";
 import enGoals from "./locales/en/goals.json";
 import enFocus from "./locales/en/focus.json";
 import enBrowserUsage from "./locales/en/browserUsage.json";
+import enLlm from "./locales/en/llm.json";
 
 // ZH-CN
 import zhCommon from "./locales/zh-CN/common.json";
@@ -22,6 +23,7 @@ import zhCategories from "./locales/zh-CN/categories.json";
 import zhGoals from "./locales/zh-CN/goals.json";
 import zhFocus from "./locales/zh-CN/focus.json";
 import zhBrowserUsage from "./locales/zh-CN/browserUsage.json";
+import zhLlm from "./locales/zh-CN/llm.json";
 
 // ZH-TW
 import zhTWCommon from "./locales/zh-TW/common.json";
@@ -33,6 +35,7 @@ import zhTWCategories from "./locales/zh-TW/categories.json";
 import zhTWGoals from "./locales/zh-TW/goals.json";
 import zhTWFocus from "./locales/zh-TW/focus.json";
 import zhTWBrowserUsage from "./locales/zh-TW/browserUsage.json";
+import zhTWLlm from "./locales/zh-TW/llm.json";
 
 // JA
 import jaCommon from "./locales/ja/common.json";
@@ -44,6 +47,7 @@ import jaCategories from "./locales/ja/categories.json";
 import jaGoals from "./locales/ja/goals.json";
 import jaFocus from "./locales/ja/focus.json";
 import jaBrowserUsage from "./locales/ja/browserUsage.json";
+import jaLlm from "./locales/ja/llm.json";
 
 // KO
 import koCommon from "./locales/ko/common.json";
@@ -55,6 +59,7 @@ import koCategories from "./locales/ko/categories.json";
 import koGoals from "./locales/ko/goals.json";
 import koFocus from "./locales/ko/focus.json";
 import koBrowserUsage from "./locales/ko/browserUsage.json";
+import koLlm from "./locales/ko/llm.json";
 
 // FR
 import frCommon from "./locales/fr/common.json";
@@ -66,6 +71,7 @@ import frCategories from "./locales/fr/categories.json";
 import frGoals from "./locales/fr/goals.json";
 import frFocus from "./locales/fr/focus.json";
 import frBrowserUsage from "./locales/fr/browserUsage.json";
+import frLlm from "./locales/fr/llm.json";
 
 // DE
 import deCommon from "./locales/de/common.json";
@@ -77,6 +83,7 @@ import deCategories from "./locales/de/categories.json";
 import deGoals from "./locales/de/goals.json";
 import deFocus from "./locales/de/focus.json";
 import deBrowserUsage from "./locales/de/browserUsage.json";
+import deLlm from "./locales/de/llm.json";
 
 // ES
 import esCommon from "./locales/es/common.json";
@@ -88,6 +95,7 @@ import esCategories from "./locales/es/categories.json";
 import esGoals from "./locales/es/goals.json";
 import esFocus from "./locales/es/focus.json";
 import esBrowserUsage from "./locales/es/browserUsage.json";
+import esLlm from "./locales/es/llm.json";
 
 /**
  * To add a new language:
@@ -148,6 +156,7 @@ i18n
         goals: enGoals,
         focus: enFocus,
         browserUsage: enBrowserUsage,
+        llm: enLlm,
       },
       "zh-CN": {
         common: zhCommon,
@@ -159,6 +168,7 @@ i18n
         goals: zhGoals,
         focus: zhFocus,
         browserUsage: zhBrowserUsage,
+        llm: zhLlm,
       },
       "zh-TW": {
         common: zhTWCommon,
@@ -170,6 +180,7 @@ i18n
         goals: zhTWGoals,
         focus: zhTWFocus,
         browserUsage: zhTWBrowserUsage,
+        llm: zhTWLlm,
       },
       ja: {
         common: jaCommon,
@@ -181,6 +192,7 @@ i18n
         goals: jaGoals,
         focus: jaFocus,
         browserUsage: jaBrowserUsage,
+        llm: jaLlm,
       },
       ko: {
         common: koCommon,
@@ -192,6 +204,7 @@ i18n
         goals: koGoals,
         focus: koFocus,
         browserUsage: koBrowserUsage,
+        llm: koLlm,
       },
       fr: {
         common: frCommon,
@@ -203,6 +216,7 @@ i18n
         goals: frGoals,
         focus: frFocus,
         browserUsage: frBrowserUsage,
+        llm: frLlm,
       },
       de: {
         common: deCommon,
@@ -214,6 +228,7 @@ i18n
         goals: deGoals,
         focus: deFocus,
         browserUsage: deBrowserUsage,
+        llm: deLlm,
       },
       es: {
         common: esCommon,
@@ -225,12 +240,13 @@ i18n
         goals: esGoals,
         focus: esFocus,
         browserUsage: esBrowserUsage,
+        llm: esLlm,
       },
     },
     lng: resolveInitialLanguage(),
     fallbackLng: "en",
     defaultNS: "common",
-    ns: ["common", "dashboard", "widgets", "settings", "limits"],
+    ns: ["common", "dashboard", "widgets", "settings", "limits", "llm"],
     interpolation: {
       escapeValue: false,
     },

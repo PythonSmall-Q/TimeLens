@@ -19,6 +19,12 @@ function mockTodoResponses(todos: unknown[] = [], goals: unknown[] = [], progres
     if (request.scope === "goals") {
       return successResponse({ goals, progress });
     }
+    if (request.request_type === "todo_write" && request.payload?.action === "add") {
+      return successResponse({ id: 3, content: request.payload.content, done: false });
+    }
+    if (request.request_type === "todo_write") {
+      return successResponse(null);
+    }
     return successResponse(null);
   });
 }
@@ -56,9 +62,8 @@ describe("TodoWidget", () => {
     expect(screen.getByText("1 remaining")).toBeInTheDocument();
   });
 
-  it("adds a new todo through the input", async () => {
+  it("adds a new todo through the gateway", async () => {
     mockTodoResponses([], [], []);
-    mockTauriApi.addTodo.mockResolvedValue({ id: 3, content: "New task", done: false });
 
     renderWithProviders(<TodoWidget widgetId="todo-test" />);
     await waitFor(() => {
@@ -70,7 +75,13 @@ describe("TodoWidget", () => {
     await userEvent.click(screen.getByRole("button", { name: "Add todo" }));
 
     await waitFor(() => {
-      expect(mockTauriApi.addTodo).toHaveBeenCalledWith("New task");
+      const request = mockTauriApi.widgetGatewayRequest.mock.calls.find(
+        (call) => call[0].request_type === "todo_write" && call[0].payload?.action === "add"
+      )?.[0];
+      expect(request).toMatchObject({
+        scope: "todo:write",
+        payload: { action: "add", content: "New task" },
+      });
     });
     await waitFor(() => {
       expect(screen.getByText("New task")).toBeInTheDocument();
@@ -79,7 +90,6 @@ describe("TodoWidget", () => {
 
   it("toggles a todo when checkbox is clicked", async () => {
     mockTodoResponses([{ id: 1, content: "Task", done: false }], [], []);
-    mockTauriApi.toggleTodo.mockResolvedValue(undefined);
 
     renderWithProviders(<TodoWidget widgetId="todo-test" />);
     await waitFor(() => {
@@ -90,13 +100,18 @@ describe("TodoWidget", () => {
     await userEvent.click(checkbox);
 
     await waitFor(() => {
-      expect(mockTauriApi.toggleTodo).toHaveBeenCalledWith(1);
+      const request = mockTauriApi.widgetGatewayRequest.mock.calls.find(
+        (call) => call[0].request_type === "todo_write" && call[0].payload?.action === "toggle"
+      )?.[0];
+      expect(request).toMatchObject({
+        scope: "todo:write",
+        payload: { action: "toggle", id: 1 },
+      });
     });
   });
 
   it("deletes a todo when trash button is clicked", async () => {
     mockTodoResponses([{ id: 1, content: "Task", done: false }], [], []);
-    mockTauriApi.deleteTodo.mockResolvedValue(undefined);
 
     renderWithProviders(<TodoWidget widgetId="todo-test" />);
     await waitFor(() => {
@@ -107,13 +122,18 @@ describe("TodoWidget", () => {
     await userEvent.click(deleteButton);
 
     await waitFor(() => {
-      expect(mockTauriApi.deleteTodo).toHaveBeenCalledWith(1);
+      const request = mockTauriApi.widgetGatewayRequest.mock.calls.find(
+        (call) => call[0].request_type === "todo_write" && call[0].payload?.action === "delete"
+      )?.[0];
+      expect(request).toMatchObject({
+        scope: "todo:write",
+        payload: { action: "delete", id: 1 },
+      });
     });
   });
 
   it("shows clear-completed button when a todo is done", async () => {
     mockTodoResponses([{ id: 1, content: "Task", done: true }], [], []);
-    mockTauriApi.deleteTodo.mockResolvedValue(undefined);
 
     renderWithProviders(<TodoWidget widgetId="todo-test" />);
     await waitFor(() => {
@@ -122,7 +142,13 @@ describe("TodoWidget", () => {
 
     await userEvent.click(screen.getByText("Clear completed"));
     await waitFor(() => {
-      expect(mockTauriApi.deleteTodo).toHaveBeenCalledWith(1);
+      const request = mockTauriApi.widgetGatewayRequest.mock.calls.find(
+        (call) => call[0].request_type === "todo_write" && call[0].payload?.action === "delete"
+      )?.[0];
+      expect(request).toMatchObject({
+        scope: "todo:write",
+        payload: { action: "delete", id: 1 },
+      });
     });
   });
 });

@@ -29,6 +29,17 @@ export function todayString(): string {
   return `${y}-${m}-${day}`;
 }
 
+/** Returns the current local datetime as YYYY-MM-DDTHH:MM:SS */
+export function localDateTimeString(date = new Date()): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  const h = String(date.getHours()).padStart(2, "0");
+  const min = String(date.getMinutes()).padStart(2, "0");
+  const s = String(date.getSeconds()).padStart(2, "0");
+  return `${y}-${m}-${d}T${h}:${min}:${s}`;
+}
+
 /** Returns the date N days ago as YYYY-MM-DD (local timezone) */
 export function daysAgo(n: number): string {
   const d = new Date();

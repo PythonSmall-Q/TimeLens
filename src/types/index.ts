@@ -198,7 +198,8 @@ export type WidgetQueryNamespace =
   | "goals"
   | "rules"
   | "focus"
-  | "todos";
+  | "todos"
+  | "browser";
 
 export interface WidgetQueryRequest {
   widget_id: string;
@@ -240,6 +241,7 @@ export type WidgetGatewayRequestType =
   | "local_api_call"
   | "notification_send"
   | "focus_mode_write"
+  | "todo_write"
   | "runtime_info";
 
 export interface WidgetGatewayRequest {

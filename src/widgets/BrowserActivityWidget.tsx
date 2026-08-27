@@ -2,17 +2,20 @@ import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { X, Globe, Wifi, WifiOff } from "lucide-react";
-import * as api from "@/services/tauriApi";
 import type { BrowserDomainStats, BrowserExtensionStatus } from "@/types";
 import { formatDuration, todayString } from "@/utils/format";
+import { useWidgetClient } from "@/hooks/useWidgetClient";
+import { useWidgetErrorReporter } from "@/hooks/useWidgetErrorReporter";
 import clsx from "clsx";
 
 interface Props {
   widgetId: string;
 }
 
-export default function BrowserActivityWidget({ widgetId: _widgetId }: Props) {
+export default function BrowserActivityWidget({ widgetId }: Props) {
   const { t } = useTranslation(["widgets", "common"]);
+  useWidgetErrorReporter(widgetId);
+  const client = useWidgetClient({ widgetId, widgetType: "browser-activity" });
   const today = todayString();
   const [domains, setDomains] = useState<BrowserDomainStats[]>([]);
   const [status, setStatus] = useState<BrowserExtensionStatus | null>(null);
@@ -20,10 +23,7 @@ export default function BrowserActivityWidget({ widgetId: _widgetId }: Props) {
   useEffect(() => {
     const load = async () => {
       try {
-        const [d, s] = await Promise.all([
-          api.getBrowserDomainStats(today, today),
-          api.getBrowserExtensionStatus(),
-        ]);
+        const { domains: d, status: s } = await client.getBrowserActivity(today, today);
         setDomains(d.slice(0, 8));
         setStatus(s);
       } catch {
@@ -33,7 +33,7 @@ export default function BrowserActivityWidget({ widgetId: _widgetId }: Props) {
     void load();
     const timer = setInterval(() => void load(), 30000);
     return () => clearInterval(timer);
-  }, [today]);
+  }, [today, client]);
 
   const connected = status?.connected ?? false;
 

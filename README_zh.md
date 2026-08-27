@@ -179,3 +179,7 @@ TimeLens/
 ## 📄 许可证
 
 MIT © 2026 TimeLens Contributors
+
+---
+
+[![Powered by OrcaRouter](https://img.shields.io/badge/Powered_by-OrcaRouter-2563eb)](https://www.orcarouter.ai/ref/ref_2bd137bce0d730edcd93)

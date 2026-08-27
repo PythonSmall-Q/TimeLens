@@ -1,6 +1,9 @@
 import { type UnlistenFn } from "@tauri-apps/api/event";
 import * as api from "@/services/tauriApi";
 import type {
+  BrowserDomainStats,
+  BrowserExtensionStatus,
+  TodoItem,
   WidgetGatewayRequest,
   WidgetGatewayRequestType,
   WidgetGatewayResponse,
@@ -150,6 +153,56 @@ export class WidgetClient {
     if (response.status !== "success") {
       throw new WidgetGatewayError(response.error ?? { code: "unknown", message: "deleteState failed" });
     }
+  }
+
+  async addTodo(content: string): Promise<TodoItem> {
+    const response = await this.gatewayRequest(
+      this.makeRequest("todo_write", "todo:write", { action: "add", content }),
+    );
+    if (response.status === "success") {
+      return response.payload as TodoItem;
+    }
+    throw new WidgetGatewayError(response.error ?? { code: "unknown", message: "addTodo failed" });
+  }
+
+  async toggleTodo(id: number): Promise<void> {
+    const response = await this.gatewayRequest(
+      this.makeRequest("todo_write", "todo:write", { action: "toggle", id }),
+    );
+    if (response.status !== "success") {
+      throw new WidgetGatewayError(response.error ?? { code: "unknown", message: "toggleTodo failed" });
+    }
+  }
+
+  async deleteTodo(id: number): Promise<void> {
+    const response = await this.gatewayRequest(
+      this.makeRequest("todo_write", "todo:write", { action: "delete", id }),
+    );
+    if (response.status !== "success") {
+      throw new WidgetGatewayError(response.error ?? { code: "unknown", message: "deleteTodo failed" });
+    }
+  }
+
+  async reorderTodos(ids: number[]): Promise<void> {
+    const response = await this.gatewayRequest(
+      this.makeRequest("todo_write", "todo:write", { action: "reorder", ids }),
+    );
+    if (response.status !== "success") {
+      throw new WidgetGatewayError(response.error ?? { code: "unknown", message: "reorderTodos failed" });
+    }
+  }
+
+  async getBrowserActivity(start?: string, end?: string): Promise<{
+    domains: BrowserDomainStats[];
+    status: BrowserExtensionStatus;
+  }> {
+    const response = await this.gatewayRequest(
+      this.makeRequest("query", "browser", { start, end }),
+    );
+    if (response.status === "success") {
+      return response.payload as { domains: BrowserDomainStats[]; status: BrowserExtensionStatus };
+    }
+    throw new WidgetGatewayError(response.error ?? { code: "unknown", message: "getBrowserActivity failed" });
   }
 
   async subscribe(event: string, callback: (payload: unknown) => void): Promise<number> {

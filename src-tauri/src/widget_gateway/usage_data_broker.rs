@@ -3,7 +3,7 @@ use rusqlite::Connection;
 use serde_json::Value;
 
 use crate::db;
-use crate::models::{AppUsageSummary, CategoryUsageSummary, FocusSession, GoalProgress, UsageGoal};
+use crate::models::{AppUsageSummary, BrowserDomainStats, CategoryUsageSummary, FocusSession, GoalProgress, UsageGoal};
 
 fn today() -> String {
     Local::now().format("%Y-%m-%d").to_string()
@@ -148,6 +148,47 @@ fn query_todos(conn: &Connection, _payload: &Option<Value>) -> Result<Value, Str
     Ok(serde_json::to_value(todos).unwrap_or(Value::Array(vec![])))
 }
 
+#[derive(serde::Serialize)]
+struct BrowserQueryResult {
+    domains: Vec<BrowserDomainStats>,
+    status: crate::models::BrowserExtensionStatus,
+}
+
+fn query_browser(conn: &Connection, payload: &Option<Value>) -> Result<Value, String> {
+    let today_str = today();
+    let start = payload
+        .as_ref()
+        .and_then(|p| p.get("start"))
+        .and_then(|v| v.as_str())
+        .unwrap_or(&today_str);
+    let end = payload
+        .as_ref()
+        .and_then(|p| p.get("end"))
+        .and_then(|v| v.as_str())
+        .unwrap_or(start);
+
+    let domains = db::get_browser_domain_stats(conn, start, end).map_err(|e| e.to_string())?;
+    let enabled = db::get_bool_setting(conn, "browser_extension_enabled", true).unwrap_or(true);
+    let last_sync_at = db::get_setting(conn, "browser_extension_last_sync_at").ok().flatten();
+    let last_browser_name = db::get_setting(conn, "browser_extension_last_browser_name").ok().flatten();
+    let last_locale = db::get_setting(conn, "browser_extension_last_locale").ok().flatten();
+    let recent_sessions = db::get_recent_browser_sessions(conn, 6).unwrap_or_default();
+    let recent_session_count = db::count_browser_sessions(conn).unwrap_or(0);
+
+    let status = crate::models::BrowserExtensionStatus {
+        enabled,
+        api_base_url: crate::api_server::local_api_base_url(),
+        connected: last_sync_at.is_some(),
+        last_sync_at,
+        last_browser_name,
+        last_locale,
+        recent_session_count,
+        recent_sessions,
+    };
+
+    Ok(serde_json::to_value(BrowserQueryResult { domains, status }).unwrap_or(Value::Null))
+}
+
 pub fn handle_query(
     conn: &Connection,
     namespace: &str,
@@ -163,6 +204,7 @@ pub fn handle_query(
         "rules" => query_rules(conn, payload),
         "focus" => query_focus(conn, payload),
         "todos" => query_todos(conn, payload),
+        "browser" => query_browser(conn, payload),
         _ => Err(format!("unknown widget query namespace: {}", namespace)),
     }
 }

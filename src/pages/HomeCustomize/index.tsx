@@ -50,7 +50,7 @@ export default function HomeCustomize() {
           </button>
           <button
             onClick={() => navigate("/dashboard")}
-            className="ui-btn-primary !text-xs !px-3 !py-2"
+            className="btn-primary !text-xs !px-3 !py-2"
           >
             {t("dashboard:backToDashboard")}
           </button>

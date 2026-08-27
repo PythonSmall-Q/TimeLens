@@ -20,6 +20,12 @@
   "extensionBridgeDesc": "本地 API 与扩展认证",
   "aboutDesc": "版本、日志与更新",
   "privacyCenterDesc": "隐私与权限统一概览",
+  "aiAssistant": {
+    "title": "AI 助手",
+    "description": "大语言模型集成与洞察分析",
+    "provider": "提供商",
+    "apiKey": "API 密钥"
+  },
   "general": "通用",
   "appearance": "外观",
   "language": "语言",

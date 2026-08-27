@@ -10,6 +10,7 @@ pub fn required_scope(request: &WidgetGatewayRequest) -> Option<&'static str> {
             "metrics" | "sessions" | "categories" | "projects" | "tags" | "goals" | "rules"
             | "focus" => Some("screen-time:read"),
             "todos" => Some("todo:read"),
+            "browser" => Some("browser:read"),
             _ => None,
         },
         WidgetGatewayRequestType::Subscribe | WidgetGatewayRequestType::Unsubscribe => None,
@@ -18,6 +19,7 @@ pub fn required_scope(request: &WidgetGatewayRequest) -> Option<&'static str> {
         | WidgetGatewayRequestType::StateDelete => None,
         WidgetGatewayRequestType::LocalApiCall => Some("local-api:call"),
         WidgetGatewayRequestType::FocusModeWrite => Some("settings:write"),
+        WidgetGatewayRequestType::TodoWrite => Some("todo:write"),
         WidgetGatewayRequestType::NotificationSend => Some("notification:send"),
         WidgetGatewayRequestType::NetworkFetch | WidgetGatewayRequestType::MediaLoad => {
             // v4 scopes are used directly for network/media.
@@ -39,6 +41,7 @@ pub fn namespace_display(namespace: &str) -> String {
         "rules" => "focus rules".to_string(),
         "focus" => "focus state".to_string(),
         "todos" => "todo list".to_string(),
+        "browser" => "browser activity".to_string(),
         _ => namespace.to_string(),
     }
 }

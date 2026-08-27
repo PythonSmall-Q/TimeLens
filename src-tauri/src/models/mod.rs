@@ -496,6 +496,7 @@ pub enum WidgetGatewayRequestType {
     LocalApiCall,
     NotificationSend,
     FocusModeWrite,
+    TodoWrite,
     RuntimeInfo,
 }
 

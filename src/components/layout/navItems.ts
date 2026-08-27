@@ -9,6 +9,7 @@ import {
   Globe,
   Code2,
   Sparkles,
+  Bot,
 } from "lucide-react";
 
 export const NAV_ITEMS = [
@@ -21,5 +22,6 @@ export const NAV_ITEMS = [
   { to: "/categories", icon: Tag, labelKey: "categories:title" },
   { to: "/goals", icon: Target, labelKey: "goals:title" },
   { to: "/focus", icon: Focus, labelKey: "focus:title" },
+  { to: "/llm-insights", icon: Bot, labelKey: "llm:navTitle" },
   { to: "/settings", icon: Settings, labelKey: "settings:title" },
 ] as const;

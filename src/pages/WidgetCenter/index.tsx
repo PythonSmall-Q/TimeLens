@@ -906,9 +906,9 @@ export default function WidgetCenter() {
 
       {/* ── Add Widget tab — split columns ── */}
       {tab === "selfAdd" && (
-        <div className="flex-1 min-h-0 flex gap-1">
+        <div className="flex-1 min-h-0 flex gap-5">
           {/* Left column: official */}
-          <div className="flex-1 min-w-0 h-full overflow-y-auto px-2 py-1">
+          <div className="flex-1 min-w-0 h-full overflow-y-auto overflow-x-hidden py-1 pr-1">
             <div className="space-y-5">
               {GROUP_ORDER.map((group) => {
                 const groupEntries = officialEntriesByGroup[group];
@@ -926,11 +926,8 @@ export default function WidgetCenter() {
             </div>
           </div>
 
-          {/* Subtle divider */}
-          <div className="w-px h-full bg-surface-border/60 flex-shrink-0" />
-
           {/* Right column: third-party */}
-          <div className="flex-1 min-w-0 h-full overflow-y-auto px-2 py-1">
+          <div className="flex-1 min-w-0 h-full overflow-y-auto overflow-x-hidden py-1 pl-1">
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <p className="text-xs font-semibold text-text-secondary uppercase tracking-wider">

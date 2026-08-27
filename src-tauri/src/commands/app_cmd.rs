@@ -115,11 +115,17 @@ fn default_shortcuts() -> ShortcutSettings {
 }
 
 #[tauri::command]
-pub fn get_app_settings(db: State<DbState>) -> Result<AppSettingsPayload, String> {
+pub fn get_app_settings(app: AppHandle, db: State<DbState>) -> Result<AppSettingsPayload, String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
 
-    let launch_at_startup =
-        crate::db::get_bool_setting(&conn, "launch_at_startup", false).unwrap_or(false);
+    // Use the actual OS autostart state as the source of truth so the UI stays
+    // in sync even if the local DB is reset (e.g. after a reinstall).
+    let os_autostart_enabled = app.autolaunch().is_enabled().unwrap_or(false);
+    let db_autostart = crate::db::get_bool_setting(&conn, "launch_at_startup", false).unwrap_or(false);
+    let launch_at_startup = os_autostart_enabled || db_autostart;
+    if os_autostart_enabled != db_autostart {
+        let _ = crate::db::set_bool_setting(&conn, "launch_at_startup", os_autostart_enabled);
+    }
     let silent_startup =
         crate::db::get_bool_setting(&conn, "silent_startup", true).map_err(|e| e.to_string())?;
     let auto_open_widgets =

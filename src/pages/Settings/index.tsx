@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSettingsStore } from "@/stores/settingsStore";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
-import { Moon, Sun, Activity, Database, Info, Rocket, Keyboard, PanelsTopLeft, ArrowLeft, Search, Lock, Copy, RotateCw, User, Shield, Droplet } from "lucide-react";
+import { Moon, Sun, Activity, Database, Info, Rocket, Keyboard, PanelsTopLeft, ArrowLeft, Search, Lock, Copy, RotateCw, User, Shield, Droplet, Sparkles } from "lucide-react";
 import clsx from "clsx";
 import * as api from "@/services/tauriApi";
 import { APP_VERSION } from "../../version";
@@ -33,6 +33,7 @@ import type {
 } from "@/types";
 import ExePickerInput from "@/components/ExePickerInput";
 import BackupSection from "./BackupSection";
+import LlmSettings from "./LlmSettings";
 
 import SettingsCard from "./SettingsCard";
 
@@ -81,6 +82,7 @@ export default function Settings() {
     | "encryption"
     | "transparency"
     | "extensionBridge"
+    | "aiAssistant"
     | "about"
     | null
   >(null);
@@ -757,6 +759,7 @@ export default function Settings() {
     { key: "encryption", title: t("encryption.title"), description: t("encryptionDesc"), icon: Shield, keywords: [t("encryption.status"), t("encryption.enable")] },
     { key: "transparency", title: t("transparency.title"), description: t("transparencyDesc"), icon: Info, keywords: [t("transparency.active"), t("transparency.fields")] },
     { key: "extensionBridge", title: t("extensionBridge.title"), description: t("extensionBridgeDesc"), icon: Lock, keywords: [t("extensionBridge.key"), "bridge", "extension"] },
+    { key: "aiAssistant", title: t("aiAssistant.title"), description: t("aiAssistant.description"), icon: Sparkles, keywords: [t("aiAssistant.provider"), t("aiAssistant.apiKey"), "llm", "ai"] },
     { key: "about", title: t("about.title"), description: t("aboutDesc"), icon: Info, keywords: [t("about.version"), "github"] },
   ];
   const settingSearchLower = settingSearch.trim().toLowerCase();
@@ -2331,6 +2334,13 @@ export default function Settings() {
             <p className="text-xs text-accent-blue">{apiGovernanceMessage}</p>
           )}
         </div>
+      </SettingsCard>
+      )}
+
+      {/* AI Assistant */}
+      {activeSection === "aiAssistant" && (
+      <SettingsCard icon={Sparkles} title={t("aiAssistant.title")} description={t("aiAssistant.description")}>
+        <LlmSettings />
       </SettingsCard>
       )}
 

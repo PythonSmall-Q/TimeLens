@@ -20,7 +20,6 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { X, Plus, GripVertical, Trash2, Target, Droplet } from "lucide-react";
-import * as api from "@/services/tauriApi";
 import type { GoalProgress, TodoItem, UsageGoal } from "@/types";
 import { formatDuration } from "@/utils/format";
 import { useWidgetErrorReporter } from "@/hooks/useWidgetErrorReporter";
@@ -236,7 +235,7 @@ export default function TodoWidget({ widgetId }: Props) {
     if (!content) return;
     const goal = goals.find((g) => goalKey(g) === selectedGoalKey);
     const finalContent = goal ? buildGoalLink(goal, content) : content;
-    const item = await api.addTodo(finalContent);
+    const item = await client.addTodo(finalContent);
     setTodos((prev) => [...prev, item]);
     setInput("");
     setSelectedGoalKey("");
@@ -244,14 +243,14 @@ export default function TodoWidget({ widgetId }: Props) {
   };
 
   const handleToggle = async (id: number) => {
-    await api.toggleTodo(id);
+    await client.toggleTodo(id);
     setTodos((prev) =>
       prev.map((t) => (t.id === id ? { ...t, done: !t.done } : t))
     );
   };
 
   const handleDelete = async (id: number) => {
-    await api.deleteTodo(id);
+    await client.deleteTodo(id);
     setTodos((prev) => prev.filter((t) => t.id !== id));
   };
 
@@ -262,12 +261,12 @@ export default function TodoWidget({ widgetId }: Props) {
     const newIndex = todos.findIndex((t) => t.id === over.id);
     const reordered = arrayMove(todos, oldIndex, newIndex);
     setTodos(reordered);
-    await api.reorderTodos(reordered.map((t) => t.id));
+    await client.reorderTodos(reordered.map((t) => t.id));
   };
 
   const clearCompleted = async () => {
     const completed = todos.filter((t) => t.done);
-    await Promise.all(completed.map((t) => api.deleteTodo(t.id)));
+    await Promise.all(completed.map((t) => client.deleteTodo(t.id)));
     setTodos((prev) => prev.filter((t) => !t.done));
   };
 
