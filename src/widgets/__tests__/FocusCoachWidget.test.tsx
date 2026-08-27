@@ -21,7 +21,6 @@ describe("FocusCoachWidget", () => {
   });
 
   it("starts a focus session when clicking start", async () => {
-    const today = new Date().toISOString().slice(0, 10);
     mockTauriApi.widgetGatewayRequest.mockResolvedValue(successResponse([]));
     mockTauriApi.startFocusSession.mockResolvedValue(42);
     renderWithProviders(<FocusCoachWidget widgetId="focus-test" />);

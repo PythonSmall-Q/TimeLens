@@ -32,7 +32,7 @@ describe("QuickCaptureWidget", () => {
 
     const textarea = screen.getByPlaceholderText("Add a quick task…");
     await userEvent.type(textarea, "Quick task");
-    await userEvent.click(screen.getByRole("button", { name: "Add Todo" }));
+    await userEvent.click(screen.getByRole("button", { name: "Add todo" }));
 
     await waitFor(() => {
       expect(mockTauriApi.addTodo).toHaveBeenCalledWith("Quick task");

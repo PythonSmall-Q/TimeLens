@@ -697,13 +697,14 @@ After this plan is reviewed, the next artifact should be a narrow RFC that freez
 | 后端默认权限 | `src-tauri/src/commands/widget_cmd.rs`、`src-tauri/src/widget_registry.rs` | 创建官方组件时按 capability 自动授予默认权限 |
 | Gateway query | `src-tauri/src/widget_gateway/usage_data_broker.rs`、capability_resolver | 新增 `focus` namespace，返回 `active` + `active_session` |
 | SDK 测试 | `src/widgets/sdk/__tests__/WidgetClient.test.ts` | mock gateway 覆盖 query/state/subscribe/consent retry |
+| 官方组件全量测试 | `src/widgets/__tests__/*.test.tsx` | 覆盖 Clock/Todo/Note/Status/GoalProgress/SessionPulse/FocusCoach/Pet/QuickCapture/Timer/BrowserActivity |
 | 权限治理 UX | `src/pages/WidgetCenter/index.tsx` | 权限矩阵支持单个权限撤销，保留「撤销全部」入口 |
 
 ### 验证结果
 
 - `npm run typecheck` ✅
 - `npm run lint` ✅（0 errors，8 pre-existing warnings）
-- `npm run test` ✅（22/22，含 11 个新增 WidgetClient 测试）
+- `npm run test` ✅（56/56，含 11 个 WidgetClient 测试 + 34 个官方组件测试）
 - `cargo check` ✅
 - `cargo test` ✅（38/38）
 
@@ -713,7 +714,7 @@ After this plan is reviewed, the next artifact should be a narrow RFC that freez
 - 旧 widget 的 `widget_permissions` 被 Gateway 视为已授权，保证迁移期兼容。
 - `WidgetClient.fetch` 与 `loadMedia` 为占位实现，会抛出未实现错误。
 - 同意提示目前统一按 `low` 风险等级记录；后续应结合 capability 风险分级自动映射 `low/medium/high`。
-- TimerWidget、QuickCaptureWidget、BrowserActivityWidget 仍使用直接 `tauriApi` 调用，待 Gateway 暴露对应能力后再迁移。
+- TimerWidget、QuickCaptureWidget、BrowserActivityWidget 仍使用直接 `tauriApi` 调用，待 Gateway 暴露对应能力后再迁移；但其渲染与交互已纳入官方组件测试覆盖。
 
 ### 建议下一步
 
@@ -728,6 +729,8 @@ After this plan is reviewed, the next artifact should be a narrow RFC that freez
 ---
 
 ## Agent 下一步计划（由当前 Kimi Code agent 制定）
+
+- [x] Phase C 官方组件全量测试流程已落地。
 
 基于 Phase C 已完成，当前建议转向用户此前提到的 v2.2.0 其他需求。优先级最高的未解决项包括：
 

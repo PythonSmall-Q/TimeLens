@@ -199,8 +199,9 @@ export function mockGatewayState(initialState: Record<string, string | null>) {
     }
     if (request.scope === "state" && request.request_type === "state_write") {
       const key = request.payload?.key;
+      const value = request.payload?.value;
       if (key) {
-        state[key] = request.payload.value ?? null;
+        state[key] = value ?? null;
       }
       return successResponse(null);
     }

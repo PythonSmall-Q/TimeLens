@@ -5,7 +5,6 @@ import {
   mockTauriApi,
   renderWithProviders,
   resetWidgetMocks,
-  mockGatewayState,
   successResponse,
 } from "./test-utils";
 import StatusWidget from "../StatusWidget";
