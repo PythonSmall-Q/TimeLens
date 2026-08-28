@@ -36,8 +36,8 @@ This template is a complete TypeScript showcase for the rewritten TimeLens widge
 
 In v4, capability strings are runtime scopes. The top-level `entry` must match
 `runtime.entry`. This example declares all implemented scopes because it
-demonstrates every available API. Network and media calls only demonstrate their
-current unimplemented response.
+demonstrates every available API. Network and media calls are mediated by the
+Gateway and are subject to public-target, MIME, timeout, and response-size policy.
 
 ## Build
 

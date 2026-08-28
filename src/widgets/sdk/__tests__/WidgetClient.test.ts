@@ -224,6 +224,54 @@ describe("WidgetClient", () => {
     await expect(client.query("metrics")).rejects.toBeInstanceOf(WidgetGatewayError);
     expect(mockGatewayRequest).toHaveBeenCalledTimes(1);
   });
+
+  it("reconstructs a real Response from a gateway fetch payload", async () => {
+    mockGatewayRequest.mockResolvedValue(successResponse({
+      status: 201,
+      content_type: "text/plain",
+      body_base64: btoa("created"),
+    }));
+    const client = new WidgetClient({ widgetId: "w1", widgetType: "test" });
+
+    const response = await client.fetch("https://example.com/resource");
+    expect(response).toBeInstanceOf(Response);
+    expect(response.status).toBe(201);
+    expect(response.headers.get("content-type")).toBe("text/plain");
+    expect(await response.text()).toBe("created");
+  });
+
+  it("returns only a safe media reference", async () => {
+    mockGatewayRequest.mockResolvedValue(successResponse({
+      kind: "data_url",
+      content_type: "image/png",
+      url: "data:image/png;base64,AA==",
+    }));
+    const client = new WidgetClient({ widgetId: "w1", widgetType: "test" });
+
+    await expect(client.loadMedia("https://example.com/image.png")).resolves.toEqual({
+      kind: "data_url",
+      content_type: "image/png",
+      url: "data:image/png;base64,AA==",
+    });
+  });
+
+  it("routes local API calls through the gateway", async () => {
+    mockGatewayRequest.mockResolvedValue(successResponse({
+      status: 200,
+      body_base64: btoa('{"ok":true}'),
+    }));
+    const client = new WidgetClient({ widgetId: "w1", widgetType: "test" });
+
+    await expect(client.localApiCall({
+      method: "GET",
+      path: "/api/status",
+      scopes: ["screen-time:read"],
+    })).resolves.toEqual({ ok: true });
+    expect(mockGatewayRequest.mock.calls[0][0]).toMatchObject({
+      request_type: "local_api_call",
+      scope: "local-api:call",
+    });
+  });
 });
 
 describe("buildLegacyChannel", () => {

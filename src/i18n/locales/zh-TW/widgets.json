@@ -303,6 +303,7 @@
     "source": "第三方",
     "loading": "正在載入小元件模組...",
     "recoveryHint": "請嘗試撤銷權限、移除該小元件，或匯入更新版本。",
+    "retry": "重試",
     "loadErrorHint": "請檢查權限並重新載入小元件。",
     "recoveryHints": {
       "permission": "請在小元件中心或設定中檢查小元件權限。",

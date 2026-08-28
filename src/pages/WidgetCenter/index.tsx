@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
+import { emit } from "@tauri-apps/api/event";
 import {
   Clock, List, Timer, ExternalLink, Trash2, Plus, StickyNote, Activity,
   Puzzle, FolderOpen, ShieldCheck, PawPrint, Ruler, Upload, Wrench,
@@ -177,6 +178,7 @@ function WidgetCard({
   };
 
   const handleRefresh = () => {
+    void emit("timelens-widget-refresh", { widgetId: config.id });
     onPermissionsChanged();
   };
 

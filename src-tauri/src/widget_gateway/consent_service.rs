@@ -50,8 +50,10 @@ pub fn record_decision(
     source: &str,
 ) -> Result<(), String> {
     let decision = if granted { "granted" } else { "denied" };
-    db::set_widget_consent_decision(conn, widget_id, scope, decision, remembered, risk_level, source)
-        .map_err(|e| e.to_string())
+    db::set_widget_consent_decision(
+        conn, widget_id, scope, decision, remembered, risk_level, source,
+    )
+    .map_err(|e| e.to_string())
 }
 
 /// Revoke a previously granted scope.

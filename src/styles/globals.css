@@ -64,9 +64,26 @@ body {
     radial-gradient(900px 480px at -12% -18%, rgba(78, 165, 160, 0.16), transparent 62%),
     radial-gradient(860px 440px at 112% -24%, rgba(224, 144, 80, 0.14), transparent 60%),
     linear-gradient(170deg, rgba(108, 142, 191, 0.08), transparent 42%);
+  background-image:
+    linear-gradient(rgba(20, 24, 36, 0.62), rgba(20, 24, 36, 0.62)),
+    var(--timelens-app-background-image, none),
+    radial-gradient(900px 480px at -12% -18%, rgba(78, 165, 160, 0.16), transparent 62%),
+    radial-gradient(860px 440px at 112% -24%, rgba(224, 144, 80, 0.14), transparent 60%),
+    linear-gradient(170deg, rgba(108, 142, 191, 0.08), transparent 42%);
+  background-size: cover, cover, auto, auto, auto;
+  background-position: center, center, center, center, center;
+  background-attachment: fixed;
   color: var(--text-primary);
   height: 100%;
   overflow: hidden;
+}
+
+.widget-root > * {
+  background-image:
+    linear-gradient(rgba(30, 36, 51, 0.62), rgba(30, 36, 51, 0.62)),
+    var(--timelens-widget-background-image, none);
+  background-size: cover;
+  background-position: center;
 }
 
 #root {

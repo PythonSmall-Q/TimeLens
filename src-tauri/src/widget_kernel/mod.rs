@@ -70,6 +70,10 @@ impl WidgetKernel {
         self.gateway.handle_request(request)
     }
 
+    pub fn set_app_handle(&self, app: tauri::AppHandle) {
+        self.gateway.set_app_handle(app);
+    }
+
     /// Convenience helper for legacy query requests.
     pub fn query(
         &self,

@@ -1,6 +1,6 @@
 [package]
 name = "timelens"
-version = "2.1.0"
+version = "2.2.0"
 description = "A screen time tracker and desktop widget manager"
 authors = ["Shan Wenxiao"]
 license = "MIT"
@@ -48,6 +48,8 @@ argon2 = "0.5"
 toml = "0.8"
 axum = { version = "0.7", features = ["ws"] }
 tower-http = { version = "0.5", features = ["cors"] }
+reqwest = { version = "0.13", default-features = false, features = ["blocking", "rustls", "json"] }
+base64 = "0.22"
 tokio-tungstenite = { version = "0.21", optional = true }
 
 [target.'cfg(target_os = "windows")'.dependencies]

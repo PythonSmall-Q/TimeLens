@@ -3,7 +3,10 @@ use rusqlite::Connection;
 use serde_json::Value;
 
 use crate::db;
-use crate::models::{AppUsageSummary, BrowserDomainStats, CategoryUsageSummary, FocusSession, GoalProgress, UsageGoal};
+use crate::models::{
+    AppUsageSummary, BrowserDomainStats, CategoryUsageSummary, FocusSession, GoalProgress,
+    UsageGoal,
+};
 
 fn today() -> String {
     Local::now().format("%Y-%m-%d").to_string()
@@ -50,7 +53,8 @@ fn query_sessions(conn: &Connection, payload: &Option<Value>) -> Result<Value, S
     let start = start_at.unwrap_or_else(|| format!("{}T00:00:00", today_str));
     let end = end_at.unwrap_or_else(|| format!("{}T23:59:59", today_str));
 
-    let rows = db::list_focus_sessions(conn, Some(&start), Some(&end)).map_err(|e| e.to_string())?;
+    let rows =
+        db::list_focus_sessions(conn, Some(&start), Some(&end)).map_err(|e| e.to_string())?;
     Ok(serde_json::to_value(rows).unwrap_or(Value::Array(vec![])))
 }
 
@@ -83,7 +87,8 @@ fn query_projects(conn: &Connection, _payload: &Option<Value>) -> Result<Value, 
     let start = (Local::now() - chrono::Duration::days(6))
         .format("%Y-%m-%d")
         .to_string();
-    let rows = db::get_vscode_project_stats_in_range(conn, &start, &end).map_err(|e| e.to_string())?;
+    let rows =
+        db::get_vscode_project_stats_in_range(conn, &start, &end).map_err(|e| e.to_string())?;
     Ok(serde_json::to_value(rows).unwrap_or(Value::Array(vec![])))
 }
 
@@ -137,10 +142,15 @@ fn query_focus(conn: &Connection, payload: &Option<Value>) -> Result<Value, Stri
     let end = end_at.unwrap_or_else(|| format!("{}T23:59:59", today_str));
 
     let active = db::get_bool_setting(conn, "focus_mode_active", false).unwrap_or(false);
-    let sessions = db::list_focus_sessions(conn, Some(&start), Some(&end)).map_err(|e| e.to_string())?;
+    let sessions =
+        db::list_focus_sessions(conn, Some(&start), Some(&end)).map_err(|e| e.to_string())?;
     let active_session = sessions.into_iter().find(|s| s.ended_at.is_none());
 
-    Ok(serde_json::to_value(FocusStateResult { active, active_session }).unwrap_or(Value::Null))
+    Ok(serde_json::to_value(FocusStateResult {
+        active,
+        active_session,
+    })
+    .unwrap_or(Value::Null))
 }
 
 fn query_todos(conn: &Connection, _payload: &Option<Value>) -> Result<Value, String> {
@@ -169,9 +179,15 @@ fn query_browser(conn: &Connection, payload: &Option<Value>) -> Result<Value, St
 
     let domains = db::get_browser_domain_stats(conn, start, end).map_err(|e| e.to_string())?;
     let enabled = db::get_bool_setting(conn, "browser_extension_enabled", true).unwrap_or(true);
-    let last_sync_at = db::get_setting(conn, "browser_extension_last_sync_at").ok().flatten();
-    let last_browser_name = db::get_setting(conn, "browser_extension_last_browser_name").ok().flatten();
-    let last_locale = db::get_setting(conn, "browser_extension_last_locale").ok().flatten();
+    let last_sync_at = db::get_setting(conn, "browser_extension_last_sync_at")
+        .ok()
+        .flatten();
+    let last_browser_name = db::get_setting(conn, "browser_extension_last_browser_name")
+        .ok()
+        .flatten();
+    let last_locale = db::get_setting(conn, "browser_extension_last_locale")
+        .ok()
+        .flatten();
     let recent_sessions = db::get_recent_browser_sessions(conn, 6).unwrap_or_default();
     let recent_session_count = db::count_browser_sessions(conn).unwrap_or(0);
 

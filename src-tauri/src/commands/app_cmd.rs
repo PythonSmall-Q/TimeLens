@@ -345,19 +345,26 @@ fn send_windows_toast(title: &str, body: &str, alarm: bool) -> Result<(), String
 
 #[tauri::command]
 pub fn send_native_notification(
+    app: AppHandle,
     title: String,
     body: String,
     alarm: Option<bool>,
 ) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
+        let _ = app;
         return send_windows_toast(&title, &body, alarm.unwrap_or(false));
     }
 
     #[cfg(not(target_os = "windows"))]
     {
-        let _ = (&title, &body, &alarm);
-        Err("native toast alarm is only implemented on Windows".to_string())
+        use tauri_plugin_notification::NotificationExt;
+        app.notification()
+            .builder()
+            .title(&title)
+            .body(&body)
+            .show()
+            .map_err(|e| format!("show notification failed: {e}"))
     }
 }
 

@@ -79,6 +79,7 @@ export default function ExternalWidgetHost({ widgetId, widgetType }: Props) {
   const unmountRef = useRef<ThirdPartyWidgetInstance["unmount"]>(undefined);
   const [registryItem, setRegistryItem] = useState<WidgetRegistryItem | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [retryNonce, setRetryNonce] = useState(0);
   const [pendingConsents, setPendingConsents] = useState<PendingConsent[]>([]);
   const pendingConsentsRef = useRef<PendingConsent[]>([]);
 
@@ -232,7 +233,13 @@ export default function ExternalWidgetHost({ widgetId, widgetType }: Props) {
       setPendingConsents([]);
       void api.emitWidgetLifecycle({ widget_id: widgetId, event: "uninstall" }).catch(() => {});
     };
-  }, [channel, client, t, widgetId, widgetType]);
+  }, [channel, client, retryNonce, t, widgetId, widgetType]);
+
+  const retry = () => {
+    setError(null);
+    setRegistryItem(null);
+    setRetryNonce((value) => value + 1);
+  };
 
   if (error) {
     return (
@@ -246,6 +253,12 @@ export default function ExternalWidgetHost({ widgetId, widgetType }: Props) {
         <div className="text-[11px] text-text-muted">
           {t("thirdParty.recoveryHint")}
         </div>
+        <button
+          onClick={retry}
+          className="self-start rounded-lg border border-surface-border px-3 py-1.5 text-[11px] text-text-secondary hover:text-text-primary"
+        >
+          {t("thirdParty.retry")}
+        </button>
       </div>
     );
   }

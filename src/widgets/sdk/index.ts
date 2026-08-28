@@ -25,6 +25,12 @@ export interface WidgetClientOptions {
   ) => Promise<boolean>;
 }
 
+export interface SafeMediaReference {
+  kind: "data_url";
+  content_type: string;
+  url: string;
+}
+
 export interface LegacyChannel {
   getTodayAppTotals: () => Promise<unknown>;
   getAppTotalsInRange: (start: string, end: string) => Promise<unknown>;
@@ -87,6 +93,16 @@ export class WidgetClient {
 
   private consentRetrying = false;
 
+  private consentRiskLevel(scope: string): "low" | "medium" | "high" {
+    if (scope === "sessions" || scope === "network_fetch" || scope === "media_load" || scope === "local_api_call") {
+      return "high";
+    }
+    if (scope === "browser" || scope === "projects" || scope === "rules" || scope === "notification_send") {
+      return "medium";
+    }
+    return "low";
+  }
+
   async gatewayRequest(request: WidgetGatewayRequest): Promise<WidgetGatewayResponse> {
     const response = await api.widgetGatewayRequest(request);
 
@@ -100,7 +116,7 @@ export class WidgetClient {
       try {
         const granted = await this.options.onConsentRequired(
           request.scope,
-          "low",
+          this.consentRiskLevel(request.scope),
           response.error.message,
         );
         if (granted) {
@@ -226,26 +242,70 @@ export class WidgetClient {
     }
   }
 
-  async fetch(url: string, _options?: RequestInit): Promise<Response> {
+  async fetch(url: string, options?: RequestInit): Promise<Response> {
     const response = await this.gatewayRequest(
-      this.makeRequest("network_fetch", "network_fetch", undefined, url),
+      this.makeRequest("network_fetch", "network_fetch", options, url),
     );
     if (response.status !== "success") {
       throw new WidgetGatewayError(response.error ?? { code: "unknown", message: "fetch failed" });
     }
-    // Phase D: gateway will return a proxied response body.
-    throw new Error("gateway-mediated fetch is not yet implemented");
+    const payload = response.payload as { status: number; content_type: string; body_base64: string };
+    if (!payload || typeof payload.body_base64 !== "string") {
+      throw new WidgetGatewayError({ code: "invalid_response", message: "fetch returned an invalid response payload" });
+    }
+    const bytes = Uint8Array.from(atob(payload.body_base64), (character) => character.charCodeAt(0));
+    return new Response(bytes, {
+      status: payload.status,
+      headers: { "Content-Type": payload.content_type },
+    });
   }
 
-  async loadMedia(url: string): Promise<unknown> {
+  async loadMedia(url: string): Promise<SafeMediaReference> {
     const response = await this.gatewayRequest(
       this.makeRequest("media_load", "media_load", undefined, url),
     );
     if (response.status !== "success") {
       throw new WidgetGatewayError(response.error ?? { code: "unknown", message: "media load failed" });
     }
-    // Phase D: gateway will return a safe media reference.
-    throw new Error("gateway-mediated media load is not yet implemented");
+    const payload = response.payload as SafeMediaReference;
+    if (payload?.kind !== "data_url" || !payload.url.startsWith("data:")) {
+      throw new WidgetGatewayError({ code: "invalid_response", message: "loadMedia returned an invalid media reference" });
+    }
+    return payload;
+  }
+
+  async sendNotification(title: string, body: string, alarm = false): Promise<void> {
+    const response = await this.gatewayRequest(
+      this.makeRequest("notification_send", "notification:send", { title, body, alarm }),
+    );
+    if (response.status !== "success") {
+      throw new WidgetGatewayError(response.error ?? { code: "unknown", message: "notification failed" });
+    }
+  }
+
+  async localApiCall(options: {
+    method?: string;
+    path: string;
+    body?: unknown;
+    scopes?: string[];
+  }): Promise<unknown> {
+    const response = await this.gatewayRequest(
+      this.makeRequest("local_api_call", "local-api:call", options),
+    );
+    if (response.status !== "success") {
+      throw new WidgetGatewayError(response.error ?? { code: "unknown", message: "local API call failed" });
+    }
+    const payload = response.payload as { status: number; body_base64: string };
+    if (payload.status >= 400) {
+      throw new WidgetGatewayError({
+        code: "local_api_error",
+        message: `local API call failed: ${payload.status}`,
+        recoverable: true,
+      });
+    }
+    if (payload.status === 204) return undefined;
+    const bytes = Uint8Array.from(atob(payload.body_base64), (character) => character.charCodeAt(0));
+    return JSON.parse(new TextDecoder().decode(bytes)) as unknown;
   }
 
   async requestConsent(scope: string, riskLevel: "low" | "medium" | "high" = "low"): Promise<void> {
@@ -327,38 +387,12 @@ export function buildLegacyChannel(client: WidgetClient): LegacyChannel {
       api.setMonitoringActive(Boolean(active)) as Promise<unknown>,
     ),
     localApiCall: withPermissionAccess("local-api:call", async (options) => {
-      const {
-        method = "GET",
-        path,
-        body,
-        scopes = [],
-      } = options as {
+      return client.localApiCall(options as {
         method?: string;
         path: string;
         body?: unknown;
         scopes?: string[];
-      };
-      if (!path || typeof path !== "string") {
-        throw new Error("localApiCall requires a path string");
-      }
-      const token = await api.issueWidgetApiToken(client.widgetId, scopes);
-      const baseUrl = await api.getLocalApiBaseUrl();
-      const resp = await fetch(`${baseUrl}${path}`, {
-        method: method.toUpperCase(),
-        headers: {
-          "Content-Type": "application/json",
-          "X-Client-Id": `widget-${client.widgetId}`,
-          "X-Api-Token": token.token,
-        },
-        body: body !== undefined ? JSON.stringify(body) : undefined,
       });
-      if (!resp.ok) {
-        throw new Error(`local API call failed: ${resp.status}`);
-      }
-      if (resp.status === 204) {
-        return undefined;
-      }
-      return (await resp.json()) as unknown;
     }),
     query: (namespace, payload) => client.query(namespace, payload),
     subscribe: (event, cb) => client.subscribe(event, cb),

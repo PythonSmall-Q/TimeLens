@@ -1,0 +1,14 @@
+{
+  "manifest_version": "v4",
+  "widget_type": "focus_summary",
+  "name": "Focus Summary",
+  "publisher": "TimeLens Example",
+  "entry": "dist/index.js",
+  "runtime": {
+    "language": "typescript",
+    "version": "5.0",
+    "entry": "dist/index.js"
+  },
+  "ui": { "model": "web-sandbox" },
+  "capabilities": ["screen-time:read"]
+}

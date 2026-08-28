@@ -661,6 +661,7 @@ pub fn run() {
             // Widget Runtime Rewrite kernel + gateway
             let widget_kernel =
                 widget_kernel::WidgetKernel::new(db_state.clone(), widget_call_rate_limiter.clone());
+            widget_kernel.set_app_handle(app.handle().clone());
             app.manage(widget_kernel);
 
             // Initialize extension bridge key on first run
@@ -975,7 +976,7 @@ pub fn run() {
                             #[cfg(target_os = "windows")]
                             {
                                 let _ = crate::commands::app_cmd::send_native_notification(
-                                    title, body, Some(false),
+                                    app_handle_risk.clone(), title, body, Some(false),
                                 );
                             }
                             #[cfg(not(target_os = "windows"))]

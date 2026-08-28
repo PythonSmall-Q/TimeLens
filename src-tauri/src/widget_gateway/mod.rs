@@ -4,7 +4,11 @@ pub mod consent_service;
 pub mod policy_firewall;
 pub mod usage_data_broker;
 
+use base64::Engine;
 use serde_json::Value;
+use std::io::Read;
+use std::sync::{Arc, Mutex};
+use tauri::AppHandle;
 
 use crate::commands::storage_cmd::DbState;
 use crate::commands::widget_runtime_cmd::WidgetCallRateLimiter;
@@ -19,6 +23,17 @@ use consent_service::{check_consent, ConsentState};
 const MAX_WIDGET_STATE_ENTRIES: i64 = 100;
 const MAX_WIDGET_STATE_VALUE_BYTES: usize = 64 * 1024;
 const MAX_CHANNEL_CALLS_PER_MIN: u32 = 60;
+const MAX_PROXY_RESPONSE_BYTES: usize = 2 * 1024 * 1024;
+const PROXY_TIMEOUT_SECS: u64 = 5;
+const MAX_NOTIFICATION_TEXT_BYTES: usize = 4 * 1024;
+const LOCAL_API_SCOPES: &[&str] = &[
+    "screen-time:read",
+    "browser:read",
+    "browser:write",
+    "vscode:read",
+    "vscode:write",
+    "active-window:subscribe",
+];
 
 /// The Widget Gateway is the single trust boundary for all privileged widget
 /// requests. It authenticates the widget instance, resolves capabilities, checks
@@ -27,6 +42,7 @@ const MAX_CHANNEL_CALLS_PER_MIN: u32 = 60;
 pub struct WidgetGateway {
     db: DbState,
     call_rate_limiter: WidgetCallRateLimiter,
+    app: Arc<Mutex<Option<AppHandle>>>,
 }
 
 impl WidgetGateway {
@@ -34,6 +50,13 @@ impl WidgetGateway {
         Self {
             db,
             call_rate_limiter,
+            app: Arc::new(Mutex::new(None)),
+        }
+    }
+
+    pub fn set_app_handle(&self, app: AppHandle) {
+        if let Ok(mut slot) = self.app.lock() {
+            *slot = Some(app);
         }
     }
 
@@ -130,7 +153,11 @@ impl WidgetGateway {
                     payload: None,
                     error: Some(WidgetGatewayError {
                         code: "permission_denied".to_string(),
-                        message: format!("permission denied: {} required for {}", scope, capability_resolver::namespace_display(&request.scope)),
+                        message: format!(
+                            "permission denied: {} required for {}",
+                            scope,
+                            capability_resolver::namespace_display(&request.scope)
+                        ),
                         scope: Some(scope.to_string()),
                         recoverable: true,
                     }),
@@ -189,17 +216,25 @@ impl WidgetGateway {
                     "error",
                     request.resource_hint.as_deref(),
                 );
-                self.error_response(
-                    &request,
-                    WidgetGatewayStatus::Error,
-                    "provider_error",
-                    e,
-                )
+                self.error_response(&request, WidgetGatewayStatus::Error, "provider_error", e)
             }
         }
     }
 
     fn dispatch(&self, request: &WidgetGatewayRequest) -> Result<Value, String> {
+        match request.request_type {
+            WidgetGatewayRequestType::LocalApiCall => return self.dispatch_local_api_call(request),
+            WidgetGatewayRequestType::NetworkFetch => {
+                return self.dispatch_network_fetch(request, false)
+            }
+            WidgetGatewayRequestType::MediaLoad => {
+                return self.dispatch_network_fetch(request, true)
+            }
+            WidgetGatewayRequestType::NotificationSend => {
+                return self.dispatch_notification(request)
+            }
+            _ => {}
+        }
         let conn = self.db.lock().map_err(|e| e.to_string())?;
 
         match request.request_type {
@@ -280,15 +315,6 @@ impl WidgetGateway {
                     .map_err(|e| e.to_string())?;
                 Ok(Value::Null)
             }
-            WidgetGatewayRequestType::LocalApiCall => {
-                // Phase D: route through LocalApiBroker with scoped tokens.
-                Err("local_api_call not yet implemented in gateway".to_string())
-            }
-            WidgetGatewayRequestType::NetworkFetch | WidgetGatewayRequestType::MediaLoad => {
-                let hint = request.resource_hint.as_deref().unwrap_or("");
-                policy_firewall::is_target_allowed(hint)?;
-                Err("network/media proxy not yet implemented in gateway".to_string())
-            }
             WidgetGatewayRequestType::FocusModeWrite => {
                 let active = request
                     .payload
@@ -296,7 +322,8 @@ impl WidgetGateway {
                     .and_then(|p| p.get("active"))
                     .and_then(|v| v.as_bool())
                     .ok_or_else(|| "focus_mode_write requires active".to_string())?;
-                db::set_bool_setting(&conn, "focus_mode_active", active).map_err(|e| e.to_string())?;
+                db::set_bool_setting(&conn, "focus_mode_active", active)
+                    .map_err(|e| e.to_string())?;
                 Ok(Value::Null)
             }
             WidgetGatewayRequestType::TodoWrite => {
@@ -320,9 +347,12 @@ impl WidgetGateway {
                             .map(|t| t.order_index)
                             .max()
                             .unwrap_or(0);
-                        let id = db::insert_todo(&conn, content, max_order + 1).map_err(|e| e.to_string())?;
+                        let id = db::insert_todo(&conn, content, max_order + 1)
+                            .map_err(|e| e.to_string())?;
                         let todos = db::get_all_todos(&conn).map_err(|e| e.to_string())?;
-                        let item = todos.into_iter().find(|t| t.id == Some(id))
+                        let item = todos
+                            .into_iter()
+                            .find(|t| t.id == Some(id))
                             .ok_or_else(|| "failed to retrieve created todo".to_string())?;
                         Ok(serde_json::to_value(item).unwrap_or(Value::Null))
                     }
@@ -354,8 +384,9 @@ impl WidgetGateway {
                             .and_then(|v| v.as_array())
                             .ok_or_else(|| "todo_write reorder requires ids".to_string())?;
                         for (index, id_value) in ids.iter().enumerate() {
-                            let id = id_value.as_i64()
-                                .ok_or_else(|| "todo_write reorder ids must be integers".to_string())?;
+                            let id = id_value.as_i64().ok_or_else(|| {
+                                "todo_write reorder ids must be integers".to_string()
+                            })?;
                             db::reorder_todo(&conn, id, index as i64).map_err(|e| e.to_string())?;
                         }
                         Ok(Value::Null)
@@ -363,14 +394,219 @@ impl WidgetGateway {
                     _ => Err(format!("unknown todo_write action: {}", action)),
                 }
             }
-            WidgetGatewayRequestType::NotificationSend => {
-                // Phase D: gate through native notification service.
-                Err("notification_send not yet implemented in gateway".to_string())
-            }
             WidgetGatewayRequestType::RuntimeInfo => {
                 // Low-risk runtime info; return empty for now.
                 Ok(Value::Object(serde_json::Map::new()))
             }
+            WidgetGatewayRequestType::LocalApiCall
+            | WidgetGatewayRequestType::NetworkFetch
+            | WidgetGatewayRequestType::MediaLoad
+            | WidgetGatewayRequestType::NotificationSend => {
+                unreachable!("privileged provider requests are dispatched before database requests")
+            }
+        }
+    }
+
+    fn dispatch_local_api_call(&self, request: &WidgetGatewayRequest) -> Result<Value, String> {
+        let payload = request
+            .payload
+            .as_ref()
+            .ok_or_else(|| "invalid_request: local_api_call requires payload".to_string())?;
+        let method = payload
+            .get("method")
+            .and_then(Value::as_str)
+            .unwrap_or("GET")
+            .to_uppercase();
+        if !matches!(method.as_str(), "GET" | "POST" | "PUT" | "PATCH" | "DELETE") {
+            return Err("invalid_request: unsupported local API method".to_string());
+        }
+        let path = payload
+            .get("path")
+            .and_then(Value::as_str)
+            .ok_or_else(|| "invalid_request: local_api_call requires path".to_string())?;
+        if !path.starts_with("/api/")
+            || path.contains("..")
+            || path.contains('\n')
+            || path.contains('\r')
+        {
+            return Err("policy_denied: local API path is not allowed".to_string());
+        }
+        let scopes = payload
+            .get("scopes")
+            .and_then(Value::as_array)
+            .map(|items| {
+                items
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .map(str::to_string)
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        if scopes
+            .iter()
+            .any(|scope| !LOCAL_API_SCOPES.contains(&scope.as_str()))
+        {
+            return Err("policy_denied: local API scope is not supported".to_string());
+        }
+        let conn = self.db.lock().map_err(|e| e.to_string())?;
+        let permissions = db::get_widget_permissions(&conn, &request.widget_id)
+            .map_err(|e| format!("provider_error: {e}"))?;
+        if !permissions
+            .iter()
+            .any(|p| p == "local-api:call" || p == "api:call")
+        {
+            return Err("permission_denied: local-api:call permission is required".to_string());
+        }
+        let token = crate::commands::extension_bridge_cmd::issue_api_token_impl(
+            &conn,
+            format!("Widget: {}", request.widget_id),
+            scopes,
+            None,
+        )?;
+        drop(conn);
+
+        let url = format!("{}{}", crate::api_server::local_api_base_url(), path);
+        let client = reqwest::blocking::Client::builder()
+            .timeout(std::time::Duration::from_secs(PROXY_TIMEOUT_SECS))
+            .build()
+            .map_err(|e| format!("provider_error: {e}"))?;
+        let request_method = reqwest::Method::from_bytes(method.as_bytes())
+            .map_err(|_| "invalid_request: invalid method".to_string())?;
+        let mut builder = client
+            .request(request_method, url)
+            .header("X-Client-Id", format!("widget-{}", request.widget_id))
+            .header("X-Api-Token", token.token);
+        if let Some(body) = payload.get("body") {
+            builder = builder.json(body);
+        }
+        let response = builder.send().map_err(|e| {
+            if e.is_timeout() {
+                "timed_out: local API request timed out".to_string()
+            } else {
+                format!("provider_error: {e}")
+            }
+        })?;
+        self.response_value(response)
+    }
+
+    fn dispatch_network_fetch(
+        &self,
+        request: &WidgetGatewayRequest,
+        media_only: bool,
+    ) -> Result<Value, String> {
+        let target = request
+            .resource_hint
+            .as_deref()
+            .ok_or_else(|| "invalid_request: resource URL is required".to_string())?;
+        policy_firewall::is_target_allowed(target)?;
+        let client = reqwest::blocking::Client::builder()
+            .timeout(std::time::Duration::from_secs(PROXY_TIMEOUT_SECS))
+            .build()
+            .map_err(|e| format!("provider_error: {e}"))?;
+        let response = client.get(target).send().map_err(|e| {
+            if e.is_timeout() {
+                "timed_out: network request timed out".to_string()
+            } else {
+                format!("provider_error: {e}")
+            }
+        })?;
+        if media_only {
+            let content_type = response
+                .headers()
+                .get(reqwest::header::CONTENT_TYPE)
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("")
+                .to_lowercase();
+            if !content_type.starts_with("image/")
+                && !content_type.starts_with("audio/")
+                && !content_type.starts_with("video/")
+            {
+                return Err("policy_denied: media response content type is not allowed".to_string());
+            }
+            let response = self.response_value(response)?;
+            let mime = response
+                .get("content_type")
+                .and_then(Value::as_str)
+                .unwrap_or("application/octet-stream");
+            let bytes = response
+                .get("body_base64")
+                .and_then(Value::as_str)
+                .unwrap_or("");
+            return Ok(serde_json::json!({
+                "kind": "data_url", "content_type": mime,
+                "url": format!("data:{};base64,{}", mime, bytes)
+            }));
+        }
+        self.response_value(response)
+    }
+
+    fn response_value(&self, response: reqwest::blocking::Response) -> Result<Value, String> {
+        let status = response.status().as_u16();
+        let content_type = response
+            .headers()
+            .get(reqwest::header::CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("application/octet-stream")
+            .to_string();
+        let mut body = Vec::new();
+        response
+            .take((MAX_PROXY_RESPONSE_BYTES + 1) as u64)
+            .read_to_end(&mut body)
+            .map_err(|e| format!("provider_error: {e}"))?;
+        if body.len() > MAX_PROXY_RESPONSE_BYTES {
+            return Err(format!(
+                "size_limit: response exceeds {} bytes",
+                MAX_PROXY_RESPONSE_BYTES
+            ));
+        }
+        Ok(serde_json::json!({
+            "status": status, "content_type": content_type,
+            "body_base64": base64::engine::general_purpose::STANDARD.encode(body)
+        }))
+    }
+
+    fn dispatch_notification(&self, request: &WidgetGatewayRequest) -> Result<Value, String> {
+        let payload = request
+            .payload
+            .as_ref()
+            .ok_or_else(|| "invalid_request: notification_send requires payload".to_string())?;
+        let title = payload
+            .get("title")
+            .and_then(Value::as_str)
+            .unwrap_or("TimeLens");
+        let body = payload
+            .get("body")
+            .and_then(Value::as_str)
+            .ok_or_else(|| "invalid_request: notification body is required".to_string())?;
+        if title.len() > MAX_NOTIFICATION_TEXT_BYTES || body.len() > MAX_NOTIFICATION_TEXT_BYTES {
+            return Err("size_limit: notification text exceeds 4096 bytes".to_string());
+        }
+        #[cfg(target_os = "windows")]
+        {
+            let app = self.app.lock().map_err(|_| "provider_error: notification provider unavailable".to_string())?
+                .clone()
+                .ok_or_else(|| "provider_error: notification provider unavailable".to_string())?;
+            crate::commands::app_cmd::send_native_notification(
+                app,
+                title.to_string(),
+                body.to_string(),
+                payload.get("alarm").and_then(Value::as_bool),
+            )
+            .map_err(|e| format!("provider_error: {e}"))?;
+            Ok(Value::Null)
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            let app = self.app.lock().map_err(|_| "provider_error: notification provider unavailable".to_string())?
+                .clone()
+                .ok_or_else(|| "provider_error: notification provider unavailable".to_string())?;
+            crate::commands::app_cmd::send_native_notification(
+                app,
+                title.to_string(),
+                body.to_string(),
+                payload.get("alarm").and_then(Value::as_bool),
+            ).map_err(|e| format!("provider_error: {e}"))?;
+            Ok(Value::Null)
         }
     }
 
@@ -475,5 +711,3 @@ fn is_known_widget_event(event: &str) -> bool {
             | "interruption-signal"
     )
 }
-
-

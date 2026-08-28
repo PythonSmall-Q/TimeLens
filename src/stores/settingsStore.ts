@@ -22,6 +22,8 @@ const safeSettingsStorage = createJSONStorage(() => ({
 interface SettingsState {
   language: string;
   theme: "dark" | "light" | "system";
+  appBackgroundImage: string;
+  widgetBackgroundImage: string;
   updateMode: "off" | "notify" | "auto";
   monitoringActive: boolean;
   samplingIntervalMs: number;
@@ -38,6 +40,8 @@ interface SettingsState {
   notificationCooldownMin: number;
   setLanguage: (lang: string) => void;
   setTheme: (theme: "dark" | "light" | "system") => void;
+  setAppBackgroundImage: (path: string) => void;
+  setWidgetBackgroundImage: (path: string) => void;
   setUpdateMode: (mode: "off" | "notify" | "auto") => void;
   setMonitoringActive: (active: boolean) => Promise<void>;
   setSamplingInterval: (ms: number) => void;
@@ -59,6 +63,8 @@ export const useSettingsStore = create<SettingsState>()(
     (set) => ({
       language: i18n.language || "en",
       theme: "dark",
+      appBackgroundImage: "",
+      widgetBackgroundImage: "",
       updateMode: "notify",
       monitoringActive: true,
       samplingIntervalMs: 1000,
@@ -81,6 +87,10 @@ export const useSettingsStore = create<SettingsState>()(
       },
 
       setTheme: (theme) => set({ theme }),
+
+      setAppBackgroundImage: (appBackgroundImage) => set({ appBackgroundImage }),
+
+      setWidgetBackgroundImage: (widgetBackgroundImage) => set({ widgetBackgroundImage }),
 
       setUpdateMode: (updateMode) => set({ updateMode }),
 

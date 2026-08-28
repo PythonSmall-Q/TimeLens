@@ -710,21 +710,20 @@ After this plan is reviewed, the next artifact should be a narrow RFC that freez
 
 ### 当前限制
 
-- Gateway 中的 `network_fetch`、`media_load`、`local_api_call`、`notification_send` 已占位，尚未实现完整代理逻辑，计划在 Phase D 补齐。
+- Gateway 已实现 `network_fetch`、`media_load`、`local_api_call`、`notification_send` 的受限代理逻辑：公网 HTTP(S)、5 秒超时、2 MiB 响应上限、媒体 MIME 白名单、本地 API scope 校验和 Windows 原生通知。
 - 旧 widget 的 `widget_permissions` 被 Gateway 视为已授权，保证迁移期兼容。
-- `WidgetClient.fetch` 与 `loadMedia` 为占位实现，会抛出未实现错误。
-- 同意提示目前统一按 `low` 风险等级记录；后续应结合 capability 风险分级自动映射 `low/medium/high`。
+- `WidgetClient.fetch` 返回代理后的标准 `Response`，`loadMedia` 返回受限的 `data:` URL 引用。
+- `notification_send` 已通过 Tauri notification provider 支持 Windows、macOS 和 Linux，实际显示仍受操作系统通知权限和桌面环境影响。
 - TimerWidget、QuickCaptureWidget、BrowserActivityWidget 仍使用直接 `tauriApi` 调用，待 Gateway 暴露对应能力后再迁移；但其渲染与交互已纳入官方组件测试覆盖。
 
 ### 建议下一步
 
-进入 **Phase D — Media 与 Sensitive Access Hardening**：
+后续可选的 Runtime 强化工作：
 
-1. 实现 Gateway `network_fetch` 代理与域名策略防火墙。
-2. 实现 Gateway `media_load` 代理与本地/远程媒体白名单。
-3. 实现高风险数据访问的二次确认提示。
-4. 处理 widget 被撤销权限（revoked）后的降级 UI 与事件通知。
-5. 评估是否将 `buildLegacyChannel` 标记为 deprecated，并更新 `WIDGET_SDK_v2_MIGRATION.md`。
+1. 为非 Windows 平台补充统一的原生通知 provider。
+2. 为高风险详细数据访问增加更细粒度的二次确认和降级 UI。
+3. 处理撤权后的长连接主动终止与显式 revoked 事件。
+4. 评估是否将 `buildLegacyChannel` 标记为 deprecated，并更新 `WIDGET_SDK_v2_MIGRATION.md`。
 
 ---
 

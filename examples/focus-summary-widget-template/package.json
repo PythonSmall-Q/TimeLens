@@ -1,0 +1,11 @@
+{
+  "name": "timelens-focus-summary-widget",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc --target ES2022 --module ES2022 --moduleResolution Bundler --outDir dist index.ts"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

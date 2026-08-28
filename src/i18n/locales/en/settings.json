@@ -35,6 +35,13 @@
     "light": "Light",
     "system": "System"
   },
+  "skin": {
+    "appBackground": "TimeLens background",
+    "widgetBackground": "Widget background",
+    "choose": "Choose image",
+    "clear": "Clear",
+    "none": "Default"
+  },
   "trayIconStyle": {
     "label": "Tray Icon Style",
     "auto": "Auto",

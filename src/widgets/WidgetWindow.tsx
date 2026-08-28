@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { availableMonitors, monitorFromPoint, type Monitor } from "@tauri-apps/api/window";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { listen } from "@tauri-apps/api/event";
 import ClockWidget from "./ClockWidget";
 import TodoWidget from "./TodoWidget";
 import TimerWidget from "./TimerWidget";
@@ -34,6 +35,7 @@ export default function WidgetWindow({ widgetId }: Props) {
   const [widgetType, setWidgetType] = useState<string>(
     widgetId.includes("-") ? widgetId.substring(0, widgetId.lastIndexOf("-")) : ""
   );
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const getMonitorIndexForRect = async (x: number, y: number, width: number, height: number) => {
     try {
@@ -131,6 +133,19 @@ export default function WidgetWindow({ widgetId }: Props) {
     };
   }, [widgetId]);
 
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    listen<{ widgetId?: string }>("timelens-widget-refresh", (event) => {
+      if (!event.payload?.widgetId || event.payload.widgetId === widgetId) {
+        setRefreshKey((value) => value + 1);
+      }
+    }).then((cleanup) => {
+      unlisten = cleanup;
+    }).catch(() => {});
+
+    return () => unlisten?.();
+  }, [widgetId]);
+
   const handleMouseEnter = () => {
     clearTimeout(idleTimer.current);
     setIdle(false);
@@ -151,17 +166,17 @@ export default function WidgetWindow({ widgetId }: Props) {
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
-      {widgetType === "clock" && <ClockWidget widgetId={widgetId} isBlurred={isBlurred} />}
-      {widgetType === "todo" && <TodoWidget widgetId={widgetId} />}
-      {widgetType === "timer" && <TimerWidget widgetId={widgetId} />}
-      {widgetType === "note" && <NoteWidget widgetId={widgetId} />}
-      {widgetType === "status" && <StatusWidget widgetId={widgetId} />}
-      {widgetType === "pet" && <PetWidget widgetId={widgetId} />}
-      {widgetType === "focus-coach" && <FocusCoachWidget widgetId={widgetId} />}
-      {widgetType === "quick-capture" && <QuickCaptureWidget widgetId={widgetId} />}
-      {widgetType === "session-pulse" && <SessionPulseWidget widgetId={widgetId} />}
-      {widgetType === "goal-progress" && <GoalProgressWidget widgetId={widgetId} />}
-      {widgetType === "browser-activity" && <BrowserActivityWidget widgetId={widgetId} />}
+      {widgetType === "clock" && <ClockWidget key={refreshKey} widgetId={widgetId} isBlurred={isBlurred} />}
+      {widgetType === "todo" && <TodoWidget key={refreshKey} widgetId={widgetId} />}
+      {widgetType === "timer" && <TimerWidget key={refreshKey} widgetId={widgetId} />}
+      {widgetType === "note" && <NoteWidget key={refreshKey} widgetId={widgetId} />}
+      {widgetType === "status" && <StatusWidget key={refreshKey} widgetId={widgetId} />}
+      {widgetType === "pet" && <PetWidget key={refreshKey} widgetId={widgetId} />}
+      {widgetType === "focus-coach" && <FocusCoachWidget key={refreshKey} widgetId={widgetId} />}
+      {widgetType === "quick-capture" && <QuickCaptureWidget key={refreshKey} widgetId={widgetId} />}
+      {widgetType === "session-pulse" && <SessionPulseWidget key={refreshKey} widgetId={widgetId} />}
+      {widgetType === "goal-progress" && <GoalProgressWidget key={refreshKey} widgetId={widgetId} />}
+      {widgetType === "browser-activity" && <BrowserActivityWidget key={refreshKey} widgetId={widgetId} />}
       {widgetType !== "clock"
         && widgetType !== "todo"
         && widgetType !== "timer"
@@ -173,7 +188,7 @@ export default function WidgetWindow({ widgetId }: Props) {
         && widgetType !== "session-pulse"
         && widgetType !== "goal-progress"
         && widgetType !== "browser-activity"
-        && <ExternalWidgetHost widgetId={widgetId} widgetType={widgetType} />}
+        && <ExternalWidgetHost key={refreshKey} widgetId={widgetId} widgetType={widgetType} />}
     </div>
   );
 }

@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { emit } from "@tauri-apps/api/event";
+import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
 import { useSettingsStore } from "@/stores/settingsStore";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
-import { Moon, Sun, Activity, Database, Info, Rocket, Keyboard, PanelsTopLeft, ArrowLeft, Search, Lock, Copy, RotateCw, User, Shield, Droplet, Sparkles } from "lucide-react";
+import { Moon, Sun, Activity, Database, Info, Rocket, Keyboard, PanelsTopLeft, ArrowLeft, Search, Lock, Copy, RotateCw, User, Shield, Droplet, Sparkles, Image } from "lucide-react";
 import clsx from "clsx";
 import * as api from "@/services/tauriApi";
 import { APP_VERSION } from "../../version";
@@ -162,6 +164,10 @@ export default function Settings() {
   const {
     theme,
     setTheme,
+    appBackgroundImage,
+    widgetBackgroundImage,
+    setAppBackgroundImage,
+    setWidgetBackgroundImage,
     monitoringActive,
     setMonitoringActive,
     samplingIntervalMs,
@@ -190,6 +196,28 @@ export default function Settings() {
     updateMode,
     setUpdateMode,
   } = useSettingsStore();
+
+  const updateSkin = (kind: "app" | "widget", path: string) => {
+    if (kind === "app") setAppBackgroundImage(path);
+    else setWidgetBackgroundImage(path);
+    void emit("timelens-skin-changed", {
+      appBackgroundImage: kind === "app" ? path : appBackgroundImage,
+      widgetBackgroundImage: kind === "widget" ? path : widgetBackgroundImage,
+    });
+  };
+
+  const chooseSkinImage = async (kind: "app" | "widget") => {
+    try {
+      const selected = await openFileDialog({
+        multiple: false,
+        directory: false,
+        filters: [{ name: "Images", extensions: ["png", "jpg", "jpeg", "webp", "gif"] }],
+      });
+      if (typeof selected === "string") updateSkin(kind, selected);
+    } catch {
+      // A cancelled or unavailable native picker leaves the current skin unchanged.
+    }
+  };
 
   useEffect(() => {
     api.getAppSettings()
@@ -744,7 +772,7 @@ export default function Settings() {
     keywords: string[];
   }> = [
     { key: "general", title: t("general"), description: t("generalDesc"), icon: Sun, keywords: [t("language")] },
-    { key: "appearance", title: t("appearance"), description: t("appearanceDesc"), icon: Moon, keywords: [t("theme.label")] },
+    { key: "appearance", title: t("appearance"), description: t("appearanceDesc"), icon: Moon, keywords: [t("theme.label"), t("skin.appBackground"), t("skin.widgetBackground")] },
     { key: "aiAssistant", title: t("aiAssistant.title"), description: t("aiAssistant.description"), icon: Sparkles, keywords: [t("aiAssistant.provider"), t("aiAssistant.apiKey"), "llm", "ai"] },
     { key: "trayIcon", title: t("trayIconStyle.label"), description: t("trayIconDesc"), icon: PanelsTopLeft, keywords: [t("trayIconStyle.auto"), t("trayIconStyle.color"), t("trayIconStyle.black"), t("trayIconStyle.white")] },
     { key: "privacyCenter", title: t("privacyCenter.title"), description: t("privacyCenterDesc"), icon: Lock, keywords: [t("privacyCenter.subtitle"), t("apiSecurity.title"), t("backup.title"), t("transparency.title")] },
@@ -846,6 +874,48 @@ export default function Settings() {
                 {t(`theme.${th}`)}
               </button>
             ))}
+          </div>
+        </SettingsRow>
+        <SettingsRow label={t("skin.appBackground")}>
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-[11px] text-text-muted truncate max-w-48" title={appBackgroundImage || t("skin.none")}>
+              {appBackgroundImage || t("skin.none")}
+            </span>
+            <button
+              onClick={() => void chooseSkinImage("app")}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs border border-surface-border text-text-secondary hover:text-text-primary transition-colors"
+            >
+              <Image size={12} /> {t("skin.choose")}
+            </button>
+            {appBackgroundImage && (
+              <button
+                onClick={() => updateSkin("app", "")}
+                className="text-xs text-accent-red hover:underline"
+              >
+                {t("skin.clear")}
+              </button>
+            )}
+          </div>
+        </SettingsRow>
+        <SettingsRow label={t("skin.widgetBackground")}>
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-[11px] text-text-muted truncate max-w-48" title={widgetBackgroundImage || t("skin.none")}>
+              {widgetBackgroundImage || t("skin.none")}
+            </span>
+            <button
+              onClick={() => void chooseSkinImage("widget")}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs border border-surface-border text-text-secondary hover:text-text-primary transition-colors"
+            >
+              <Image size={12} /> {t("skin.choose")}
+            </button>
+            {widgetBackgroundImage && (
+              <button
+                onClick={() => updateSkin("widget", "")}
+                className="text-xs text-accent-red hover:underline"
+              >
+                {t("skin.clear")}
+              </button>
+            )}
           </div>
         </SettingsRow>
       </SettingsCard>

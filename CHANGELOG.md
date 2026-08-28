@@ -5,6 +5,34 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [2.2.0] - 2026-08-28
+
+### Added
+
+- **Widget Runtime Gateway** — widgets can now use governed local API calls, public HTTP(S) fetches, safe media loading, and native notifications with scoped permissions, policy checks, timeouts, and response-size limits.
+- **Widget Center controls** — per-widget pause/resume and refresh-now actions now work across Tauri windows.
+- **Risk-aware widget consent** — runtime consent prompts classify session, browser, network, media, API, and notification access by risk level.
+- **User skins** — Appearance settings can now select and clear separate local background images for the TimeLens interface and widget windows, with live cross-window synchronization.
+- **Developer resources** — added a read-only Focus Summary TypeScript widget template using the v4 `WidgetClient` contract.
+- **Cross-platform widget notifications** — widget notification requests now use the Tauri notification provider on Windows, macOS, and Linux.
+
+### Changed
+
+- **Pet widget** — promoted from a disabled placeholder to an importable `pet.json` resource-pack widget with state-aware display, avatar assets, interactions, and configurable size.
+- **Widget SDK** — `WidgetClient.fetch()` now returns a real proxied `Response`; `loadMedia()` returns a safe data URL reference.
+- **Widget developer experience** — third-party widget failures now expose recovery guidance and a real remount/retry action; the Widget Dev Harness provides capability simulation, manifest/hash diagnostics, auto-reload, logs, and live preview.
+
+### Fixed
+
+- **Widget refresh** — Widget Center refresh no longer only reloads permission metadata; it now remounts the selected widget window.
+- **Runtime documentation drift** — marked completed pet and pause/refresh work consistently across release documentation.
+
+### Notes
+
+- Native notification delivery remains subject to the operating system's notification permission and desktop environment.
+
+---
+
 ## [2.1.0] - 2026-08-27
 
 ### Added

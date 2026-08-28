@@ -35,6 +35,13 @@
     "light": "浅色",
     "system": "跟随系统"
   },
+  "skin": {
+    "appBackground": "TimeLens 背景图片",
+    "widgetBackground": "小组件背景图片",
+    "choose": "选择图片",
+    "clear": "清除",
+    "none": "默认"
+  },
   "trayIconStyle": {
     "label": "托盘图标样式",
     "auto": "自动",

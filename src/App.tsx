@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { convertFileSrc } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { emit } from "@tauri-apps/api/event";
 import MainApp from "./MainApp";
@@ -17,6 +19,9 @@ export default function App() {
   const [windowLabel, setWindowLabel] = useState<string>("main");
   const theme = useSettingsStore((s) => s.theme);
   const language = useSettingsStore((s) => s.language);
+  const appBackgroundImage = useSettingsStore((s) => s.appBackgroundImage);
+  const widgetBackgroundImage = useSettingsStore((s) => s.widgetBackgroundImage);
+  const [skin, setSkin] = useState({ app: appBackgroundImage, widget: widgetBackgroundImage });
 
   useEffect(() => {
     try {
@@ -55,6 +60,29 @@ export default function App() {
       // Ignore when backend is not ready; next emit will sync menu labels.
     });
   }, [language]);
+
+  useEffect(() => {
+    setSkin({ app: appBackgroundImage, widget: widgetBackgroundImage });
+  }, [appBackgroundImage, widgetBackgroundImage]);
+
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    listen<{ appBackgroundImage?: string; widgetBackgroundImage?: string }>("timelens-skin-changed", (event) => {
+      setSkin({
+        app: event.payload?.appBackgroundImage ?? "",
+        widget: event.payload?.widgetBackgroundImage ?? "",
+      });
+    }).then((cleanup) => { unlisten = cleanup; }).catch(() => {});
+    return () => unlisten?.();
+  }, []);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const appImage = skin.app ? convertFileSrc(skin.app) : "";
+    const widgetImage = skin.widget ? convertFileSrc(skin.widget) : "";
+    root.style.setProperty("--timelens-app-background-image", appImage ? `url("${appImage}")` : "none");
+    root.style.setProperty("--timelens-widget-background-image", widgetImage ? `url("${widgetImage}")` : "none");
+  }, [skin]);
 
   if (windowLabel !== "main") {
     return <WidgetWindow widgetId={windowLabel} />;
