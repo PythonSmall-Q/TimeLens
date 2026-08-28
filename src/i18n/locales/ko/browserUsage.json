@@ -55,5 +55,6 @@
   "hideIgnored": "무시한 항목 숨기기",
   "totalDomains": "{{count}}개 도메인",
   "totalDomains_plural": "{{count}}개 도메인",
+  "localApiPort": "로컬 API 포트: {{port}}",
   "refresh": "새로고침"
 }

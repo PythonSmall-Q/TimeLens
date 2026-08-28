@@ -45,11 +45,11 @@
     "ruleMetaApp": "앱: {{app}}",
     "noMatch": "규칙이 현재 조건과 일치하지 않았습니다.",
     "simulationError": "지금 규칙을 평가할 수 없습니다.",
-    "saveSuccess": "Rule saved.",
-    "saveFailed": "Could not save rule.",
-    "nameRequired": "Please enter a rule name.",
-    "keywordRequired": "Please enter a keyword.",
-    "appRequired": "Please enter an app name.",
-    "timeWindowRequired": "Please select a start and end time."
+    "saveSuccess": "규칙이 저장되었습니다.",
+    "saveFailed": "규칙을 저장할 수 없습니다.",
+    "nameRequired": "규칙 이름을 입력하세요.",
+    "keywordRequired": "키워드를 입력하세요.",
+    "appRequired": "앱 이름을 입력하세요.",
+    "timeWindowRequired": "시작 시간과 종료 시간을 선택하세요."
   }
 }

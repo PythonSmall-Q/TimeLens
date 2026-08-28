@@ -21,10 +21,10 @@
   "aboutDesc": "版本、紀錄與更新",
   "privacyCenterDesc": "隱私與權限統一概覽",
   "aiAssistant": {
-    "title": "AI Assistant",
-    "description": "Large language model integration and insights",
-    "provider": "Provider",
-    "apiKey": "API key"
+    "title": "AI 助手",
+    "description": "大型語言模型整合與洞察分析",
+    "provider": "提供者",
+    "apiKey": "API 金鑰"
   },
   "general": "通用",
   "appearance": "外觀",
@@ -78,13 +78,13 @@
     "title": "小元件",
     "fadeOnBlur": "失焦時透明化",
     "fadeHint": "小元件被覆蓋時近透明顯示，點選後恢復",
-    "permissionsTitle": "Widget permissions",
-    "noWidgetsForPermissions": "No widgets installed.",
-    "noPermissions": "No permissions granted.",
-    "neverAccessed": "Never accessed",
-    "autoBlurTitle": "Auto-blur per widget",
-    "autoBlurDesc": "Choose which widgets blur when unfocused.",
-    "autoBlurEnabledCount": "widgets auto-blur"
+    "permissionsTitle": "小元件權限",
+    "noWidgetsForPermissions": "尚未安裝小元件。",
+    "noPermissions": "未授予任何權限。",
+    "neverAccessed": "從未存取",
+    "autoBlurTitle": "依小元件自動模糊",
+    "autoBlurDesc": "選擇哪些小元件在失焦時自動模糊。",
+    "autoBlurEnabledCount": "個小元件已啟用自動模糊"
   },
   "browser": {
     "title": "瀏覽器擴充功能",
@@ -132,7 +132,7 @@
     "integrity": "資料庫完整性",
     "indexes": "核心索引",
     "timeline": "時間線缺口",
-    "schema": "Schema v{{version}}",
+    "schema": "結構版本 v{{version}}",
     "appRows": "使用記錄：{{count}}",
     "archiveRows": "歸檔記錄：{{count}}",
     "ok": "正常",
@@ -192,7 +192,7 @@
     "openTitle": "開啟 TimeLens 備份",
     "filterName": "TimeLens 備份",
     "previewVersion": "包版本 v{{version}}，來源應用程式 {{appVersion}}",
-    "previewSchema": "Schema：{{schema}}",
+    "previewSchema": "結構版本：{{schema}}",
     "previewCounts": "記錄 {{appUsage}}，待辦 {{todos}}，小元件 {{widgets}}",
     "previewChecksum": "校驗和 {{checksum}}...",
     "none": "無",
