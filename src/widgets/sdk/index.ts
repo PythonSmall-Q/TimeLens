@@ -216,6 +216,15 @@ export class WidgetClient {
     }
   }
 
+  async setFocusModeActive(active: boolean): Promise<void> {
+    const response = await this.gatewayRequest(
+      this.makeRequest("focus_mode_write", "settings:write", { active }),
+    );
+    if (response.status !== "success") {
+      throw new WidgetGatewayError(response.error ?? { code: "unknown", message: "setFocusModeActive failed" });
+    }
+  }
+
   async reorderTodos(ids: number[]): Promise<void> {
     const response = await this.gatewayRequest(
       this.makeRequest("todo_write", "todo:write", { action: "reorder", ids }),

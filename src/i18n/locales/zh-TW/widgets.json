@@ -313,6 +313,7 @@
     "title": "第三方小元件",
     "source": "第三方",
     "loading": "正在載入小元件模組...",
+    "jvmRunning": "JVM 小元件主機正在執行。",
     "recoveryHint": "請嘗試撤銷權限、移除該小元件，或匯入更新版本。",
     "retry": "重試",
     "loadErrorHint": "請檢查權限並重新載入小元件。",

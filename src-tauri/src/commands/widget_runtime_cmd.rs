@@ -548,6 +548,24 @@ pub fn emit_widget_lifecycle(
     kernel.lifecycle_event(&request.widget_id, &request.event)
 }
 
+#[tauri::command]
+pub fn start_jvm_widget(
+    widget_id: String,
+    widget_type: String,
+    app: AppHandle,
+    runtime: State<'_, crate::jvm_runtime::JvmRuntimeManager>,
+) -> Result<(), String> {
+    runtime.start(&app, &widget_id, &widget_type)
+}
+
+#[tauri::command]
+pub fn stop_jvm_widget(
+    widget_id: String,
+    runtime: State<'_, crate::jvm_runtime::JvmRuntimeManager>,
+) -> Result<(), String> {
+    runtime.stop(&widget_id)
+}
+
 // ── Error logs and runtime control ────────────────────────────
 
 fn record_widget_error_inner(

@@ -23,6 +23,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - **Widget refresh orchestration** — refresh now targets only the selected or event-affected widget, with a polling fallback when no event is available.
 - **Browser usage classification** — browser domain and hourly statistics now retain the browser name, so usage from Chrome, Edge, and other supported browsers is kept separate; the Browser Usage page also provides a browser filter.
+- **JVM widget hosting** — Java widget manifests are validated and launched through a managed `java -jar` runtime host with lifecycle cleanup instead of being rejected by the registry.
+- **Neutral texture catalog** — added a bundled, dependency-free texture catalog for the neutral skin with linen, paper, and grid patterns.
+- **Widget SDK migration** — the JavaScript template, TypeScript template, and Widget Dev Harness now use the Gateway-backed `WidgetClient` for standard reads, subscriptions, local API calls, and focus writes; the legacy channel remains only as an explicit compatibility surface.
 - **Permission revocation behavior** — revoked widget permissions now clear active subscriptions and emit a `widget-permission-revoked` event so external widgets can enter a degraded state.
 - **Skin asset handling** — selected images are validated and copied into the managed application `skins` directory instead of retaining arbitrary source paths.
 - **Third-party widget recovery** — failed widgets now show recovery guidance and a real remount/retry action.
@@ -56,12 +59,6 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Rust `cargo check`: passed.
 - Rust unit tests compile successfully, but execution is blocked on the current Windows environment by `0xc0000139 STATUS_ENTRYPOINT_NOT_FOUND` during test-process startup.
 - `git diff --check`: passed.
-
-### Known Limitations
-
-- Java/JVM widget hosting is not enabled yet and is explicitly rejected by the registry.
-- The bundled neutral texture catalog remains optional follow-up work; built-in color palettes are available.
-- Some legacy widgets still use compatibility APIs while migration to the Gateway continues.
 
 ---
 

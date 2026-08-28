@@ -479,6 +479,12 @@ export const setWidgetAlwaysOnTop = (id: string, mode: string): Promise<void> =>
 export const getWidgetRegistry = (): Promise<WidgetRegistryResponse> =>
   invoke("get_widget_registry");
 
+export const startJvmWidget = (widgetId: string, widgetType: string): Promise<void> =>
+  invoke("start_jvm_widget", { widgetId, widgetType });
+
+export const stopJvmWidget = (widgetId: string): Promise<void> =>
+  invoke("stop_jvm_widget", { widgetId });
+
 // ── Widget DB config ──────────────────────────────────────────
 export const getAllWidgets = (): Promise<WidgetConfig[]> =>
   invoke("get_all_widgets");

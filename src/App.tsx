@@ -8,6 +8,7 @@ import WidgetWindow from "./widgets/WidgetWindow";
 import { useSettingsStore } from "./stores/settingsStore";
 import { AnnouncerProvider } from "@/components/Announcer";
 import { getSkinPalette } from "@/utils/skinPalettes";
+import { getNeutralTexture } from "@/utils/skinTextures";
 
 /**
  * Root component. Decides whether to render the main dashboard or a widget,
@@ -127,7 +128,7 @@ export default function App() {
     root.style.setProperty("--timelens-app-overlay", skin.app ? String(skin.appOverlay / 100) : "0");
     root.style.setProperty("--timelens-widget-overlay", skin.widget ? String(skin.widgetOverlay / 100) : "0");
     root.style.setProperty("--timelens-skin-pattern", activePalette === "neutral-texture"
-      ? "repeating-linear-gradient(135deg, rgba(255,255,255,.025) 0 1px, transparent 1px 7px)"
+      ? getNeutralTexture().css
       : "none");
     const palette = getSkinPalette(activePalette);
     const paletteVars: Record<string, string> = {

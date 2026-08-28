@@ -567,23 +567,36 @@ pub fn load_third_party_widget_from_manifest_path(
         });
     };
 
-    if manifest
-        .runtime
-        .as_ref()
-        .is_some_and(|runtime| runtime.language.eq_ignore_ascii_case("java"))
-    {
-        return Err(WidgetRegistryLoadError {
-            path: manifest_path.display().to_string(),
-            message: "java runtime is unsupported: no JVM host is enabled".to_string(),
-        });
-    }
-
     let entry_path = parent_dir.join(&manifest.entry);
     if !entry_path.exists() {
         return Err(WidgetRegistryLoadError {
             path: manifest_path.display().to_string(),
             message: format!("entry file not found: {}", entry_path.display()),
         });
+    }
+
+        if let Some(runtime) = manifest.runtime.as_ref() {
+            if runtime.language.eq_ignore_ascii_case("java") {
+        let Some(runtime_entry) = runtime.entry.as_ref() else {
+            return Err(WidgetRegistryLoadError {
+                path: manifest_path.display().to_string(),
+                message: "java runtime requires runtime.entry (a JAR file)".to_string(),
+            });
+        };
+        let runtime_path = parent_dir.join(runtime_entry);
+        if !runtime_path.is_file() {
+            return Err(WidgetRegistryLoadError {
+                path: manifest_path.display().to_string(),
+                message: format!("java runtime entry not found: {}", runtime_path.display()),
+            });
+        }
+        if runtime_path.extension().and_then(|ext| ext.to_str()) != Some("jar") {
+            return Err(WidgetRegistryLoadError {
+                path: manifest_path.display().to_string(),
+                message: "java runtime.entry must point to a .jar file".to_string(),
+            });
+        }
+      }
     }
 
     // ── Signature verification (Phase B) ─────────────────────

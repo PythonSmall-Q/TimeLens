@@ -14,6 +14,20 @@ interface ThirdPartyWidgetContext {
   widgetId: string;
   widgetType: string;
   channel: Record<string, (...args: unknown[]) => Promise<unknown>>;
+  client: {
+    query: <T = unknown>(namespace: string, payload?: Record<string, unknown>) => Promise<T>;
+    localApiCall: (options: unknown) => Promise<unknown>;
+    getBrowserActivity: () => Promise<unknown>;
+    addTodo: (content: string) => Promise<{ id: number }>;
+    toggleTodo: (id: number) => Promise<void>;
+    reorderTodos: (ids: number[]) => Promise<void>;
+    deleteTodo: (id: number) => Promise<void>;
+    setFocusModeActive: (active: boolean) => Promise<void>;
+    requestConsent: (scope: string) => Promise<void>;
+    fetch: (url: string) => Promise<Response>;
+    loadMedia: (url: string) => Promise<unknown>;
+    subscribe: (event: string, callback: (payload: unknown) => void) => Promise<number>;
+  };
 }
 
 interface DevCapability {
@@ -178,6 +192,35 @@ function buildDevChannel(
   return channel;
 }
 
+function buildDevClient(widgetId: string, grantedPerms: string[]) {
+  const channel = buildDevChannel(widgetId, grantedPerms);
+  const states = new Map<string, string>();
+  return {
+    query: async <T = unknown>(namespace: string, payload?: Record<string, unknown>) => {
+      if (namespace === "metrics") return await channel.getAppTotalsInRange(String(payload?.start ?? ""), String(payload?.end ?? "")) as T;
+      if (namespace === "categories") return await channel.getCategoryTotalsInRange(String(payload?.start ?? ""), String(payload?.end ?? "")) as T;
+      if (namespace === "todos") return await channel.getTodos() as T;
+      if (namespace === "goals") return await channel.getUsageGoals() as T;
+      if (namespace === "sessions" || namespace === "focus") return await channel.listFocusSessions() as T;
+      return [] as T;
+    },
+    localApiCall: async (options: unknown) => channel.localApiCall(options),
+    getBrowserActivity: async () => ({ domains: [], status: { connected: false } }),
+    addTodo: async (content: string) => await channel.addTodo(content) as { id: number },
+    toggleTodo: async (id: number) => { await channel.toggleTodo(id); },
+    reorderTodos: async (ids: number[]) => { void ids; },
+    deleteTodo: async (id: number) => { await channel.deleteTodo(id); },
+    setFocusModeActive: async (active: boolean) => { await channel.setFocusModeActive(active); },
+    requestConsent: async (scope: string) => { if (!grantedPerms.includes(scope)) throw new Error(`permission denied: ${scope}`); },
+    fetch: async (url: string) => { void url; throw new Error("network access is unavailable in the dev harness"); },
+    loadMedia: async (url: string) => { void url; throw new Error("media access is unavailable in the dev harness"); },
+    subscribe: async (event: string, callback: (payload: unknown) => void) => channel.onActiveWindowChanged((payload: unknown) => { if (event === "active-window-changed") callback(payload); }) as Promise<number>,
+    setState: async (key: string, value: string) => { states.set(key, value); },
+    getState: async (key: string) => states.get(key) ?? null,
+    deleteState: async (key: string) => { states.delete(key); },
+  };
+}
+
 async function fetchText(url: string): Promise<string> {
   const resp = await fetch(url, { cache: "no-store" });
   if (!resp.ok) throw new Error(`failed to fetch ${url}: ${resp.status}`);
@@ -218,6 +261,7 @@ export default function WidgetDevHarness() {
     () => buildDevChannel("dev-harness-widget", grantedPerms),
     [grantedPerms]
   );
+  const client = useMemo(() => buildDevClient("dev-harness-widget", grantedPerms), [grantedPerms]);
 
   // Pre-select capability toggles from the loaded manifest.
   useEffect(() => {
@@ -282,6 +326,7 @@ export default function WidgetDevHarness() {
         widgetId: "dev-harness-widget",
         widgetType: parsed.widget_type,
         channel,
+        client,
       });
       unmountRef.current = widget.unmount;
       addLog(`loaded widget: ${parsed.widget_type}`);
@@ -290,7 +335,7 @@ export default function WidgetDevHarness() {
       setError(message);
       addLog(`error: ${message}`);
     }
-  }, [folder, channel, addLog]);
+  }, [folder, channel, client, addLog]);
 
   // Initial load when folder or channel changes.
   useEffect(() => {

@@ -154,6 +154,13 @@ export default function ExternalWidgetHost({ widgetId, widgetType }: Props) {
           setRegistryItem(item);
         }
 
+        if (item.runtime_language?.toLowerCase() === "java") {
+          await api.startJvmWidget(widgetId, widgetType);
+          return async () => {
+            await api.stopJvmWidget(widgetId).catch(() => {});
+          };
+        }
+
         const moduleUrl = convertFileSrc(item.entry);
         const loaded = await import(/* @vite-ignore */ moduleUrl);
         const widget = normalizeModule(loaded);
@@ -273,6 +280,11 @@ export default function ExternalWidgetHost({ widgetId, widgetType }: Props) {
         </div>
       )}
       <div ref={containerRef} className="h-full w-full" />
+      {registryItem?.runtime_language?.toLowerCase() === "java" && !error && (
+        <div className="absolute inset-0 grid place-items-center text-xs text-text-muted">
+          {t("thirdParty.jvmRunning")}
+        </div>
+      )}
       {!registryItem && (
         <div className="absolute inset-0 grid place-items-center text-xs text-text-muted">
           {t("thirdParty.loading")}

@@ -8,6 +8,7 @@ pub mod monitor;
 pub mod widget_gateway;
 pub mod widget_kernel;
 pub mod widget_registry;
+pub mod jvm_runtime;
 
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -663,6 +664,7 @@ pub fn run() {
                 widget_kernel::WidgetKernel::new(db_state.clone(), widget_call_rate_limiter.clone());
             widget_kernel.set_app_handle(app.handle().clone());
             app.manage(widget_kernel);
+            app.manage(jvm_runtime::JvmRuntimeManager::default());
 
             // Initialize extension bridge key on first run
             {
@@ -1270,6 +1272,8 @@ pub fn run() {
             commands::set_widget_state,
             commands::delete_widget_state,
             commands::emit_widget_lifecycle,
+            commands::start_jvm_widget,
+            commands::stop_jvm_widget,
             commands::record_widget_error,
             commands::get_widget_error_log,
             commands::clear_widget_error_log,

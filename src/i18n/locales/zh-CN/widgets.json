@@ -296,6 +296,7 @@
     "title": "第三方小组件",
     "source": "第三方",
     "loading": "正在加载小组件模块...",
+    "jvmRunning": "JVM 小组件宿主正在运行。",
     "recoveryHint": "请尝试撤销权限、移除该小组件，或导入更新版本。",
     "retry": "重试",
     "loadErrorHint": "请检查权限并重新加载小组件。",

@@ -98,11 +98,11 @@ export function createWidget(): WidgetInstance {
         button("Client queries/state", () => void runClientReads()),
         button("Legacy read channel", () => void runLegacyReads()),
         button("Todo write lifecycle", () => void runTodoWrites()),
-        button("Local API call", () => void context.channel.localApiCall({
+        button("Local API call", () => void context.client.localApiCall({
           method: "GET", path: "/api/screen-time/today", scopes: ["screen-time:read"],
-        }).then((value) => write(output, "channel.localApiCall", value)).catch((error: unknown) => write(output, "local API error", String(error)))),
+        }).then((value) => write(output, "client.localApiCall", value)).catch((error: unknown) => write(output, "local API error", String(error)))),
         button("Focus/settings writes", () => void Promise.all([
-          context.channel.setFocusModeActive(false),
+          context.client.setFocusModeActive(false),
           context.channel.setMonitoringActive(true),
         ]).then(() => write(output, "channel settings", "ok")).catch((error: unknown) => write(output, "settings error", String(error)))),
         button("Request consent", () => void context.client.requestConsent("screen-time:read").then(() => write(output, "client.requestConsent", "ok")).catch((error: unknown) => write(output, "consent error", String(error)))),

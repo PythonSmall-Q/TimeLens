@@ -296,6 +296,7 @@
     "title": "Third-party Widget",
     "source": "Third-party",
     "loading": "Loading widget module...",
+    "jvmRunning": "JVM widget host is running.",
     "recoveryHint": "Try revoking permissions, removing the widget, or importing an updated version.",
     "retry": "Retry",
     "loadErrorHint": "Check permissions and reload the widget.",

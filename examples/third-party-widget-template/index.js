@@ -86,7 +86,7 @@ export function createWidget() {
       container.appendChild(rootEl);
 
       try {
-        const rows = await context.channel.getTodayAppTotals();
+        const rows = await context.client.query("metrics");
         const total = rows.reduce((acc, row) => acc + row.total_seconds, 0);
         const hours = (total / 3600).toFixed(1);
         usage.textContent = `Today tracked: ${hours} h`;
@@ -95,7 +95,7 @@ export function createWidget() {
       }
 
       try {
-        stopListening = await context.channel.onActiveWindowChanged((info) => {
+        stopListening = await context.client.subscribe("active-window-changed", (info) => {
           title.textContent = `Sample Hello Widget · ${info.app_name || "Unknown"}`;
         });
       } catch (err) {
@@ -104,7 +104,7 @@ export function createWidget() {
 
       // Example: call the local HTTP API through the widget bridge.
       try {
-        const result = await context.channel.localApiCall({
+        const result = await context.client.localApiCall({
           method: "GET",
           path: "/api/screen-time/today",
           scopes: ["screen-time:read"],
