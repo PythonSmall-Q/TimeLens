@@ -116,6 +116,8 @@
     "untitled": "未命名便签",
     "savedAt": "已保存于",
     "unsaved": "未保存的更改",
+    "saving": "保存中...",
+    "saveFailed": "保存失败",
     "recovered": "已从备份恢复便签",
     "restore": "从备份恢复"
   },

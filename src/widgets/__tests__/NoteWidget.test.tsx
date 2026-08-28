@@ -71,6 +71,26 @@ describe("NoteWidget", () => {
     window.removeEventListener("timelens-widget-auto-blur-changed", onAutoBlurChanged);
   });
 
+  it("saves edited note content when Save is clicked", async () => {
+    const notes = JSON.stringify([
+      { id: "n1", content: "First note", updatedAt: new Date().toISOString() },
+    ]);
+    mockGatewayState({ notes, notes_backup: notes });
+    renderWithProviders(<NoteWidget widgetId="note-test" />);
+
+    const editor = await screen.findByRole("textbox");
+    await userEvent.type(editor, " updated");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      const writeCalls = mockTauriApi.widgetGatewayRequest.mock.calls.filter(
+        (call) => call[0].request_type === "state_write"
+      );
+      expect(writeCalls).toHaveLength(2);
+    });
+    expect(screen.getByText(/^Saved at/)).toBeInTheDocument();
+  });
+
   it("deletes the current note", async () => {
     const notes = JSON.stringify([
       { id: "n1", content: "First note", updatedAt: new Date().toISOString() },

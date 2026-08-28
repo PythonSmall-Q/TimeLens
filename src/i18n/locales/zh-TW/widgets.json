@@ -116,6 +116,8 @@
     "untitled": "未命名便箋",
     "savedAt": "儲存於",
     "unsaved": "有未儲存的變更",
+    "saving": "儲存中...",
+    "saveFailed": "無法儲存變更",
     "recovered": "便箋已從備份還原",
     "restore": "從備份還原"
   },

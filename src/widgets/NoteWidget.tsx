@@ -57,6 +57,7 @@ export default function NoteWidget({ widgetId }: Props) {
   const [selectedId, setSelectedId] = useState<string>("");
   const [draft, setDraft] = useState<string>("");
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "error">("idle");
   const [showRecovered, setShowRecovered] = useState(false);
   const [autoBlur, setAutoBlur] = useState(() => {
     try {
@@ -160,8 +161,9 @@ export default function NoteWidget({ widgetId }: Props) {
         client.setState(BACKUP_KEY, serializeNotes(nextNotes)),
       ]);
       setLastSavedAt(new Date());
+      return true;
     } catch {
-      // Keep local state even if gateway write fails.
+      return false;
     }
   }, [client]);
 
@@ -250,12 +252,14 @@ export default function NoteWidget({ widgetId }: Props) {
 
   const saveCurrent = async () => {
     if (!selectedNote) return;
+    setSaveState("saving");
     const next = notes.map((n) =>
       n.id === selectedNote.id
         ? { ...n, content: draft, updatedAt: new Date().toISOString() }
         : n
     );
-    await persist(next);
+    const saved = await persist(next);
+    setSaveState(saved ? "idle" : "error");
   };
 
   const deleteCurrent = async () => {
@@ -387,22 +391,32 @@ export default function NoteWidget({ widgetId }: Props) {
             <>
               <textarea
                 value={draft}
-                onChange={(e) => setDraft(e.target.value)}
+                onChange={(e) => {
+                  setDraft(e.target.value);
+                  setLastSavedAt(null);
+                  setSaveState("idle");
+                }}
                 placeholder={t("note.placeholder")}
                 className="ui-field flex-1 min-h-0 resize-none leading-relaxed"
               />
               <div className="flex justify-between items-center">
-                <span className={clsx("text-[11px] transition-colors", lastSavedAt ? "text-accent-green" : "text-text-muted")}>
-                  {lastSavedAt
+                <span className={clsx(
+                  "text-[11px] transition-colors",
+                  saveState === "error" ? "text-accent-red" : lastSavedAt ? "text-accent-green" : "text-text-muted"
+                )}>
+                  {saveState === "error"
+                    ? t("note.saveFailed")
+                    : lastSavedAt
                     ? `${t("note.savedAt")} ${lastSavedAt.toLocaleTimeString()}`
                     : t("note.unsaved")}
                 </span>
                 <button
                   onClick={() => void saveCurrent()}
+                  disabled={saveState === "saving"}
                   className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg border border-accent-blue/50 text-accent-blue hover:bg-accent-blue/10 transition-colors"
                 >
                   <Save size={12} />
-                  {t("note.save")}
+                  {saveState === "saving" ? t("note.saving") : t("note.save")}
                 </button>
               </div>
             </>

@@ -116,6 +116,8 @@
     "untitled": "Untitled note",
     "savedAt": "Saved at",
     "unsaved": "Unsaved changes",
+    "saving": "Saving...",
+    "saveFailed": "Could not save changes",
     "recovered": "Notes restored from backup",
     "restore": "Restore from backup"
   },
