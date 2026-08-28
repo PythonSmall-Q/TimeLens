@@ -5,6 +5,64 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [2.3.0] - 2026-08-28
+
+### Added
+
+- **Skin Studio** — added separate local background images for the TimeLens app and widget windows, with live preview, clear/reset actions, `cover` / `contain` / `stretch` fit modes, configurable overlay strength, and per-widget skin overrides.
+- **Built-in skin palettes** — added Default, Ocean, Forest, Sunset, and Monochrome palettes that update surface, text, border, and accent colors across the app and widgets.
+- **Widget layout presets** — save, apply, replace, delete, import, and export named widget layouts; built-in Work, Focus, Break, Coding, and Review presets are created automatically.
+- **Backup-compatible layout settings** — layout presets are included in Backup & Restore packages and restored with the backup payload.
+- **Scheduled layout switching** — switch layouts automatically by local time or focus state without relying on a cloud service.
+- **Widget health center** — added heartbeat, memory, CPU time, consecutive failure, pause, suspension, last error, and recovery information for installed widgets.
+- **Official experience widgets** — added Skin Preview, Layout Switcher, Widget Health, and Focus Streak widgets.
+- **Widget diagnostics** — added redacted skin snapshot export, contrast checking, reduced-motion support, compact widget mode, and Widget Dev Harness diagnostics with capability simulation, hash inspection, logs, and auto-reload.
+- **Update flow tests** — added coverage for update checking, download confirmation, download progress, install confirmation, and unavailable updater states.
+
+### Changed
+
+- **Widget refresh orchestration** — refresh now targets only the selected or event-affected widget, with a polling fallback when no event is available.
+- **Permission revocation behavior** — revoked widget permissions now clear active subscriptions and emit a `widget-permission-revoked` event so external widgets can enter a degraded state.
+- **Skin asset handling** — selected images are validated and copied into the managed application `skins` directory instead of retaining arbitrary source paths.
+- **Third-party widget recovery** — failed widgets now show recovery guidance and a real remount/retry action.
+- **Update confirmation policy** — automatic and manual update checks now use the same explicit flow: confirm download first, then confirm installation after download completes.
+- **Cross-window events** — todo, focus, active-window, goal, interruption, skin, and widget-refresh events now update relevant windows without requiring a full app restart.
+
+### Fixed
+
+- **Main app skin visibility** — fixed opaque layout backgrounds covering the configured app background image.
+- **Skin reset appearance** — clearing a background image now removes its overlay and restores the original theme instead of leaving a gray veil.
+- **Managed skin URL resolution** — fixed imported skin paths so Asset Protocol can resolve copied files in the application data directory.
+- **Asset Protocol exposure** — restricted local asset access to managed `skins` and `widgets` directories instead of the entire user home directory.
+- **Network SSRF protection** — disabled automatic redirects, validated resolved host addresses, and blocked private, loopback, link-local, multicast, documentation, and reserved targets.
+- **Local API scope escalation** — widget local API requests are now limited by both route scope and the widget's granted permissions; payload-declared scopes cannot expand access.
+- **CodeQL Rust extraction** — changed the Rust CodeQL job to `manual` build mode and moved the Cargo build after CodeQL initialization.
+- **Cryptographic value detection** — changed Argon2 output-buffer initialization so CodeQL no longer reports the derived-key buffer as a hard-coded cryptographic value.
+- **Manual update notification** — fixed Settings > About so a manually detected update opens the same confirmation dialog used by automatic checks.
+
+### Security
+
+- **Managed local resources** — image imports enforce allowed extensions, file signatures, size limits, managed-directory boundaries, and traversal protection.
+- **Gateway request governance** — network, media, local API, and notification requests continue through permission checks, audit logging, timeouts, response limits, and normalized errors.
+- **Dependency audit** — `npm audit --audit-level=high` reports zero vulnerabilities for the v2.3.0 dependency tree.
+
+### Tests
+
+- Frontend tests: **69 passed**.
+- TypeScript typecheck: passed.
+- ESLint: 0 errors; 8 existing warnings remain.
+- Rust `cargo check`: passed.
+- Rust unit tests compile successfully, but execution is blocked on the current Windows environment by `0xc0000139 STATUS_ENTRYPOINT_NOT_FOUND` during test-process startup.
+- `git diff --check`: passed.
+
+### Known Limitations
+
+- Java/JVM widget hosting is not enabled yet and is explicitly rejected by the registry.
+- The bundled neutral texture catalog remains optional follow-up work; built-in color palettes are available.
+- Some legacy widgets still use compatibility APIs while migration to the Gateway continues.
+
+---
+
 ## [2.2.0] - 2026-08-28
 
 ### Added
