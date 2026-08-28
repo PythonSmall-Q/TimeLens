@@ -57,6 +57,7 @@ html {
 
 html,
 body {
+  background-image: var(--timelens-skin-pattern, none);
   margin: 0;
   padding: 0;
   background: var(--app-bg);

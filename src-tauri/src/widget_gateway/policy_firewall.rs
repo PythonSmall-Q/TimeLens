@@ -2,6 +2,48 @@
 const DEFAULT_BLOCKED_CATEGORIES: &[&str] =
     &["auth", "payment", "file-hosting", "sensitive-upload"];
 
+fn is_forbidden_ip(ip: std::net::IpAddr) -> bool {
+    match ip {
+        std::net::IpAddr::V4(ip) => {
+            ip.is_private()
+                || ip.is_loopback()
+                || ip.is_link_local()
+                || ip.is_unspecified()
+                || ip.is_broadcast()
+                || ip.is_documentation()
+                || ip.octets()[0] == 0
+                || (ip.octets()[0] == 100 && (64..=127).contains(&ip.octets()[1]))
+                || ip.octets()[0] >= 224
+        }
+        std::net::IpAddr::V6(ip) => {
+            ip.is_loopback()
+                || ip.is_unspecified()
+                || ip.is_unique_local()
+                || ip.is_unicast_link_local()
+                || ip.is_multicast()
+                || (ip.segments()[0] == 0x2001 && ip.segments()[1] == 0x0db8)
+        }
+    }
+}
+
+pub fn validate_resolved_host(host: &str, port: u16) -> Result<(), String> {
+    use std::net::ToSocketAddrs;
+    let addresses = (host, port)
+        .to_socket_addrs()
+        .map_err(|_| "policy_denied: resource host could not be resolved".to_string())?;
+    let mut found = false;
+    for address in addresses {
+        found = true;
+        if is_forbidden_ip(address.ip()) {
+            return Err("policy_denied: resolved resource target is private or reserved".to_string());
+        }
+    }
+    if !found {
+        return Err("policy_denied: resource host has no addresses".to_string());
+    }
+    Ok(())
+}
+
 /// Check whether a network/media request target is allowed by baseline policy.
 pub fn is_target_allowed(resource_hint: &str) -> Result<(), String> {
     if resource_hint.is_empty() {
@@ -21,17 +63,7 @@ pub fn is_target_allowed(resource_hint: &str) -> Result<(), String> {
         .ok_or_else(|| "policy_denied: resource URL has no host".to_string())?
         .to_lowercase();
 
-    let private_ip = host.parse::<std::net::IpAddr>().is_ok_and(|ip| match ip {
-        std::net::IpAddr::V4(ip) => {
-            ip.is_private() || ip.is_loopback() || ip.is_link_local() || ip.is_unspecified()
-        }
-        std::net::IpAddr::V6(ip) => {
-            ip.is_loopback()
-                || ip.is_unspecified()
-                || ip.is_unique_local()
-                || ip.is_unicast_link_local()
-        }
-    });
+    let private_ip = host.parse::<std::net::IpAddr>().is_ok_and(is_forbidden_ip);
     if host == "localhost" || host == "localhost.localdomain" || private_ip {
         return Err("policy_denied: private or loopback resource targets are blocked".to_string());
     }

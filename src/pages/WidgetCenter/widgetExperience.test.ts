@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { WidgetConfig } from "@/types";
-import { applyWidgetPreset, createWidgetPreset, readWidgetPresets, saveWidgetPresets } from "./widgetExperience";
+import { applyWidgetPreset, createWidgetPreset, getCurrentProfileId, readWidgetPresets, saveWidgetPresets, setCurrentProfileId } from "./widgetExperience";
 
 const widget: WidgetConfig = {
   id: "clock-1", widget_type: "clock", monitor_index: 0, x: 10, y: 20, width: 320, height: 220,
@@ -19,5 +19,21 @@ describe("widget layout presets", () => {
   it("keeps current config when a preset does not contain that widget", () => {
     const preset = createWidgetPreset("Work", []);
     expect(applyWidgetPreset([widget], preset)).toEqual([widget]);
+  });
+
+  it("isolates presets by profile", () => {
+    const values = new Map<string, string>();
+    const storage = {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => { values.set(key, value); },
+    };
+    setCurrentProfileId("old", storage);
+    saveWidgetPresets([createWidgetPreset("Old", [])], storage);
+    setCurrentProfileId("new", storage);
+    expect(getCurrentProfileId(storage)).toBe("new");
+    expect(readWidgetPresets(storage)).toEqual([]);
+    saveWidgetPresets([createWidgetPreset("New", [])], storage);
+    setCurrentProfileId("old", storage);
+    expect(readWidgetPresets(storage)[0].name).toBe("Old");
   });
 });

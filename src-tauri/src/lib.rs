@@ -1249,6 +1249,7 @@ pub fn run() {
             commands::record_widget_permission_access,
             commands::import_local_widget,
             commands::issue_widget_api_token,
+            commands::import_skin_image,
             // Widget runtime v2.2.0
             commands::widget_query,
             commands::widget_subscribe,

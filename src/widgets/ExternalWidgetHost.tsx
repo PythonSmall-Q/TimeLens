@@ -81,6 +81,7 @@ export default function ExternalWidgetHost({ widgetId, widgetType }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [retryNonce, setRetryNonce] = useState(0);
   const [pendingConsents, setPendingConsents] = useState<PendingConsent[]>([]);
+  const [permissionRevoked, setPermissionRevoked] = useState(false);
   const pendingConsentsRef = useRef<PendingConsent[]>([]);
 
   const client = useMemo(() => {
@@ -102,6 +103,7 @@ export default function ExternalWidgetHost({ widgetId, widgetType }: Props) {
           });
         });
       },
+      onPermissionRevoked: () => setPermissionRevoked(true),
     });
   }, [widgetId, widgetType]);
 
@@ -265,6 +267,11 @@ export default function ExternalWidgetHost({ widgetId, widgetType }: Props) {
 
   return (
     <div className="h-full w-full relative">
+      {permissionRevoked && (
+        <div className="absolute inset-x-2 top-2 z-10 rounded bg-yellow-100 px-2 py-1 text-xs text-yellow-900">
+          {t("permissionRevoked")}
+        </div>
+      )}
       <div ref={containerRef} className="h-full w-full" />
       {!registryItem && (
         <div className="absolute inset-0 grid place-items-center text-xs text-text-muted">

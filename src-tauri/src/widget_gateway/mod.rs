@@ -448,6 +448,8 @@ impl WidgetGateway {
         {
             return Err("policy_denied: local API scope is not supported".to_string());
         }
+        let route_scopes = local_api_route_scopes(path, method.as_str())
+            .ok_or_else(|| "policy_denied: local API route is not allowed for widgets".to_string())?;
         let conn = self.db.lock().map_err(|e| e.to_string())?;
         let permissions = db::get_widget_permissions(&conn, &request.widget_id)
             .map_err(|e| format!("provider_error: {e}"))?;
@@ -457,10 +459,22 @@ impl WidgetGateway {
         {
             return Err("permission_denied: local-api:call permission is required".to_string());
         }
+        if scopes.iter().any(|scope| !route_scopes.contains(&scope.as_str())) {
+            return Err("policy_denied: requested scope is not allowed for this route".to_string());
+        }
+        let granted_scopes = route_scopes
+            .iter()
+            .copied()
+            .filter(|scope| permissions.iter().any(|permission| permission == scope))
+            .map(str::to_string)
+            .collect::<Vec<_>>();
+        if scopes.iter().any(|scope| !granted_scopes.iter().any(|granted| granted == scope)) {
+            return Err("permission_denied: requested local API scope is not granted".to_string());
+        }
         let token = crate::commands::extension_bridge_cmd::issue_api_token_impl(
             &conn,
             format!("Widget: {}", request.widget_id),
-            scopes,
+            granted_scopes,
             None,
         )?;
         drop(conn);
@@ -499,8 +513,17 @@ impl WidgetGateway {
             .as_deref()
             .ok_or_else(|| "invalid_request: resource URL is required".to_string())?;
         policy_firewall::is_target_allowed(target)?;
+        let parsed_target = reqwest::Url::parse(target)
+            .map_err(|_| "policy_denied: invalid resource URL".to_string())?;
+        policy_firewall::validate_resolved_host(
+            parsed_target
+                .host_str()
+                .ok_or_else(|| "policy_denied: resource URL has no host".to_string())?,
+            parsed_target.port_or_known_default().unwrap_or(443),
+        )?;
         let client = reqwest::blocking::Client::builder()
             .timeout(std::time::Duration::from_secs(PROXY_TIMEOUT_SECS))
+            .redirect(reqwest::redirect::Policy::none())
             .build()
             .map_err(|e| format!("provider_error: {e}"))?;
         let response = client.get(target).send().map_err(|e| {
@@ -698,6 +721,26 @@ impl WidgetGateway {
     pub fn revoke_consent(&self, widget_id: &str, scope: &str) -> Result<(), String> {
         let conn = self.db.lock().map_err(|e| e.to_string())?;
         consent_service::revoke_scope(&conn, widget_id, scope)
+    }
+}
+
+fn local_api_route_scopes(path: &str, method: &str) -> Option<&'static [&'static str]> {
+    match (method, path) {
+        ("GET", "/api/status")
+        | ("GET", "/api/screen-time/today")
+        | ("GET", "/api/screen-time/range")
+        | ("GET", "/api/categories") => Some(&["screen-time:read"]),
+        ("GET", "/api/browser/link") => Some(&["browser:read"]),
+        ("POST", "/api/browser/session") => Some(&["browser:write"]),
+        ("GET", "/api/vscode/stats/today")
+        | ("GET", "/api/vscode/stats/range")
+        | ("GET", "/api/vscode/languages/range")
+        | ("GET", "/api/vscode/projects/range")
+        | ("GET", "/api/vscode/enabled") => Some(&["vscode:read"]),
+        ("POST", "/api/vscode/sessions") | ("POST", "/api/vscode/enabled") => {
+            Some(&["vscode:write"])
+        }
+        _ => None,
     }
 }
 

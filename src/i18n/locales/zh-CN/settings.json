@@ -38,7 +38,7 @@
   },
   "skin": {
     "palette": "调色板",
-    "palettes": { "default": "默认", "ocean": "海洋", "forest": "森林", "sunset": "夕阳", "monochrome": "黑白" },
+    "palettes": { "default": "默认", "ocean": "海洋", "forest": "森林", "sunset": "夕阳", "monochrome": "黑白", "neutral-texture": "中性纹理" },
     "appBackground": "TimeLens 背景图片",
     "widgetBackground": "小组件背景图片",
     "choose": "选择图片",
@@ -386,6 +386,7 @@
     "upToDate": "已是最新版本",
     "updateAvailable": "发现新版本：v{{version}}",
     "viewRelease": "查看发布说明"
+    ,"updateTitle": "更新 TimeLens", "downloadConfirm": "下载版本 {{version}}？", "installConfirm": "现在安装版本 {{version}}？", "downloadUpdate": "下载", "installUpdate": "安装", "downloading": "下载中…", "installing": "安装中…"
   },
   "saved": "设置已保存",
   "addLanguageHint": "如需添加新语言，请参阅 docs/ADD_LANGUAGE.md",

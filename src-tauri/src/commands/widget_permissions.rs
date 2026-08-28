@@ -1,5 +1,5 @@
 use std::fs;
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::commands::storage_cmd::DbState;
 use crate::models::{IssuedApiToken, WidgetPermissionAuditEntry, WidgetPermissionEntry};
@@ -32,11 +32,18 @@ pub fn set_widget_permissions(
 pub fn revoke_all_widget_permissions(
     widget_id: String,
     actor: Option<String>,
+    app: AppHandle,
     db: State<'_, DbState>,
 ) -> Result<(), String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
     crate::db::revoke_all_widget_permissions(&conn, &widget_id, actor.as_deref())
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    crate::db::clear_widget_subscriptions(&conn, &widget_id).map_err(|e| e.to_string())?;
+    let _ = app.emit(
+        "widget-permission-revoked",
+        serde_json::json!({ "widgetId": widget_id, "scope": null, "all": true }),
+    );
+    Ok(())
 }
 
 #[tauri::command]

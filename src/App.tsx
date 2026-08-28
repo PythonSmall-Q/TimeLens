@@ -126,6 +126,9 @@ export default function App() {
     root.style.setProperty("--timelens-widget-background-fit", skin.widgetFit === "stretch" ? "100% 100%" : skin.widgetFit);
     root.style.setProperty("--timelens-app-overlay", skin.app ? String(skin.appOverlay / 100) : "0");
     root.style.setProperty("--timelens-widget-overlay", skin.widget ? String(skin.widgetOverlay / 100) : "0");
+    root.style.setProperty("--timelens-skin-pattern", activePalette === "neutral-texture"
+      ? "repeating-linear-gradient(135deg, rgba(255,255,255,.025) 0 1px, transparent 1px 7px)"
+      : "none");
     const palette = getSkinPalette(activePalette);
     const paletteVars: Record<string, string> = {
       "--app-bg": palette.appBg, "--surface": palette.surface, "--surface-light": palette.surfaceLight,

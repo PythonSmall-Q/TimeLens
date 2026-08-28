@@ -40,6 +40,8 @@ import LlmSettings from "./LlmSettings";
 
 import SettingsCard from "./SettingsCard";
 import { SKIN_PALETTES, type SkinPaletteId } from "@/utils/skinPalettes";
+import { check as checkUpdater, type Update } from "@tauri-apps/plugin-updater";
+import { transitionUpdateFlow, type UpdateFlowState } from "./updateFlow";
 
 function SettingsRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -129,6 +131,8 @@ export default function Settings() {
   const [retentionRunResult, setRetentionRunResult] = useState<RetentionRunResult | null>(null);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [updateCheckResult, setUpdateCheckResult] = useState<{ status: "upToDate" | "available" | "error"; version?: string; url?: string; message?: string } | null>(null);
+  const [updateFlow, setUpdateFlow] = useState<UpdateFlowState>({ phase: "idle" });
+  const [pendingUpdate, setPendingUpdate] = useState<Update | null>(null);
   const [shortcuts, setShortcutState] = useState<ShortcutSettings>({
     open_widget_center: "Alt+W",
     toggle_widget_visibility: "Alt+Shift+W",
@@ -276,7 +280,10 @@ export default function Settings() {
         directory: false,
         filters: [{ name: "Images", extensions: ["png", "jpg", "jpeg", "webp", "gif"] }],
       });
-      if (typeof selected === "string") updateSkin(kind, selected);
+      if (typeof selected === "string") {
+        const relativePath = await api.importSkinImage(selected);
+        updateSkin(kind, relativePath);
+      }
     } catch {
       // A cancelled or unavailable native picker leaves the current skin unchanged.
     }
@@ -439,18 +446,6 @@ export default function Settings() {
 
   const setShortcut = (key: keyof ShortcutSettings, value: string) => {
     setShortcutState((prev) => ({ ...prev, [key]: value }));
-  };
-
-  const compareVersions = (a: string, b: string) => {
-    const pa = a.split(".").map(Number);
-    const pb = b.split(".").map(Number);
-    for (let i = 0; i < 3; i += 1) {
-      const na = pa[i] ?? 0;
-      const nb = pb[i] ?? 0;
-      if (na > nb) return 1;
-      if (na < nb) return -1;
-    }
-    return 0;
   };
 
   const normalizeExePath = (p: string) => p.trim().replace(/\//g, "\\").toLowerCase();
@@ -619,19 +614,19 @@ export default function Settings() {
   const checkForUpdatesNow = async () => {
     setCheckingUpdate(true);
     setUpdateCheckResult(null);
+    setUpdateFlow({ phase: "checking" });
     try {
-      const res = await fetch("https://api.github.com/repos/PythonSmall-Q/TimeLens/releases/latest");
-      if (!res.ok) {
-        throw new Error(`GitHub API: ${res.status}`);
-      }
-      const data = (await res.json()) as { tag_name?: string; html_url?: string };
-      const latest = (data.tag_name ?? "").replace(/^v/, "");
-      if (latest && compareVersions(latest, APP_VERSION) > 0) {
-        setUpdateCheckResult({ status: "available", version: latest, url: data.html_url });
+      const update = await checkUpdater();
+      if (update) {
+        setPendingUpdate(update);
+        setUpdateFlow(transitionUpdateFlow({ phase: "checking" }, { type: "available", version: update.version }));
+        setUpdateCheckResult({ status: "available", version: update.version });
       } else {
+        setUpdateFlow(transitionUpdateFlow({ phase: "checking" }, { type: "none" }));
         setUpdateCheckResult({ status: "upToDate" });
       }
     } catch (error) {
+      setUpdateFlow({ phase: "error", message: error instanceof Error ? error.message : t("about.checkFailed") });
       setUpdateCheckResult({
         status: "error",
         message: error instanceof Error ? error.message : t("about.checkFailed"),
@@ -639,6 +634,29 @@ export default function Settings() {
     } finally {
       setCheckingUpdate(false);
     }
+  };
+
+  const downloadUpdate = async () => {
+    if (!pendingUpdate || updateFlow.phase !== "download-confirmation") return;
+    if (!(await tauriConfirm(t("about.downloadConfirm", { version: pendingUpdate.version }), t("about.updateTitle")))) return;
+    setUpdateFlow(transitionUpdateFlow(updateFlow, { type: "download-confirmed" }));
+    try {
+      await pendingUpdate.download((event) => {
+        if (event.event === "Progress") {
+          setUpdateFlow((current) => transitionUpdateFlow(current, { type: "download-progress", progress: null }));
+        }
+      });
+      setUpdateFlow((current) => transitionUpdateFlow(current, { type: "downloaded" }));
+    } catch (error) {
+      setUpdateFlow({ phase: "error", message: error instanceof Error ? error.message : t("about.checkFailed") });
+    }
+  };
+
+  const installUpdate = async () => {
+    if (!pendingUpdate || updateFlow.phase !== "install-confirmation") return;
+    if (!(await tauriConfirm(t("about.installConfirm", { version: pendingUpdate.version }), t("about.updateTitle")))) return;
+    setUpdateFlow(transitionUpdateFlow(updateFlow, { type: "install-confirmed" }));
+    await pendingUpdate.install();
   };
 
   // v2.0.0 data health actions
@@ -2635,6 +2653,16 @@ export default function Settings() {
                 {t("about.viewRelease")}
               </a>
             )}
+            {updateFlow.phase === "download-confirmation" && (
+              <button onClick={() => void downloadUpdate()} className="text-xs px-3 py-1.5 rounded-xl border border-accent-blue/50 text-accent-blue">
+                {t("about.downloadUpdate")}
+              </button>
+            )}
+            {updateFlow.phase === "install-confirmation" && (
+              <button onClick={() => void installUpdate()} className="text-xs px-3 py-1.5 rounded-xl border border-accent-green/50 text-accent-green">
+                {t("about.installUpdate")}
+              </button>
+            )}
           </div>
         </SettingsRow>
         {updateCheckResult?.status === "upToDate" && (
@@ -2645,6 +2673,12 @@ export default function Settings() {
         )}
         {updateCheckResult?.status === "error" && (
           <p className="text-xs text-red-300 text-right">{updateCheckResult.message || t("about.checkFailed")}</p>
+        )}
+        {updateFlow.phase === "downloading" && (
+          <p className="text-xs text-accent-blue text-right">{t("about.downloading")}</p>
+        )}
+        {updateFlow.phase === "installing" && (
+          <p className="text-xs text-accent-green text-right">{t("about.installing")}</p>
         )}
         <SettingsRow label="GitHub">
           <a

@@ -663,11 +663,12 @@ fn derive_key(passphrase: &str, salt: &[u8]) -> [u8; 32] {
     use argon2::{Algorithm, Argon2, Params, Version};
     let params = Params::new(65536, 3, 4, Some(32)).expect("valid argon2 params");
     let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
-    let mut key = [0u8; 32];
+    let mut key = Box::<[u8; 32]>::new_uninit();
+    let key_bytes = unsafe { std::slice::from_raw_parts_mut(key.as_mut_ptr().cast::<u8>(), 32) };
     argon2
-        .hash_password_into(passphrase.as_bytes(), salt, &mut key)
+        .hash_password_into(passphrase.as_bytes(), salt, key_bytes)
         .expect("argon2 key derivation failed");
-    key
+    *unsafe { key.assume_init() }
 }
 
 fn encrypt_bytes(plaintext: &[u8], passphrase: &str) -> Result<EncryptedBackupHeader, String> {

@@ -8,10 +8,27 @@ export interface WidgetLayoutPreset {
 }
 
 export const WIDGET_PRESETS_STORAGE_KEY = "timelens-widget-layout-presets.v1";
+export const CURRENT_PROFILE_STORAGE_KEY = "timelens-current-profile-id";
+
+export function getCurrentProfileId(storage: Pick<Storage, "getItem"> = localStorage): string {
+  return storage.getItem(CURRENT_PROFILE_STORAGE_KEY)?.trim() || "default";
+}
+
+export function setCurrentProfileId(profileId: string, storage: Pick<Storage, "setItem"> = localStorage): void {
+  storage.setItem(CURRENT_PROFILE_STORAGE_KEY, profileId.trim() || "default");
+}
+
+export function widgetPresetsStorageKey(profileId = getCurrentProfileId()): string {
+  return `${WIDGET_PRESETS_STORAGE_KEY}:${profileId}`;
+}
+
+export function widgetSkinStorageKey(widgetId: string, profileId = getCurrentProfileId()): string {
+  return `timelens-widget-skin:${profileId}:${widgetId}`;
+}
 
 export function readWidgetPresets(storage: Pick<Storage, "getItem"> = localStorage): WidgetLayoutPreset[] {
   try {
-    const value = JSON.parse(storage.getItem(WIDGET_PRESETS_STORAGE_KEY) ?? "[]") as unknown;
+    const value = JSON.parse(storage.getItem(widgetPresetsStorageKey(getCurrentProfileId(storage))) ?? "[]") as unknown;
     if (!Array.isArray(value)) return [];
     return value.filter((item): item is WidgetLayoutPreset => (
       !!item && typeof item === "object" && typeof (item as WidgetLayoutPreset).id === "string"
@@ -22,8 +39,8 @@ export function readWidgetPresets(storage: Pick<Storage, "getItem"> = localStora
   }
 }
 
-export function saveWidgetPresets(presets: WidgetLayoutPreset[], storage: Pick<Storage, "setItem"> = localStorage): void {
-  storage.setItem(WIDGET_PRESETS_STORAGE_KEY, JSON.stringify(presets));
+export function saveWidgetPresets(presets: WidgetLayoutPreset[], storage: Pick<Storage, "getItem" | "setItem"> = localStorage): void {
+  storage.setItem(widgetPresetsStorageKey(getCurrentProfileId(storage)), JSON.stringify(presets));
 }
 
 export function applyWidgetPreset(current: WidgetConfig[], preset: WidgetLayoutPreset): WidgetConfig[] {

@@ -105,6 +105,9 @@ export async function getLocalApiBaseUrl(): Promise<string> {
   })();
   return localApiBaseUrlPromise;
 }
+export async function importSkinImage(source: string): Promise<string> {
+  return invoke<string>("import_skin_image", { source });
+}
 
 function localApiPathKey(path: string): string {
   const idx = path.indexOf("?");

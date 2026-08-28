@@ -26,6 +26,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - **Widget refresh** — Widget Center refresh no longer only reloads permission metadata; it now remounts the selected widget window.
 - **Runtime documentation drift** — marked completed pet and pause/refresh work consistently across release documentation.
+- **CodeQL Rust extraction** — changed the Rust CodeQL job to use `manual` build mode and moved `cargo build --release` after CodeQL initialization, allowing all Rust files to be extracted during analysis.
+
+### Security
+
+- **CodeQL analysis hardening** — corrected the Rust analysis workflow so security scanning observes the actual release build instead of analyzing an untracked pre-init build.
 
 ### Notes
 

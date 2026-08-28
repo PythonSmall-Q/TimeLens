@@ -7,6 +7,7 @@ import {
   Puzzle, FolderOpen, ShieldCheck, PawPrint, Ruler, Upload, Wrench,
   Target, Lightbulb, BarChart3, TrendingUp, Globe, Pause, Play, RefreshCw,
   Terminal, ChevronDown, ChevronUp, X, Save, HeartPulse, RotateCcw,
+  Palette, LayoutDashboard, Flame,
 } from "lucide-react";
 import { useWidgetStore } from "@/stores/widgetStore";
 import type {
@@ -29,6 +30,7 @@ import {
   readWidgetPresets,
   saveWidgetPresets,
   serializeWidgetPresets,
+  widgetSkinStorageKey,
   type WidgetLayoutPreset,
 } from "./widgetExperience";
 
@@ -89,7 +91,7 @@ function WidgetCard({
   const [errorLogOpen, setErrorLogOpen] = useState(false);
   const [errorLogs, setErrorLogs] = useState<WidgetErrorLogEntry[]>([]);
   const [errorFilter, setErrorFilter] = useState("");
-  const [widgetSkin, setWidgetSkin] = useState(() => localStorage.getItem(`timelens-widget-skin:${config.id}`) ?? "");
+  const [widgetSkin, setWidgetSkin] = useState(() => localStorage.getItem(widgetSkinStorageKey(config.id)) ?? "");
 
   useEffect(() => {
     setPetWidth(String(Math.round(config.width)));
@@ -157,13 +159,13 @@ function WidgetCard({
       reader.readAsDataURL(file);
     });
     if (!dataUrl) return;
-    localStorage.setItem(`timelens-widget-skin:${config.id}`, dataUrl);
+    localStorage.setItem(widgetSkinStorageKey(config.id), dataUrl);
     setWidgetSkin(dataUrl);
     void emit("timelens-widget-skin-changed", { widgetId: config.id, image: dataUrl });
   };
 
   const clearWidgetSkin = () => {
-    localStorage.removeItem(`timelens-widget-skin:${config.id}`);
+    localStorage.removeItem(widgetSkinStorageKey(config.id));
     setWidgetSkin("");
     void emit("timelens-widget-skin-changed", { widgetId: config.id, image: "" });
   };
@@ -531,6 +533,10 @@ const OFFICIAL_CATALOG: { type: string; icon: typeof Clock; descKey: string; com
   { type: "session-pulse", icon: BarChart3, descKey: "sessionPulseDesc", group: "insight", comingSoon: false },
   { type: "goal-progress", icon: TrendingUp, descKey: "goalProgressDesc", group: "insight", comingSoon: false },
   { type: "browser-activity", icon: Globe, descKey: "browserActivityDesc", group: "insight", comingSoon: false },
+  { type: "skin-preview", icon: Palette, descKey: "skinPreviewDesc", group: "utility" },
+  { type: "layout-switcher", icon: LayoutDashboard, descKey: "layoutSwitcherDesc", group: "utility" },
+  { type: "widget-health", icon: HeartPulse, descKey: "widgetHealthDesc", group: "insight" },
+  { type: "focus-streak", icon: Flame, descKey: "focusStreakDesc", group: "reflection" },
 ];
 
 const GROUP_ORDER: WidgetGroup[] = ["utility", "focus", "insight", "reflection"];

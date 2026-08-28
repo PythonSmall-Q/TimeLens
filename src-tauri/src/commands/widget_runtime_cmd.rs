@@ -670,9 +670,15 @@ pub fn widget_deny_consent(
 pub fn widget_revoke_consent(
     widget_id: String,
     scope: String,
+    app: AppHandle,
     kernel: State<'_, WidgetKernel>,
 ) -> Result<(), String> {
-    kernel.gateway().revoke_consent(&widget_id, &scope)
+    kernel.gateway().revoke_consent(&widget_id, &scope)?;
+    let _ = app.emit(
+        "widget-permission-revoked",
+        serde_json::json!({ "widgetId": widget_id, "scope": scope, "all": false }),
+    );
+    Ok(())
 }
 
 // ── Helpers used by other backend modules ─────────────────────

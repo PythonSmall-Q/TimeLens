@@ -355,27 +355,8 @@ export default function MainApp() {
           return;
         }
 
-        if (updateMode === "auto") {
-          try {
-            const update = await check();
-            if (update) {
-              await update.downloadAndInstall();
-              await api.relaunchApp();
-              return;
-            }
-          } catch {
-            // fallback to release page
-          }
-          if (data.html_url) window.open(data.html_url, "_blank", "noopener,noreferrer");
-          await notifyWithNavigate(
-            t("common:updateAvailableTitle"),
-            t("common:updateAvailableBody", { version: latest, current: CURRENT_VERSION }),
-            "#/settings"
-          );
-          return;
-        }
-
-        // notify mode: show the manual download/install dialog
+        // Both notify and auto modes use the same explicit confirmation flow.
+        // The old auto path downloaded and installed without giving the user a choice.
         try {
           const update = await check();
           if (update) {
@@ -401,6 +382,32 @@ export default function MainApp() {
       updateCloseButtonRef.current?.focus();
     }
   }, [updateInfo]);
+
+  useEffect(() => {
+    const handleManualUpdate = async (event: Event) => {
+      const detail = (event as CustomEvent<{ version?: string; notes?: string; url?: string }>).detail;
+      if (!detail?.version) return;
+
+      let update: Update | null = null;
+      try {
+        update = await check();
+      } catch {
+        update = null;
+      }
+
+      setUpdateInfo({
+        version: detail.version,
+        notes: detail.notes ?? "",
+        url: detail.url ?? "",
+        update,
+      });
+      setUpdatePhase("available");
+      setDownloadProgress(0);
+    };
+
+    window.addEventListener("timelens-update-available", handleManualUpdate);
+    return () => window.removeEventListener("timelens-update-available", handleManualUpdate);
+  }, []);
 
   useEffect(() => {
     let mounted = true;

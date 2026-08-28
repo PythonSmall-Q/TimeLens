@@ -5,7 +5,7 @@ import clsx from "clsx";
 import * as api from "@/services/tauriApi";
 import { useAnnouncer } from "@/hooks/useAnnouncer";
 import type { BackupPreview } from "@/types";
-import { WIDGET_PRESETS_STORAGE_KEY } from "@/pages/WidgetCenter/widgetExperience";
+import { getCurrentProfileId, setCurrentProfileId, widgetPresetsStorageKey } from "@/pages/WidgetCenter/widgetExperience";
 
 function basename(path: string) {
   if (!path) return "";
@@ -153,7 +153,8 @@ export default function BackupSection() {
     try {
       const result = await api.importBackupV2Apply(backupPackagePath, backupStrategy, importPassphrase());
       if (result.layout_presets && typeof result.layout_presets === "object") {
-        localStorage.setItem(WIDGET_PRESETS_STORAGE_KEY, JSON.stringify(result.layout_presets));
+        if (result.new_profile_id) setCurrentProfileId(result.new_profile_id);
+        localStorage.setItem(widgetPresetsStorageKey(getCurrentProfileId()), JSON.stringify(result.layout_presets));
       }
       const successText = result.new_profile_id
         ? t("backup.applySuccessProfile", { profile: result.new_profile_id })
@@ -187,7 +188,7 @@ export default function BackupSection() {
       const passphrase = encryptExport ? backupPassphrase : undefined;
       let layoutPresets: unknown = undefined;
       try {
-        const raw = localStorage.getItem(WIDGET_PRESETS_STORAGE_KEY);
+        const raw = localStorage.getItem(widgetPresetsStorageKey(getCurrentProfileId()));
         layoutPresets = raw ? JSON.parse(raw) : undefined;
       } catch {
         layoutPresets = undefined;

@@ -505,6 +505,10 @@ fn official_widgets() -> Vec<WidgetRegistryItem> {
             csp: None,
             ..Default::default()
         },
+        WidgetRegistryItem { widget_type: "skin-preview".to_string(), display_name: "Skin Preview".to_string(), source: "official".to_string(), description: Some("Built-in skin preview widget".to_string()), icon: Some("skin-preview".to_string()), default_width: 320.0, default_height: 240.0, manifest_version: "v2".to_string(), ..Default::default() },
+        WidgetRegistryItem { widget_type: "layout-switcher".to_string(), display_name: "Layout Switcher".to_string(), source: "official".to_string(), description: Some("Built-in layout preset widget".to_string()), icon: Some("layout-switcher".to_string()), default_width: 320.0, default_height: 300.0, manifest_version: "v2".to_string(), ..Default::default() },
+        WidgetRegistryItem { widget_type: "widget-health".to_string(), display_name: "Widget Health".to_string(), source: "official".to_string(), description: Some("Built-in widget health widget".to_string()), icon: Some("widget-health".to_string()), default_width: 320.0, default_height: 260.0, manifest_version: "v2".to_string(), ..Default::default() },
+        WidgetRegistryItem { widget_type: "focus-streak".to_string(), display_name: "Focus Streak".to_string(), source: "official".to_string(), description: Some("Built-in focus streak widget".to_string()), icon: Some("focus-streak".to_string()), default_width: 280.0, default_height: 220.0, manifest_version: "v2".to_string(), ..Default::default() },
     ]
 }
 
@@ -562,6 +566,17 @@ pub fn load_third_party_widget_from_manifest_path(
             message: "manifest path has no parent directory".to_string(),
         });
     };
+
+    if manifest
+        .runtime
+        .as_ref()
+        .is_some_and(|runtime| runtime.language.eq_ignore_ascii_case("java"))
+    {
+        return Err(WidgetRegistryLoadError {
+            path: manifest_path.display().to_string(),
+            message: "java runtime is unsupported: no JVM host is enabled".to_string(),
+        });
+    }
 
     let entry_path = parent_dir.join(&manifest.entry);
     if !entry_path.exists() {

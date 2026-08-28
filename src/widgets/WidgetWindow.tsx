@@ -13,8 +13,10 @@ import QuickCaptureWidget from "./QuickCaptureWidget";
 import SessionPulseWidget from "./SessionPulseWidget";
 import GoalProgressWidget from "./GoalProgressWidget";
 import BrowserActivityWidget from "./BrowserActivityWidget";
+import { FocusStreakWidget, LayoutSwitcherWidget, SkinPreviewWidget, WidgetHealthWidget } from "./OfficialExperienceWidgets";
 import ExternalWidgetHost from "./ExternalWidgetHost";
 import * as api from "@/services/tauriApi";
+import { widgetSkinStorageKey } from "@/pages/WidgetCenter/widgetExperience";
 
 interface Props {
   widgetId: string;
@@ -183,7 +185,7 @@ export default function WidgetWindow({ widgetId }: Props) {
   useEffect(() => {
     const root = document.documentElement;
     const apply = (image: string) => root.style.setProperty("--timelens-widget-instance-background-image", image ? `url("${image}")` : "none");
-    apply(localStorage.getItem(`timelens-widget-skin:${widgetId}`) ?? "");
+    apply(localStorage.getItem(widgetSkinStorageKey(widgetId)) ?? "");
     let unlisten: (() => void) | undefined;
     listen<{ widgetId?: string; image?: string }>("timelens-widget-skin-changed", (event) => {
       if (event.payload?.widgetId === widgetId) apply(event.payload.image ?? "");
@@ -234,6 +236,10 @@ export default function WidgetWindow({ widgetId }: Props) {
       {widgetType === "session-pulse" && <SessionPulseWidget key={refreshKey} widgetId={widgetId} />}
       {widgetType === "goal-progress" && <GoalProgressWidget key={refreshKey} widgetId={widgetId} />}
       {widgetType === "browser-activity" && <BrowserActivityWidget key={refreshKey} widgetId={widgetId} />}
+      {widgetType === "skin-preview" && <SkinPreviewWidget key={refreshKey} />}
+      {widgetType === "layout-switcher" && <LayoutSwitcherWidget key={refreshKey} />}
+      {widgetType === "widget-health" && <WidgetHealthWidget key={refreshKey} widgetId={widgetId} />}
+      {widgetType === "focus-streak" && <FocusStreakWidget key={refreshKey} />}
       {widgetType !== "clock"
         && widgetType !== "todo"
         && widgetType !== "timer"
@@ -245,6 +251,10 @@ export default function WidgetWindow({ widgetId }: Props) {
         && widgetType !== "session-pulse"
         && widgetType !== "goal-progress"
         && widgetType !== "browser-activity"
+        && widgetType !== "skin-preview"
+        && widgetType !== "layout-switcher"
+        && widgetType !== "widget-health"
+        && widgetType !== "focus-streak"
         && <ExternalWidgetHost key={refreshKey} widgetId={widgetId} widgetType={widgetType} />}
     </div>
   );

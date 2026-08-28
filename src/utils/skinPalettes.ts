@@ -1,4 +1,4 @@
-export type SkinPaletteId = "default" | "ocean" | "forest" | "sunset" | "monochrome";
+export type SkinPaletteId = "default" | "ocean" | "forest" | "sunset" | "monochrome" | "neutral-texture";
 
 export interface SkinPalette {
   id: SkinPaletteId;
@@ -34,6 +34,9 @@ export const SKIN_PALETTES: SkinPalette[] = [
   },
   {
     id: "monochrome", appBg: "#151515", surface: "#232323", surfaceLight: "#303030", surfaceCard: "#3b3b3b", surfaceHover: "#4a4a4a", surfaceBorder: "#626262", textPrimary: "#f4f4f4", textSecondary: "#c7c7c7", textMuted: "#999999", accentBlue: "#d1d1d1", accentPurple: "#b8b8b8", accentTeal: "#ababab", accentGreen: "#c8c8c8", accentRed: "#ef8c8c", accentOrange: "#e0b27f",
+  },
+  {
+    id: "neutral-texture", appBg: "#202522", surface: "#29302c", surfaceLight: "#343c37", surfaceCard: "#3b4540", surfaceHover: "#46514b", surfaceBorder: "#5d6a62", textPrimary: "#eef2ee", textSecondary: "#c2ccc4", textMuted: "#91a097", accentBlue: "#78a9b5", accentPurple: "#aa9fbe", accentTeal: "#71b5a1", accentGreen: "#9ac27c", accentRed: "#d98282", accentOrange: "#d7a36f",
   },
 ];
 

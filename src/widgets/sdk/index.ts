@@ -1,4 +1,4 @@
-import { type UnlistenFn } from "@tauri-apps/api/event";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import * as api from "@/services/tauriApi";
 import type {
   BrowserDomainStats,
@@ -23,6 +23,7 @@ export interface WidgetClientOptions {
     riskLevel: "low" | "medium" | "high",
     message: string,
   ) => Promise<boolean>;
+  onPermissionRevoked?: (scope: string | null, all: boolean) => void;
 }
 
 export interface SafeMediaReference {
@@ -67,11 +68,27 @@ export class WidgetClient {
 
   private options: WidgetClientOptions;
   private subscriptions: Array<{ event: string; callback: (payload: unknown) => void; unlisten?: UnlistenFn }> = [];
+  private permissionRevokedUnlisten?: UnlistenFn;
+  private permissionRevoked = false;
 
   constructor(options: WidgetClientOptions) {
     this.options = options;
     this.widgetId = options.widgetId;
     this.widgetType = options.widgetType;
+    void listen<{ widgetId?: string; scope?: string | null; all?: boolean }>(
+      "widget-permission-revoked",
+      (event) => {
+        if (event.payload.widgetId !== this.widgetId) return;
+        this.permissionRevoked = true;
+        this.options.onPermissionRevoked?.(event.payload.scope ?? null, event.payload.all === true);
+        this.subscriptions.forEach((subscription) => subscription.unlisten?.());
+        this.subscriptions = [];
+      },
+    ).then((unlisten) => { this.permissionRevokedUnlisten = unlisten; }).catch(() => {});
+  }
+
+  get isPermissionRevoked(): boolean {
+    return this.permissionRevoked;
   }
 
   private makeRequest(
@@ -315,6 +332,8 @@ export class WidgetClient {
   dispose(): void {
     this.subscriptions.forEach((s) => s.unlisten?.());
     this.subscriptions = [];
+    this.permissionRevokedUnlisten?.();
+    this.permissionRevokedUnlisten = undefined;
   }
 }
 

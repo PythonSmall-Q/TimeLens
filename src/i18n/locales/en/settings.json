@@ -38,7 +38,7 @@
   },
   "skin": {
     "palette": "Color palette",
-    "palettes": { "default": "Default", "ocean": "Ocean", "forest": "Forest", "sunset": "Sunset", "monochrome": "Monochrome" },
+    "palettes": { "default": "Default", "ocean": "Ocean", "forest": "Forest", "sunset": "Sunset", "monochrome": "Monochrome", "neutral-texture": "Neutral Texture" },
     "appBackground": "TimeLens background",
     "widgetBackground": "Widget background",
     "choose": "Choose image",
@@ -386,6 +386,7 @@
     "upToDate": "You are on the latest version",
     "updateAvailable": "Update available: v{{version}}",
     "viewRelease": "View Release"
+    ,"updateTitle": "Update TimeLens", "downloadConfirm": "Download version {{version}}?", "installConfirm": "Install version {{version}} now?", "downloadUpdate": "Download", "installUpdate": "Install", "downloading": "Downloading…", "installing": "Installing…"
   },
   "saved": "Settings saved",
   "addLanguageHint": "To add a new language, see docs/ADD_LANGUAGE.md",
