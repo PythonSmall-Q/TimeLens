@@ -34,6 +34,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **Dashboard day rollover** — the home dashboard now switches to the current local day automatically after midnight.
 - **Dashboard refresh flicker** — background statistics refreshes no longer insert a loading card after the initial load, preventing the main dashboard from visibly jumping during periodic updates.
 - **Main app skin visibility** — fixed opaque layout backgrounds covering the configured app background image.
 - **Skin reset appearance** — clearing a background image now removes its overlay and restores the original theme instead of leaving a gray veil.

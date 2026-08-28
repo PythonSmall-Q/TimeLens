@@ -134,12 +134,18 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (periodMode !== "day" || selectedDate !== todayString()) return;
+    const dateAtStart = selectedDate;
     const id = setInterval(() => {
+      const currentDate = todayString();
+      if (currentDate !== dateAtStart) {
+        setSelectedDate(currentDate);
+        return;
+      }
       void fetchToday();
       void fetchVsCodeStatsForRange(selectedDate, selectedDate);
     }, 10_000);
     return () => clearInterval(id);
-  }, [periodMode, selectedDate, fetchToday, fetchVsCodeStatsForRange]);
+  }, [periodMode, selectedDate, setSelectedDate, fetchToday, fetchVsCodeStatsForRange]);
 
   useEffect(() => {
     const end = todayString();
