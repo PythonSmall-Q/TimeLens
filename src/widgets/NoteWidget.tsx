@@ -142,6 +142,9 @@ export default function NoteWidget({ widgetId }: Props) {
     } catch {
       // ignore
     }
+    window.dispatchEvent(new CustomEvent("timelens-widget-auto-blur-changed", {
+      detail: { widgetId, enabled: next },
+    }));
   };
 
   const selectedNote = useMemo(

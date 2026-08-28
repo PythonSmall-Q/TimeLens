@@ -199,6 +199,9 @@ export default function TodoWidget({ widgetId }: Props) {
     } catch {
       // ignore
     }
+    window.dispatchEvent(new CustomEvent("timelens-widget-auto-blur-changed", {
+      detail: { widgetId, enabled: next },
+    }));
   };
 
   const sensors = useSensors(

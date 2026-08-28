@@ -460,6 +460,7 @@ pub fn build_widget_window_sync(app: &AppHandle, config: &WidgetConfig) -> Resul
         .inner_size(width, height)
         .position(x, y)
         .decorations(false)
+        .transparent(true)
         .always_on_top(config.always_on_top_mode == "always")
         .skip_taskbar(false)
         .resizable(true)

@@ -55,6 +55,22 @@ describe("NoteWidget", () => {
     expect(writeCalls.length).toBeGreaterThan(0);
   });
 
+  it("enables auto blur for the current widget", async () => {
+    const onAutoBlurChanged = vi.fn();
+    window.addEventListener("timelens-widget-auto-blur-changed", onAutoBlurChanged);
+    mockGatewayState({ notes: null, notes_backup: null });
+    renderWithProviders(<NoteWidget widgetId="note-test" />);
+
+    await screen.findByText("No notes yet. Create your first one.");
+    await userEvent.click(screen.getByRole("button", { name: "Auto-blur when unfocused" }));
+
+    expect(localStorage.getItem("note-test-auto-blur")).toBe("1");
+    expect(onAutoBlurChanged).toHaveBeenCalledWith(expect.objectContaining({
+      detail: { widgetId: "note-test", enabled: true },
+    }));
+    window.removeEventListener("timelens-widget-auto-blur-changed", onAutoBlurChanged);
+  });
+
   it("deletes the current note", async () => {
     const notes = JSON.stringify([
       { id: "n1", content: "First note", updatedAt: new Date().toISOString() },

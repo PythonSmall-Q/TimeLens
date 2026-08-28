@@ -79,6 +79,12 @@ body {
   overflow: hidden;
 }
 
+html.widget-window,
+html.widget-window body {
+  background: transparent;
+  background-image: none;
+}
+
 .widget-root > * {
   background-image:
     linear-gradient(rgba(30, 36, 51, var(--timelens-widget-overlay, 0.62)), rgba(30, 36, 51, var(--timelens-widget-overlay, 0.62))),

@@ -34,11 +34,18 @@ export default function WidgetWindow({ widgetId }: Props) {
   const [isBlurred, setIsBlurred] = useState(false);
   const [idle, setIdle] = useState(false);
   const idleTimer = useRef<ReturnType<typeof setTimeout>>();
+  const autoBlurEnabled = useRef(false);
+  const rootRef = useRef<HTMLDivElement>(null);
   const [widgetType, setWidgetType] = useState<string>(
     widgetId.includes("-") ? widgetId.substring(0, widgetId.lastIndexOf("-")) : ""
   );
   const [refreshKey, setRefreshKey] = useState(0);
   const [paused, setPaused] = useState(false);
+
+  useEffect(() => {
+    document.documentElement.classList.add("widget-window");
+    return () => document.documentElement.classList.remove("widget-window");
+  }, []);
 
   const getMonitorIndexForRect = async (x: number, y: number, width: number, height: number) => {
     try {
@@ -57,6 +64,20 @@ export default function WidgetWindow({ widgetId }: Props) {
   };
 
   useEffect(() => {
+    const autoBlurKey = `${widgetId}-auto-blur`;
+    autoBlurEnabled.current = localStorage.getItem(autoBlurKey) === "1";
+    const onAutoBlurChanged = (event: Event) => {
+      const { widgetId: changedWidgetId, enabled } = (event as CustomEvent<{
+        widgetId?: string;
+        enabled?: boolean;
+      }>).detail ?? {};
+      if (changedWidgetId !== widgetId) return;
+      autoBlurEnabled.current = enabled === true;
+      clearTimeout(idleTimer.current);
+      if (!autoBlurEnabled.current) setIdle(false);
+    };
+    window.addEventListener("timelens-widget-auto-blur-changed", onAutoBlurChanged);
+
     const heartbeatKey = `timelens-widget-heartbeat:${widgetId}`;
     const recordHeartbeat = (event: string) => {
       try {
@@ -140,6 +161,7 @@ export default function WidgetWindow({ widgetId }: Props) {
     return () => {
       unlistenFocus.then((u) => u());
       unlistenMove.then((u) => u());
+      window.removeEventListener("timelens-widget-auto-blur-changed", onAutoBlurChanged);
       window.removeEventListener("mousedown", restoreOnMouseDown);
       if (positionSaveTimer.current) clearTimeout(positionSaveTimer.current);
     };
@@ -211,7 +233,27 @@ export default function WidgetWindow({ widgetId }: Props) {
   };
 
   const handleMouseLeave = () => {
-    idleTimer.current = setTimeout(() => setIdle(true), 2000);
+    if (!autoBlurEnabled.current) return;
+    idleTimer.current = setTimeout(() => {
+      const activeElement = document.activeElement;
+      const isEditing = activeElement instanceof HTMLTextAreaElement
+        || activeElement instanceof HTMLInputElement
+        || activeElement instanceof HTMLElement && activeElement.isContentEditable;
+      if (!isEditing || !rootRef.current?.contains(activeElement)) {
+        setIdle(true);
+      }
+    }, 2000);
+  };
+
+  const handleFocusCapture = (event: React.FocusEvent<HTMLDivElement>) => {
+    const target = event.target;
+    const isEditing = target instanceof HTMLTextAreaElement
+      || target instanceof HTMLInputElement
+      || target instanceof HTMLElement && target.isContentEditable;
+    if (isEditing) {
+      clearTimeout(idleTimer.current);
+      setIdle(false);
+    }
   };
 
   // Cleanup idle timer on unmount
@@ -221,9 +263,11 @@ export default function WidgetWindow({ widgetId }: Props) {
 
   return (
     <div
+      ref={rootRef}
       className={`widget-root ${isBlurred && widgetType !== "clock" ? "widget-root--faded" : ""} ${idle ? "widget-idle" : ""}`}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
+      onFocusCapture={handleFocusCapture}
     >
       {widgetType === "clock" && <ClockWidget key={refreshKey} widgetId={widgetId} isBlurred={isBlurred} />}
       {widgetType === "todo" && <TodoWidget key={refreshKey} widgetId={widgetId} />}
