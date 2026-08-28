@@ -2,7 +2,12 @@ import { useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { ExternalLink, Check, AlertCircle, Loader2, Plus, Trash2, ChevronDown, ChevronUp, Sparkles, FileText, FolderOpen } from "lucide-react";
 import { useLlmStore } from "@/stores/llmStore";
-import { streamChatCompletion, openLlmConfigFile, openLlmConfigDir } from "@/services/llmApi";
+import {
+  streamChatCompletion,
+  openLlmConfigFile,
+  openLlmConfigDir,
+  providerRank,
+} from "@/services/llmApi";
 import type { LlmProvider, LlmDataSharing, AnalysisRange } from "@/types/llm";
 import clsx from "clsx";
 
@@ -52,6 +57,9 @@ export default function LlmSettings() {
   const providerIds = useMemo(() => {
     const ids = Object.keys(config.providers);
     ids.sort((a, b) => {
+      const ra = providerRank(config.providers[a]);
+      const rb = providerRank(config.providers[b]);
+      if (ra !== rb) return ra - rb;
       const la = providerDisplayLabel(config.providers[a]).toLowerCase();
       const lb = providerDisplayLabel(config.providers[b]).toLowerCase();
       return la.localeCompare(lb);
@@ -209,7 +217,7 @@ export default function LlmSettings() {
             >
               <div className="flex items-center justify-between px-4 py-3 gap-3">
                 <button
-                  onClick={() => startEdit(id)}
+                  onClick={() => (isEditing ? cancelEdit() : startEdit(id))}
                   className="flex-1 text-left flex items-center gap-3 min-w-0"
                 >
                   <div
@@ -250,9 +258,9 @@ export default function LlmSettings() {
                     </button>
                   )}
                   <button
-                    onClick={() => startEdit(id)}
+                    onClick={() => (isEditing ? cancelEdit() : startEdit(id))}
                     className="p-1.5 rounded-lg text-text-secondary hover:bg-surface-hover transition-colors"
-                    title={t("common:edit")}
+                    title={isEditing ? t("common:cancel") : t("common:edit")}
                   >
                     {isEditing ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
                   </button>

@@ -7,7 +7,15 @@ import type {
   AnalysisRange,
   LlmConversation,
   LlmConversationSummary,
+  LlmProvider,
 } from "@/types/llm";
+
+const BUILTIN_PROVIDER_ORDER = ["OrcaRouter", "OpenAI", "Groq", "OpenRouter"];
+
+export function providerRank(provider: LlmProvider): number {
+  const idx = BUILTIN_PROVIDER_ORDER.indexOf(provider.name);
+  return idx === -1 ? BUILTIN_PROVIDER_ORDER.length : idx;
+}
 
 export async function getLlmConfig(): Promise<LlmConfig> {
   return invoke<LlmConfig>("get_llm_config");

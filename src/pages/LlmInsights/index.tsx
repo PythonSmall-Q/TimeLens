@@ -27,6 +27,7 @@ import {
   streamChatCompletion,
   buildScreenTimeContext,
   getRangeDates,
+  providerRank,
 } from "@/services/llmApi";
 import {
   getAppTotalsInRange,
@@ -96,20 +97,15 @@ export default function LlmInsights() {
   const providerIds = useMemo(() => {
     const ids = Object.keys(config.providers);
     ids.sort((a, b) => {
+      const ra = providerRank(config.providers[a]);
+      const rb = providerRank(config.providers[b]);
+      if (ra !== rb) return ra - rb;
       const la = providerDisplayLabel(config.providers[a]).toLowerCase();
       const lb = providerDisplayLabel(config.providers[b]).toLowerCase();
       return la.localeCompare(lb);
     });
-    // Keep the active provider at the top so it is easy to find.
-    if (config.active_provider_id) {
-      const activeIdx = ids.indexOf(config.active_provider_id);
-      if (activeIdx > 0) {
-        ids.splice(activeIdx, 1);
-        ids.unshift(config.active_provider_id);
-      }
-    }
     return ids;
-  }, [config.providers, config.active_provider_id]);
+  }, [config.providers]);
 
   // Load conversations and config on mount.
   useEffect(() => {
