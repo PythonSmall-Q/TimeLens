@@ -22,6 +22,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 
 - **Widget refresh orchestration** — refresh now targets only the selected or event-affected widget, with a polling fallback when no event is available.
+- **Browser usage classification** — browser domain and hourly statistics now retain the browser name, so usage from Chrome, Edge, and other supported browsers is kept separate; the Browser Usage page also provides a browser filter.
 - **Permission revocation behavior** — revoked widget permissions now clear active subscriptions and emit a `widget-permission-revoked` event so external widgets can enter a degraded state.
 - **Skin asset handling** — selected images are validated and copied into the managed application `skins` directory instead of retaining arbitrary source paths.
 - **Third-party widget recovery** — failed widgets now show recovery guidance and a real remount/retry action.
@@ -30,6 +31,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **Dashboard refresh flicker** — background statistics refreshes no longer insert a loading card after the initial load, preventing the main dashboard from visibly jumping during periodic updates.
 - **Main app skin visibility** — fixed opaque layout backgrounds covering the configured app background image.
 - **Skin reset appearance** — clearing a background image now removes its overlay and restores the original theme instead of leaving a gray veil.
 - **Managed skin URL resolution** — fixed imported skin paths so Asset Protocol can resolve copied files in the application data directory.
@@ -48,7 +50,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Tests
 
-- Frontend tests: **69 passed**.
+- Frontend tests: **71 passed**.
 - TypeScript typecheck: passed.
 - ESLint: 0 errors; 8 existing warnings remain.
 - Rust `cargo check`: passed.

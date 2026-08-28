@@ -1654,7 +1654,8 @@ pub fn get_browser_domain_stats(
     end_date: &str,
 ) -> Result<Vec<crate::models::BrowserDomainStats>> {
     let mut stmt = conn.prepare(
-        "SELECT host,
+        "SELECT browser_name,
+            host,
                 SUM(duration_seconds) as total_seconds,
                 COUNT(1) as visit_count,
                 MAX(ended_at) as last_visited_at
@@ -1663,15 +1664,16 @@ pub fn get_browser_domain_stats(
            AND date(ended_at, 'localtime') <= ?2
            AND host NOT IN (SELECT host FROM browser_ignored_domains)
            AND host != ''
-         GROUP BY host
+         GROUP BY browser_name, host
          ORDER BY total_seconds DESC",
     )?;
     let rows = stmt.query_map(params![start_date, end_date], |row| {
         Ok(crate::models::BrowserDomainStats {
-            host: row.get(0)?,
-            total_seconds: row.get(1)?,
-            visit_count: row.get(2)?,
-            last_visited_at: row.get(3)?,
+            browser_name: row.get(0)?,
+            host: row.get(1)?,
+            total_seconds: row.get(2)?,
+            visit_count: row.get(3)?,
+            last_visited_at: row.get(4)?,
         })
     })?;
     rows.collect()
@@ -1688,7 +1690,8 @@ pub fn get_browser_domain_stats_for_hour(
     let hour_text = format!("{:02}", normalized_hour);
 
     let mut stmt = conn.prepare(
-        "SELECT host,
+        "SELECT browser_name,
+            host,
                 SUM(duration_seconds) as total_seconds,
                 COUNT(1) as visit_count,
                 MAX(ended_at) as last_visited_at
@@ -1697,16 +1700,17 @@ pub fn get_browser_domain_stats_for_hour(
            AND strftime('%H', ended_at, 'localtime') = ?2
            AND host NOT IN (SELECT host FROM browser_ignored_domains)
            AND host != ''
-         GROUP BY host
+         GROUP BY browser_name, host
          ORDER BY total_seconds DESC
          LIMIT ?3",
     )?;
     let rows = stmt.query_map(params![date, hour_text, safe_limit], |row| {
         Ok(crate::models::BrowserHourDomainStats {
-            host: row.get(0)?,
-            total_seconds: row.get(1)?,
-            visit_count: row.get(2)?,
-            last_visited_at: row.get(3)?,
+            browser_name: row.get(0)?,
+            host: row.get(1)?,
+            total_seconds: row.get(2)?,
+            visit_count: row.get(3)?,
+            last_visited_at: row.get(4)?,
         })
     })?;
     rows.collect()

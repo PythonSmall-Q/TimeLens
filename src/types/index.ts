@@ -410,6 +410,7 @@ export interface BrowserExtensionStatus {
 }
 
 export interface BrowserHourDomainStats {
+  browser_name: string;
   host: string;
   total_seconds: number;
   visit_count: number;
@@ -575,6 +576,7 @@ export interface LimitToast {
 }
 
 export interface BrowserDomainStats {
+  browser_name: string;
   host: string;
   total_seconds: number;
   visit_count: number;

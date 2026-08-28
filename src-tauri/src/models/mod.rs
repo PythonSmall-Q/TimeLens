@@ -294,6 +294,7 @@ impl Default for WidgetConfig {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct BrowserDomainStats {
+    pub browser_name: String,
     pub host: String,
     pub total_seconds: i64,
     pub visit_count: i64,
@@ -302,6 +303,7 @@ pub struct BrowserDomainStats {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct BrowserHourDomainStats {
+    pub browser_name: String,
     pub host: String,
     pub total_seconds: i64,
     pub visit_count: i64,

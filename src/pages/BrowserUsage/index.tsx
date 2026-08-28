@@ -137,6 +137,9 @@ function DomainRow({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-sm font-medium text-text-primary truncate">{stat.host}</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-accent-blue/10 text-accent-blue">
+              {stat.browser_name || t("browserUsage:unknownBrowser")}
+            </span>
             {isIgnored && (
               <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-surface-hover text-text-muted">
                 {t("browserUsage:ignored")}
@@ -241,6 +244,7 @@ export default function BrowserUsage() {
     }
   });
   const [search, setSearch] = useState("");
+  const [browserFilter, setBrowserFilter] = useState("all");
   const [showIgnored, setShowIgnored] = useState(false);
 
   const [stats, setStats] = useState<BrowserDomainStats[]>([]);
@@ -349,15 +353,29 @@ export default function BrowserUsage() {
 
   const ignoredSet = useMemo(() => new Set(ignoredDomains), [ignoredDomains]);
 
+  const browserOptions = useMemo(() => {
+    const names = stats
+      .map((stat) => stat.browser_name || t("browserUsage:unknownBrowser"))
+      .filter((name, index, all) => all.indexOf(name) === index)
+      .sort((a, b) => a.localeCompare(b));
+    return names;
+  }, [stats, t]);
+
   // Active stats = not ignored (or show all when showIgnored = true)
   const filteredStats = useMemo(() => {
     let rows = showIgnored ? stats : stats.filter((s) => !ignoredSet.has(s.host));
     if (search.trim()) {
       const q = search.toLowerCase();
-      rows = rows.filter((s) => s.host.toLowerCase().includes(q));
+      rows = rows.filter((s) =>
+        s.host.toLowerCase().includes(q)
+        || (s.browser_name || t("browserUsage:unknownBrowser")).toLowerCase().includes(q)
+      );
+    }
+    if (browserFilter !== "all") {
+      rows = rows.filter((s) => (s.browser_name || t("browserUsage:unknownBrowser")) === browserFilter);
     }
     return rows;
-  }, [stats, ignoredSet, showIgnored, search]);
+  }, [stats, ignoredSet, showIgnored, search, browserFilter, t]);
 
   const ignoredStats = useMemo(() =>
     stats.filter((s) => ignoredSet.has(s.host)),
@@ -731,6 +749,18 @@ export default function BrowserUsage() {
             className="w-full pl-8 pr-3 py-2 bg-surface-hover border border-surface-border rounded-xl text-sm text-text-primary placeholder:text-text-muted outline-none focus:border-accent-blue transition-colors"
           />
         </div>
+        <select
+          value={browserFilter}
+          onChange={(e) => setBrowserFilter(e.target.value)}
+          className="ui-select min-w-36 !py-2 !text-sm"
+          title={t("browserUsage:filterBrowser")}
+          aria-label={t("browserUsage:filterBrowser")}
+        >
+          <option value="all">{t("browserUsage:allBrowsers")}</option>
+          {browserOptions.map((browser) => (
+            <option key={browser} value={browser}>{browser}</option>
+          ))}
+        </select>
         {ignoredStats.length > 0 && (
           <button
             onClick={() => setShowIgnored((v) => !v)}
@@ -768,7 +798,7 @@ export default function BrowserUsage() {
         <div className="glass-card divide-y divide-surface-border">
           {filteredStats.map((stat) => (
             <DomainRow
-              key={stat.host}
+              key={`${stat.browser_name || "unknown"}:${stat.host}`}
               stat={stat}
               limit={limitsMap.get(stat.host)}
               isIgnored={ignoredSet.has(stat.host)}
