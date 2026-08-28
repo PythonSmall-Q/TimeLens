@@ -85,6 +85,7 @@ export default function Dashboard() {
     fetchDailyTotalsRange,
     fetchWeekComparison,
     loading,
+    hasLoaded,
     periodMode,
     setPeriodMode,
     todayTotals,
@@ -436,7 +437,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {loading && (
+      {loading && !hasLoaded && (
         <AsyncStateCard variant="loading" title={t("common:loading")} compact />
       )}
 

@@ -26,6 +26,7 @@ interface StatsState {
   monitorStatus: MonitorStatus;
   currentApp: string;
   loading: boolean;
+  hasLoaded: boolean;
   selectedDate: string;
   periodMode: PeriodMode;
   weekComparison: AppUsageComparison[];
@@ -81,6 +82,7 @@ export const useStatsStore = create<StatsState>((set, get) => ({
   monitorStatus: { active: true, current_app: "", current_exe_path: "", current_title: "" },
   currentApp: "",
   loading: false,
+  hasLoaded: false,
   selectedDate: todayStr(),
   periodMode: "day",
   weekComparison: [],
@@ -111,7 +113,7 @@ export const useStatsStore = create<StatsState>((set, get) => ({
     } catch (e) {
       console.error("fetchToday failed", e);
     } finally {
-      set({ loading: false });
+      set({ loading: false, hasLoaded: true });
     }
   },
 
@@ -144,7 +146,7 @@ export const useStatsStore = create<StatsState>((set, get) => ({
       console.error("fetchForDate failed", e);
       set({ todayTotals: [], todayHourly: [], totalSecondsToday: 0 });
     } finally {
-      set({ loading: false });
+      set({ loading: false, hasLoaded: true });
     }
   },
 
@@ -169,7 +171,7 @@ export const useStatsStore = create<StatsState>((set, get) => ({
     } catch (e) {
       console.error("fetchForRange failed", e);
     } finally {
-      set({ loading: false });
+      set({ loading: false, hasLoaded: true });
     }
   },
 
