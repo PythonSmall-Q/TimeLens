@@ -24,7 +24,7 @@ jobs:
       matrix:
         include:
           - language: rust
-            build-mode: manual
+            build-mode: none
           - language: javascript-typescript
             build-mode: none
 
