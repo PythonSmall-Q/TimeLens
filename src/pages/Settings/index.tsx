@@ -5,7 +5,7 @@ import { convertFileSrc } from "@tauri-apps/api/core";
 import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
 import { useSettingsStore } from "@/stores/settingsStore";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
-import { Moon, Sun, Activity, Database, Info, Rocket, Keyboard, PanelsTopLeft, ArrowLeft, Search, Lock, Copy, RotateCw, User, Shield, Droplet, Sparkles, Image } from "lucide-react";
+import { Moon, Sun, Activity, Database, Info, Rocket, Keyboard, PanelsTopLeft, ArrowLeft, Search, Lock, Copy, RotateCw, User, Shield, Droplet, Sparkles, Image, Palette } from "lucide-react";
 import clsx from "clsx";
 import * as api from "@/services/tauriApi";
 import { APP_VERSION } from "../../version";
@@ -39,6 +39,7 @@ import BackupSection from "./BackupSection";
 import LlmSettings from "./LlmSettings";
 
 import SettingsCard from "./SettingsCard";
+import { SKIN_PALETTES, type SkinPaletteId } from "@/utils/skinPalettes";
 
 function SettingsRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -185,12 +186,14 @@ export default function Settings() {
     widgetBackgroundFit,
     appBackgroundOverlay,
     widgetBackgroundOverlay,
+    skinPalette,
     setAppBackgroundImage,
     setWidgetBackgroundImage,
     setAppBackgroundFit,
     setWidgetBackgroundFit,
     setAppBackgroundOverlay,
     setWidgetBackgroundOverlay,
+    setSkinPalette,
     monitoringActive,
     setMonitoringActive,
     samplingIntervalMs,
@@ -259,6 +262,11 @@ export default function Settings() {
       appOverlay: kind === "app" ? overlay : appBackgroundOverlay,
       widgetOverlay: kind === "widget" ? overlay : widgetBackgroundOverlay,
     });
+  };
+
+  const updatePalette = (palette: SkinPaletteId) => {
+    setSkinPalette(palette);
+    void emit("timelens-skin-changed", { skinPalette: palette });
   };
 
   const chooseSkinImage = async (kind: "app" | "widget") => {
@@ -927,6 +935,28 @@ export default function Settings() {
                 )}
               >
                 {t(`theme.${th}`)}
+              </button>
+            ))}
+          </div>
+        </SettingsRow>
+        <SettingsRow label={t("skin.palette")}>
+          <div className="flex flex-wrap justify-end gap-2">
+            {SKIN_PALETTES.map((palette) => (
+              <button
+                key={palette.id}
+                onClick={() => updatePalette(palette.id)}
+                title={t(`skin.palettes.${palette.id}`)}
+                aria-label={t(`skin.palettes.${palette.id}`)}
+                className={clsx(
+                  "flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-xs transition-colors",
+                  skinPalette === palette.id ? "border-accent-blue bg-accent-blue/15 text-accent-blue" : "border-surface-border text-text-muted hover:text-text-secondary"
+                )}
+              >
+                <Palette size={12} />
+                <span>{t(`skin.palettes.${palette.id}`)}</span>
+                <span className="flex gap-0.5" aria-hidden="true">
+                  {[palette.accentBlue, palette.accentTeal, palette.accentOrange].map((color) => <span key={color} className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />)}
+                </span>
               </button>
             ))}
           </div>

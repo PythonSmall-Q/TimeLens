@@ -7,6 +7,7 @@ import MainApp from "./MainApp";
 import WidgetWindow from "./widgets/WidgetWindow";
 import { useSettingsStore } from "./stores/settingsStore";
 import { AnnouncerProvider } from "@/components/Announcer";
+import { getSkinPalette } from "@/utils/skinPalettes";
 
 /**
  * Root component. Decides whether to render the main dashboard or a widget,
@@ -25,6 +26,8 @@ export default function App() {
   const widgetBackgroundFit = useSettingsStore((s) => s.widgetBackgroundFit);
   const appBackgroundOverlay = useSettingsStore((s) => s.appBackgroundOverlay);
   const widgetBackgroundOverlay = useSettingsStore((s) => s.widgetBackgroundOverlay);
+  const skinPalette = useSettingsStore((s) => s.skinPalette);
+  const [activePalette, setActivePalette] = useState(skinPalette);
   const reducedMotion = useSettingsStore((s) => s.reducedMotion);
   const compactWidgets = useSettingsStore((s) => s.compactWidgets);
   const [skin, setSkin] = useState({
@@ -35,6 +38,10 @@ export default function App() {
     appOverlay: appBackgroundOverlay,
     widgetOverlay: widgetBackgroundOverlay,
   });
+
+  useEffect(() => {
+    setActivePalette(skinPalette);
+  }, [skinPalette]);
 
   useEffect(() => {
     try {
@@ -93,7 +100,7 @@ export default function App() {
 
   useEffect(() => {
     let unlisten: (() => void) | undefined;
-    listen<Partial<typeof skin> & { appBackgroundImage?: string; widgetBackgroundImage?: string }>("timelens-skin-changed", (event) => {
+    listen<Partial<typeof skin> & { appBackgroundImage?: string; widgetBackgroundImage?: string; skinPalette?: typeof skinPalette }>("timelens-skin-changed", (event) => {
       setSkin((previous) => ({
         app: event.payload?.app ?? event.payload?.appBackgroundImage ?? previous.app,
         widget: event.payload?.widget ?? event.payload?.widgetBackgroundImage ?? previous.widget,
@@ -102,6 +109,9 @@ export default function App() {
         appOverlay: event.payload?.appOverlay ?? previous.appOverlay,
         widgetOverlay: event.payload?.widgetOverlay ?? previous.widgetOverlay,
       }));
+      if (event.payload?.skinPalette) {
+        setActivePalette(event.payload.skinPalette);
+      }
     }).then((cleanup) => { unlisten = cleanup; }).catch(() => {});
     return () => unlisten?.();
   }, []);
@@ -116,7 +126,19 @@ export default function App() {
     root.style.setProperty("--timelens-widget-background-fit", skin.widgetFit === "stretch" ? "100% 100%" : skin.widgetFit);
     root.style.setProperty("--timelens-app-overlay", skin.app ? String(skin.appOverlay / 100) : "0");
     root.style.setProperty("--timelens-widget-overlay", skin.widget ? String(skin.widgetOverlay / 100) : "0");
-  }, [skin]);
+    const palette = getSkinPalette(activePalette);
+    const paletteVars: Record<string, string> = {
+      "--app-bg": palette.appBg, "--surface": palette.surface, "--surface-light": palette.surfaceLight,
+      "--surface-card": palette.surfaceCard, "--surface-hover": palette.surfaceHover, "--surface-border": palette.surfaceBorder,
+      "--text-primary": palette.textPrimary, "--text-secondary": palette.textSecondary, "--text-muted": palette.textMuted,
+      "--accent-blue": palette.accentBlue, "--accent-purple": palette.accentPurple, "--accent-teal": palette.accentTeal,
+      "--accent-green": palette.accentGreen, "--accent-red": palette.accentRed, "--accent-orange": palette.accentOrange,
+    };
+    Object.entries(paletteVars).forEach(([name, value]) => {
+      if (activePalette === "default") root.style.removeProperty(name);
+      else root.style.setProperty(name, value);
+    });
+  }, [activePalette, skin]);
 
   if (windowLabel !== "main") {
     return <WidgetWindow widgetId={windowLabel} />;

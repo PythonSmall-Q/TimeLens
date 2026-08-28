@@ -37,6 +37,8 @@
     "system": "System"
   },
   "skin": {
+    "palette": "Color palette",
+    "palettes": { "default": "Default", "ocean": "Ocean", "forest": "Forest", "sunset": "Sunset", "monochrome": "Monochrome" },
     "appBackground": "TimeLens background",
     "widgetBackground": "Widget background",
     "choose": "Choose image",

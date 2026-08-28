@@ -37,6 +37,8 @@
     "system": "跟隨系統"
   },
   "skin": {
+    "palette": "調色盤",
+    "palettes": { "default": "預設", "ocean": "海洋", "forest": "森林", "sunset": "夕陽", "monochrome": "黑白" },
     "appBackground": "TimeLens 背景圖片",
     "widgetBackground": "小元件背景圖片",
     "choose": "選擇圖片",

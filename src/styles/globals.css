@@ -216,6 +216,19 @@ html.compact-widgets .widget-root {
   color: var(--text-muted) !important;
 }
 
+.text-accent-blue { color: var(--accent-blue) !important; }
+.text-accent-purple { color: var(--accent-purple) !important; }
+.text-accent-teal { color: var(--accent-teal) !important; }
+.text-accent-green { color: var(--accent-green) !important; }
+.text-accent-red { color: var(--accent-red) !important; }
+.text-accent-orange { color: var(--accent-orange) !important; }
+.bg-accent-blue { background-color: var(--accent-blue) !important; }
+.bg-accent-green { background-color: var(--accent-green) !important; }
+.bg-accent-red { background-color: var(--accent-red) !important; }
+.border-accent-blue { border-color: var(--accent-blue) !important; }
+.border-accent-green { border-color: var(--accent-green) !important; }
+.border-accent-red { border-color: var(--accent-red) !important; }
+
 .hover\:bg-surface-hover:hover {
   background-color: var(--surface-hover) !important;
 }
