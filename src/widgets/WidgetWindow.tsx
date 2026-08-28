@@ -36,6 +36,7 @@ export default function WidgetWindow({ widgetId }: Props) {
     widgetId.includes("-") ? widgetId.substring(0, widgetId.lastIndexOf("-")) : ""
   );
   const [refreshKey, setRefreshKey] = useState(0);
+  const [paused, setPaused] = useState(false);
 
   const getMonitorIndexForRect = async (x: number, y: number, width: number, height: number) => {
     try {
@@ -54,12 +55,21 @@ export default function WidgetWindow({ widgetId }: Props) {
   };
 
   useEffect(() => {
+    const heartbeatKey = `timelens-widget-heartbeat:${widgetId}`;
+    const recordHeartbeat = (event: string) => {
+      try {
+        localStorage.setItem(heartbeatKey, JSON.stringify({ at: new Date().toISOString(), event }));
+      } catch { /* local storage may be unavailable in an isolated window */ }
+    };
+    recordHeartbeat("mount");
+
     // Load widget opacity preset once.
     api.getAllWidgets()
       .then((ws) => {
         const cfg = ws.find((w) => w.id === widgetId);
         if (cfg) {
           setWidgetType(cfg.widget_type);
+          setPaused(cfg.paused ?? false);
           topModeRef.current = cfg.always_on_top_mode;
           setIsBlurred(false);
           if (cfg.always_on_top_mode === "always") {
@@ -135,16 +145,63 @@ export default function WidgetWindow({ widgetId }: Props) {
 
   useEffect(() => {
     let unlisten: (() => void) | undefined;
+    const heartbeatKey = `timelens-widget-heartbeat:${widgetId}`;
+    const recordHeartbeat = (event: string) => {
+      try {
+        localStorage.setItem(heartbeatKey, JSON.stringify({ at: new Date().toISOString(), event }));
+      } catch { /* local storage may be unavailable in an isolated window */ }
+    };
     listen<{ widgetId?: string }>("timelens-widget-refresh", (event) => {
       if (!event.payload?.widgetId || event.payload.widgetId === widgetId) {
+        recordHeartbeat("refresh");
         setRefreshKey((value) => value + 1);
       }
     }).then((cleanup) => {
       unlisten = cleanup;
     }).catch(() => {});
+    const affectedEvents: Record<string, string[]> = {
+      "focus-session-changed": ["clock", "timer", "focus-coach", "session-pulse", "status"],
+      "goal-tick": ["goal-progress", "status", "session-pulse"],
+      "active-window-changed": ["status", "browser-activity", "session-pulse"],
+      "todo-changed": ["todo", "quick-capture", "status"],
+    };
+    const eventCleanups: Promise<() => void>[] = Object.entries(affectedEvents).map(([eventName, types]) => (
+      listen(eventName, () => {
+        if (types.includes(widgetType)) {
+          recordHeartbeat(eventName);
+          setRefreshKey((value) => value + 1);
+        }
+      })
+    ));
+    Promise.all(eventCleanups).catch(() => {});
+    return () => {
+      unlisten?.();
+      eventCleanups.forEach((cleanup) => cleanup.then((cleanupEvent) => cleanupEvent()).catch(() => {}));
+    };
+  }, [widgetId, widgetType]);
 
+  useEffect(() => {
+    const root = document.documentElement;
+    const apply = (image: string) => root.style.setProperty("--timelens-widget-instance-background-image", image ? `url("${image}")` : "none");
+    apply(localStorage.getItem(`timelens-widget-skin:${widgetId}`) ?? "");
+    let unlisten: (() => void) | undefined;
+    listen<{ widgetId?: string; image?: string }>("timelens-widget-skin-changed", (event) => {
+      if (event.payload?.widgetId === widgetId) apply(event.payload.image ?? "");
+    }).then((cleanup) => { unlisten = cleanup; }).catch(() => {});
     return () => unlisten?.();
   }, [widgetId]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      if (!paused) {
+        try {
+          localStorage.setItem(`timelens-widget-heartbeat:${widgetId}`, JSON.stringify({ at: new Date().toISOString(), event: "poll" }));
+        } catch { /* ignore unavailable storage */ }
+        setRefreshKey((value) => value + 1);
+      }
+    }, 30_000);
+    return () => window.clearInterval(timer);
+  }, [paused, widgetId]);
 
   const handleMouseEnter = () => {
     clearTimeout(idleTimer.current);

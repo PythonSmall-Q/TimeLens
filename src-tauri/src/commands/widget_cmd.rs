@@ -1,12 +1,13 @@
 use std::path::Path;
 
+use rusqlite::OptionalExtension;
 use serde::Deserialize;
 use tauri::{AppHandle, Manager, State, WebviewUrl, WebviewWindowBuilder};
 use uuid::Uuid;
 
 use crate::commands::storage_cmd::DbState;
 use crate::db;
-use crate::models::WidgetConfig;
+use crate::models::{WidgetConfig, WidgetRuntimeHealth};
 use crate::widget_registry::{get_widget_by_type, load_widget_registry, WidgetRegistryResponse};
 
 fn short_id() -> String {
@@ -112,6 +113,31 @@ fn widget_window_label(label: &str) -> bool {
 #[tauri::command]
 pub async fn get_widget_registry(app: AppHandle) -> Result<WidgetRegistryResponse, String> {
     Ok(load_widget_registry(&app))
+}
+
+#[tauri::command]
+pub fn get_widget_runtime_health(
+    widget_id: String,
+    db: State<'_, DbState>,
+) -> Result<Option<WidgetRuntimeHealth>, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    conn.query_row(
+        "SELECT widget_id, host_id, memory_used_mb, cpu_used_ms, last_heartbeat_at, status
+         FROM widget_runtime_health WHERE widget_id = ?1",
+        rusqlite::params![widget_id],
+        |row| {
+            Ok(WidgetRuntimeHealth {
+                widget_id: row.get(0)?,
+                host_id: row.get(1)?,
+                memory_used_mb: row.get(2)?,
+                cpu_used_ms: row.get(3)?,
+                last_heartbeat_at: row.get(4)?,
+                status: row.get(5)?,
+            })
+        },
+    )
+    .optional()
+    .map_err(|e| e.to_string())
 }
 
 #[derive(Debug, Deserialize)]

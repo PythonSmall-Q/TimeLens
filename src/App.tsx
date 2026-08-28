@@ -21,7 +21,20 @@ export default function App() {
   const language = useSettingsStore((s) => s.language);
   const appBackgroundImage = useSettingsStore((s) => s.appBackgroundImage);
   const widgetBackgroundImage = useSettingsStore((s) => s.widgetBackgroundImage);
-  const [skin, setSkin] = useState({ app: appBackgroundImage, widget: widgetBackgroundImage });
+  const appBackgroundFit = useSettingsStore((s) => s.appBackgroundFit);
+  const widgetBackgroundFit = useSettingsStore((s) => s.widgetBackgroundFit);
+  const appBackgroundOverlay = useSettingsStore((s) => s.appBackgroundOverlay);
+  const widgetBackgroundOverlay = useSettingsStore((s) => s.widgetBackgroundOverlay);
+  const reducedMotion = useSettingsStore((s) => s.reducedMotion);
+  const compactWidgets = useSettingsStore((s) => s.compactWidgets);
+  const [skin, setSkin] = useState({
+    app: appBackgroundImage,
+    widget: widgetBackgroundImage,
+    appFit: appBackgroundFit,
+    widgetFit: widgetBackgroundFit,
+    appOverlay: appBackgroundOverlay,
+    widgetOverlay: widgetBackgroundOverlay,
+  });
 
   useEffect(() => {
     try {
@@ -32,6 +45,12 @@ export default function App() {
       setWindowLabel("main");
     }
   }, []);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.toggle("reduce-motion", reducedMotion);
+    root.classList.toggle("compact-widgets", compactWidgets);
+  }, [compactWidgets, reducedMotion]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -62,16 +81,27 @@ export default function App() {
   }, [language]);
 
   useEffect(() => {
-    setSkin({ app: appBackgroundImage, widget: widgetBackgroundImage });
-  }, [appBackgroundImage, widgetBackgroundImage]);
+    setSkin({
+      app: appBackgroundImage,
+      widget: widgetBackgroundImage,
+      appFit: appBackgroundFit,
+      widgetFit: widgetBackgroundFit,
+      appOverlay: appBackgroundOverlay,
+      widgetOverlay: widgetBackgroundOverlay,
+    });
+  }, [appBackgroundFit, appBackgroundImage, appBackgroundOverlay, widgetBackgroundFit, widgetBackgroundImage, widgetBackgroundOverlay]);
 
   useEffect(() => {
     let unlisten: (() => void) | undefined;
-    listen<{ appBackgroundImage?: string; widgetBackgroundImage?: string }>("timelens-skin-changed", (event) => {
-      setSkin({
-        app: event.payload?.appBackgroundImage ?? "",
-        widget: event.payload?.widgetBackgroundImage ?? "",
-      });
+    listen<Partial<typeof skin> & { appBackgroundImage?: string; widgetBackgroundImage?: string }>("timelens-skin-changed", (event) => {
+      setSkin((previous) => ({
+        app: event.payload?.app ?? event.payload?.appBackgroundImage ?? previous.app,
+        widget: event.payload?.widget ?? event.payload?.widgetBackgroundImage ?? previous.widget,
+        appFit: event.payload?.appFit ?? previous.appFit,
+        widgetFit: event.payload?.widgetFit ?? previous.widgetFit,
+        appOverlay: event.payload?.appOverlay ?? previous.appOverlay,
+        widgetOverlay: event.payload?.widgetOverlay ?? previous.widgetOverlay,
+      }));
     }).then((cleanup) => { unlisten = cleanup; }).catch(() => {});
     return () => unlisten?.();
   }, []);
@@ -82,6 +112,10 @@ export default function App() {
     const widgetImage = skin.widget ? convertFileSrc(skin.widget) : "";
     root.style.setProperty("--timelens-app-background-image", appImage ? `url("${appImage}")` : "none");
     root.style.setProperty("--timelens-widget-background-image", widgetImage ? `url("${widgetImage}")` : "none");
+    root.style.setProperty("--timelens-app-background-fit", skin.appFit === "stretch" ? "100% 100%" : skin.appFit);
+    root.style.setProperty("--timelens-widget-background-fit", skin.widgetFit === "stretch" ? "100% 100%" : skin.widgetFit);
+    root.style.setProperty("--timelens-app-overlay", skin.app ? String(skin.appOverlay / 100) : "0");
+    root.style.setProperty("--timelens-widget-overlay", skin.widget ? String(skin.widgetOverlay / 100) : "0");
   }, [skin]);
 
   if (windowLabel !== "main") {

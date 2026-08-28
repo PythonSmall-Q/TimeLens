@@ -513,6 +513,7 @@ export interface BackupApplyResult {
   imported_rows: number;
   warnings: string[];
   new_profile_id?: string | null;
+  layout_presets?: unknown;
 }
 
 export interface RetentionPolicyInfo {

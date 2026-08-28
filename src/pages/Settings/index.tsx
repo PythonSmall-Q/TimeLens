@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { emit } from "@tauri-apps/api/event";
+import { convertFileSrc } from "@tauri-apps/api/core";
 import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
 import { useSettingsStore } from "@/stores/settingsStore";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
@@ -46,6 +47,19 @@ function SettingsRow({ label, children }: { label: string; children: React.React
       <div className="flex-1 flex justify-end">{children}</div>
     </div>
   );
+}
+
+function parseColor(value: string): [number, number, number] | null {
+  const match = value.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+  if (match) return [Number(match[1]), Number(match[2]), Number(match[3])];
+  const hex = value.trim().replace(/^#/, "");
+  if (/^[0-9a-f]{6}$/i.test(hex)) return [parseInt(hex.slice(0, 2), 16), parseInt(hex.slice(2, 4), 16), parseInt(hex.slice(4, 6), 16)];
+  return null;
+}
+
+function relativeLuminance(rgb: [number, number, number]): number {
+  const channels = rgb.map((channel) => channel / 255).map((channel) => channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4);
+  return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
 }
 
 export default function Settings() {
@@ -124,6 +138,7 @@ export default function Settings() {
   const [widgetPermissions, setWidgetPermissions] = useState<Record<string, WidgetPermissionEntry[]>>({});
   const [widgetAutoBlur, setWidgetAutoBlur] = useState<Record<string, boolean>>({});
   const [autoBlurDialogOpen, setAutoBlurDialogOpen] = useState(false);
+  const [contrastMessage, setContrastMessage] = useState<string | null>(null);
 
   // v2.0.0 data health state
   const [integrityResult, setIntegrityResult] = useState<DataIntegrityResult | null>(null);
@@ -166,8 +181,16 @@ export default function Settings() {
     setTheme,
     appBackgroundImage,
     widgetBackgroundImage,
+    appBackgroundFit,
+    widgetBackgroundFit,
+    appBackgroundOverlay,
+    widgetBackgroundOverlay,
     setAppBackgroundImage,
     setWidgetBackgroundImage,
+    setAppBackgroundFit,
+    setWidgetBackgroundFit,
+    setAppBackgroundOverlay,
+    setWidgetBackgroundOverlay,
     monitoringActive,
     setMonitoringActive,
     samplingIntervalMs,
@@ -193,6 +216,10 @@ export default function Settings() {
     setNotificationQuietStart,
     setNotificationQuietEnd,
     setNotificationCooldownMin,
+    reducedMotion,
+    compactWidgets,
+    setReducedMotion,
+    setCompactWidgets,
     updateMode,
     setUpdateMode,
   } = useSettingsStore();
@@ -201,8 +228,36 @@ export default function Settings() {
     if (kind === "app") setAppBackgroundImage(path);
     else setWidgetBackgroundImage(path);
     void emit("timelens-skin-changed", {
+      app: kind === "app" ? path : appBackgroundImage,
+      widget: kind === "widget" ? path : widgetBackgroundImage,
       appBackgroundImage: kind === "app" ? path : appBackgroundImage,
       widgetBackgroundImage: kind === "widget" ? path : widgetBackgroundImage,
+      appFit: appBackgroundFit,
+      widgetFit: widgetBackgroundFit,
+      appOverlay: appBackgroundOverlay,
+      widgetOverlay: widgetBackgroundOverlay,
+    });
+  };
+
+  const updateSkinOptions = (
+    kind: "app" | "widget",
+    fit: "cover" | "contain" | "stretch",
+    overlay: number,
+  ) => {
+    if (kind === "app") {
+      setAppBackgroundFit(fit);
+      setAppBackgroundOverlay(overlay);
+    } else {
+      setWidgetBackgroundFit(fit);
+      setWidgetBackgroundOverlay(overlay);
+    }
+    void emit("timelens-skin-changed", {
+      app: appBackgroundImage,
+      widget: widgetBackgroundImage,
+      appFit: kind === "app" ? fit : appBackgroundFit,
+      widgetFit: kind === "widget" ? fit : widgetBackgroundFit,
+      appOverlay: kind === "app" ? overlay : appBackgroundOverlay,
+      widgetOverlay: kind === "widget" ? overlay : widgetBackgroundOverlay,
     });
   };
 
@@ -876,6 +931,35 @@ export default function Settings() {
             ))}
           </div>
         </SettingsRow>
+        <SettingsRow label={t("accessibility.reducedMotion")}>
+          <input type="checkbox" className="ui-checkbox" checked={reducedMotion} onChange={(event) => setReducedMotion(event.target.checked)} aria-label={t("accessibility.reducedMotion")} />
+        </SettingsRow>
+        <SettingsRow label={t("accessibility.compactWidgets")}>
+          <input type="checkbox" className="ui-checkbox" checked={compactWidgets} onChange={(event) => setCompactWidgets(event.target.checked)} aria-label={t("accessibility.compactWidgets")} />
+        </SettingsRow>
+        <div className="flex flex-wrap justify-end gap-2">
+          <button
+            onClick={() => {
+              const styles = getComputedStyle(document.documentElement);
+              const foreground = parseColor(styles.getPropertyValue("--text-primary"));
+              const background = parseColor(styles.getPropertyValue("--surface"));
+              const ratio = foreground && background ? (Math.max(relativeLuminance(foreground), relativeLuminance(background)) + 0.05) / (Math.min(relativeLuminance(foreground), relativeLuminance(background)) + 0.05) : null;
+              setContrastMessage(ratio === null ? t("skin.contrastUnavailable") : t(ratio >= 4.5 ? "skin.contrastPass" : "skin.contrastFail", { ratio: ratio.toFixed(2) }));
+            }}
+            className="text-xs border border-surface-border rounded-lg px-2.5 py-1.5 text-text-secondary"
+          >{t("skin.checkContrast")}</button>
+          <button
+            onClick={() => {
+              const diagnostic = { version: 1, theme, appearance: { appBackground: !!appBackgroundImage, widgetBackground: !!widgetBackgroundImage, appFit: appBackgroundFit, widgetFit: widgetBackgroundFit, appOverlay: appBackgroundOverlay, widgetOverlay: widgetBackgroundOverlay, reducedMotion, compactWidgets } };
+              const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+              const blob = new Blob([JSON.stringify(diagnostic, null, 2)], { type: "application/json" });
+              const url = URL.createObjectURL(blob);
+              const link = document.createElement("a"); link.href = url; link.download = `timelens-skin-diagnostic-${stamp}.json`; link.click(); URL.revokeObjectURL(url);
+            }}
+            className="text-xs border border-surface-border rounded-lg px-2.5 py-1.5 text-text-secondary"
+          >{t("skin.exportDiagnostic")}</button>
+        </div>
+        {contrastMessage && <p className="text-xs text-text-muted text-right">{contrastMessage}</p>}
         <SettingsRow label={t("skin.appBackground")}>
           <div className="flex items-center gap-2 min-w-0">
             <span className="text-[11px] text-text-muted truncate max-w-48" title={appBackgroundImage || t("skin.none")}>
@@ -918,6 +1002,64 @@ export default function Settings() {
             )}
           </div>
         </SettingsRow>
+        <div className="grid gap-3 rounded-xl border border-surface-border bg-surface-hover/30 p-3 sm:grid-cols-2">
+          {([
+            ["app", t("skin.appBackground"), appBackgroundFit, appBackgroundOverlay],
+            ["widget", t("skin.widgetBackground"), widgetBackgroundFit, widgetBackgroundOverlay],
+          ] as const).map(([kind, label, fit, overlay]) => (
+            <div key={kind} className="space-y-2">
+              <p className="text-xs font-medium text-text-secondary">{label}</p>
+              <label className="flex items-center justify-between gap-2 text-[11px] text-text-muted">
+                <span>{t("skin.fit")}</span>
+                <select
+                  value={fit}
+                  onChange={(event) => updateSkinOptions(kind, event.target.value as "cover" | "contain" | "stretch", overlay)}
+                  className="ui-select text-xs"
+                >
+                  <option value="cover">{t("skin.cover")}</option>
+                  <option value="contain">{t("skin.contain")}</option>
+                  <option value="stretch">{t("skin.stretch")}</option>
+                </select>
+              </label>
+              <label className="flex items-center justify-between gap-2 text-[11px] text-text-muted">
+                <span>{t("skin.overlay")}</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={90}
+                  step={1}
+                  value={overlay}
+                  onChange={(event) => updateSkinOptions(kind, fit, Number(event.target.value))}
+                  className="ui-range max-w-32"
+                />
+                <span className="w-8 text-right">{overlay}%</span>
+              </label>
+            </div>
+          ))}
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {([
+            ["app", t("skin.appPreview"), appBackgroundImage, appBackgroundFit, appBackgroundOverlay],
+            ["widget", t("skin.widgetPreview"), widgetBackgroundImage, widgetBackgroundFit, widgetBackgroundOverlay],
+          ] as const).map(([kind, label, image, fit, overlay]) => (
+            <div key={kind} className="space-y-1.5">
+              <p className="text-[11px] text-text-muted">{label}</p>
+              <div
+                className="h-24 rounded-xl border border-surface-border overflow-hidden bg-surface-card"
+                style={{
+                  backgroundImage: image
+                    ? `linear-gradient(rgba(20, 24, 36, ${overlay / 100}), rgba(20, 24, 36, ${overlay / 100})), url("${convertFileSrc(image)}")`
+                    : undefined,
+                  backgroundSize: image ? (fit === "stretch" ? "100% 100%" : fit) : undefined,
+                  backgroundPosition: "center",
+                  backgroundRepeat: fit === "stretch" ? "no-repeat" : "no-repeat",
+                }}
+              >
+                {!image && <span className="grid h-full place-items-center text-xs text-text-muted">{t("skin.none")}</span>}
+              </div>
+            </div>
+          ))}
+        </div>
       </SettingsCard>
       )}
 

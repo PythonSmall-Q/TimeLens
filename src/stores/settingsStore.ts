@@ -24,6 +24,10 @@ interface SettingsState {
   theme: "dark" | "light" | "system";
   appBackgroundImage: string;
   widgetBackgroundImage: string;
+  appBackgroundFit: "cover" | "contain" | "stretch";
+  widgetBackgroundFit: "cover" | "contain" | "stretch";
+  appBackgroundOverlay: number;
+  widgetBackgroundOverlay: number;
   updateMode: "off" | "notify" | "auto";
   monitoringActive: boolean;
   samplingIntervalMs: number;
@@ -38,10 +42,16 @@ interface SettingsState {
   notificationQuietStart: string;
   notificationQuietEnd: string;
   notificationCooldownMin: number;
+  reducedMotion: boolean;
+  compactWidgets: boolean;
   setLanguage: (lang: string) => void;
   setTheme: (theme: "dark" | "light" | "system") => void;
   setAppBackgroundImage: (path: string) => void;
   setWidgetBackgroundImage: (path: string) => void;
+  setAppBackgroundFit: (fit: "cover" | "contain" | "stretch") => void;
+  setWidgetBackgroundFit: (fit: "cover" | "contain" | "stretch") => void;
+  setAppBackgroundOverlay: (value: number) => void;
+  setWidgetBackgroundOverlay: (value: number) => void;
   setUpdateMode: (mode: "off" | "notify" | "auto") => void;
   setMonitoringActive: (active: boolean) => Promise<void>;
   setSamplingInterval: (ms: number) => void;
@@ -56,6 +66,8 @@ interface SettingsState {
   setNotificationQuietStart: (value: string) => void;
   setNotificationQuietEnd: (value: string) => void;
   setNotificationCooldownMin: (minutes: number) => void;
+  setReducedMotion: (enabled: boolean) => void;
+  setCompactWidgets: (enabled: boolean) => void;
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -65,6 +77,10 @@ export const useSettingsStore = create<SettingsState>()(
       theme: "dark",
       appBackgroundImage: "",
       widgetBackgroundImage: "",
+      appBackgroundFit: "cover",
+      widgetBackgroundFit: "cover",
+      appBackgroundOverlay: 62,
+      widgetBackgroundOverlay: 62,
       updateMode: "notify",
       monitoringActive: true,
       samplingIntervalMs: 1000,
@@ -79,6 +95,8 @@ export const useSettingsStore = create<SettingsState>()(
       notificationQuietStart: "22:00",
       notificationQuietEnd: "07:00",
       notificationCooldownMin: 15,
+      reducedMotion: false,
+      compactWidgets: false,
 
       setLanguage: (lang) => {
         set({ language: lang });
@@ -91,6 +109,14 @@ export const useSettingsStore = create<SettingsState>()(
       setAppBackgroundImage: (appBackgroundImage) => set({ appBackgroundImage }),
 
       setWidgetBackgroundImage: (widgetBackgroundImage) => set({ widgetBackgroundImage }),
+
+      setAppBackgroundFit: (appBackgroundFit) => set({ appBackgroundFit }),
+
+      setWidgetBackgroundFit: (widgetBackgroundFit) => set({ widgetBackgroundFit }),
+
+      setAppBackgroundOverlay: (value) => set({ appBackgroundOverlay: Math.max(0, Math.min(90, value)) }),
+
+      setWidgetBackgroundOverlay: (value) => set({ widgetBackgroundOverlay: Math.max(0, Math.min(90, value)) }),
 
       setUpdateMode: (updateMode) => set({ updateMode }),
 
@@ -175,6 +201,10 @@ export const useSettingsStore = create<SettingsState>()(
 
       setNotificationCooldownMin: (notificationCooldownMin) =>
         set({ notificationCooldownMin: Math.max(0, Math.min(240, notificationCooldownMin)) }),
+
+      setReducedMotion: (reducedMotion) => set({ reducedMotion }),
+
+      setCompactWidgets: (compactWidgets) => set({ compactWidgets }),
     }),
     {
       name: "timelens-settings",

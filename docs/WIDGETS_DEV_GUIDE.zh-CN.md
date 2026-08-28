@@ -13,7 +13,7 @@
 - 运行时同意提示、权限撤销、请求限流、生命周期事件和审计记录。
 - 通过兼容适配器继续加载 v1/v2 清单。
 
-当前尚未提供远程市场、云端执行、完整的 Gateway 网络/媒体代理、Java Host、原始数据库/文件系统访问、无限制 `fetch` 或直接调用特权 Tauri API。`client.fetch()` 和 `client.loadMedia()` 是预留 API，目前会抛出尚未实现错误。
+当前尚未提供远程市场、云端执行、Java Host、原始数据库/文件系统访问、无限制 `fetch` 或直接调用特权 Tauri API。Gateway 网络与媒体代理已实现：`client.fetch()` 受目标策略、防火墙、超时和响应大小限制；`client.loadMedia()` 还只接受图片、音频或视频，并返回 data URL。
 
 ## 小组件目录
 
@@ -71,7 +71,7 @@ v4 契约要求 `manifest_version: "v4"`、唯一的 `widget_type`、`name`、`p
 | `settings:write` | 通过 SDK 写入专注模式 |
 | `local-api:call` | 调用带 Scope 的本地 TimeLens API |
 
-只声明小组件真正需要的能力。`network_domains_requested` 和 `media_sources_requested` 仅用于声明意图，不会启用当前尚未实现的网络/媒体代理。
+只声明小组件真正需要的能力。`network_domains_requested` 和 `media_sources_requested` 用于声明意图；运行时请求仍会经过 Gateway 策略和同意检查。
 
 ## 入口与 Context
 
@@ -141,6 +141,6 @@ Gateway 状态包括 `success`、`denied`、`revoked`、`throttled`、`timed_out
 
 本地测试时，将目录复制到应用数据目录的 `widgets` 下，以开发模式启动 TimeLens，打开小组件中心并添加小组件，检查首次 Gateway 请求的同意提示，再使用权限矩阵撤销和重新授予 Scope。开发模式提供“小组件开发调试台”时，可用它加载本地目录、模拟 Gateway 响应、切换能力并重新加载入口。
 
-当前 Gateway 对每个小组件实例限制为每分钟 60 次 channel 请求。`permission_denied` 表示需要接受同意提示或重新授予 Scope；`fetch`/`loadMedia` 返回尚未实现表示对应 Provider 计划在后续阶段实现。
+当前 Gateway 对每个小组件实例限制为每分钟 60 次 channel 请求。`permission_denied` 表示需要接受同意提示或重新授予 Scope；网络和媒体请求还可能返回策略拒绝、超时、Provider 或大小限制错误，组件应将其作为可恢复错误处理。
 
 v1/v2 迁移细节见 [`WIDGET_SDK_v2_MIGRATION.md`](WIDGET_SDK_v2_MIGRATION.md)。共享 Schema 位于 `src-tauri/widget-contract/manifest-v4.schema.json`，参考模板位于 `examples/third-party-widget-template/`。

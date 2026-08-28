@@ -16,7 +16,7 @@ Supported today:
 Not available yet:
 
 - Remote marketplace or cloud execution.
-- Fully implemented Gateway network and media proxies. `client.fetch()` and `client.loadMedia()` are reserved APIs and currently throw an unimplemented error.
+- Gateway-mediated network and media proxies are implemented. `client.fetch()` is policy-firewalled, time-limited, and response-size-limited; `client.loadMedia()` additionally accepts only image/audio/video content and returns a data URL.
 - Java runtime hosting.
 - Raw database, filesystem, unrestricted `fetch`, or direct privileged Tauri calls.
 
@@ -78,7 +78,7 @@ Every privileged request is normalized into a Gateway request. A missing grant r
 | `settings:write` | Focus-mode writes through the SDK |
 | `local-api:call` | Scoped calls to the local TimeLens API |
 
-Declare only the capabilities the widget needs. `network_domains_requested` and `media_sources_requested` document intent, but do not enable the currently unimplemented network/media proxies.
+Declare only the capabilities the widget needs. `network_domains_requested` and `media_sources_requested` document intent; runtime requests still pass through Gateway policy and consent checks.
 
 ## Widget entry contract
 
@@ -148,6 +148,6 @@ Gateway statuses include `success`, `denied`, `revoked`, `throttled`, `timed_out
 
 For local testing, copy the package to the app data `widgets` directory, start TimeLens in development mode, open Widget Center > Add Widgets, and inspect the first-request consent prompt. Use the permission matrix to revoke and re-grant scopes. The development-only Widget Dev Harness can load a local folder, mock Gateway responses, toggle capabilities, and reload the entry.
 
-The Gateway currently limits widget channel calls to 60 per minute. A `permission_denied` result means the scope must be accepted or re-granted. An `unimplemented` error from `fetch` or `loadMedia` means that provider is reserved for a later phase.
+The Gateway currently limits widget channel calls to 60 per minute. A `permission_denied` result means the scope must be accepted or re-granted. Network and media requests can also return policy, timeout, provider, or size-limit errors; callers should surface these as recoverable widget errors.
 
 For v1/v2 migration details, see [`WIDGET_SDK_v2_MIGRATION.md`](WIDGET_SDK_v2_MIGRATION.md). The shared schema is `src-tauri/widget-contract/manifest-v4.schema.json`; the reference starter is `examples/third-party-widget-template/`.

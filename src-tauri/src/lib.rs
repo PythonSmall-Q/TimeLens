@@ -1179,6 +1179,7 @@ pub fn run() {
             commands::close_widget,
             commands::set_widget_always_on_top,
             commands::get_widget_registry,
+            commands::get_widget_runtime_health,
             commands::import_pet_pack,
             // App settings / startup / shortcuts
             commands::get_app_settings,
@@ -1272,6 +1273,7 @@ pub fn run() {
             commands::get_widget_error_log,
             commands::clear_widget_error_log,
             commands::set_widget_paused,
+            commands::recover_widget,
             commands::reset_widget_permissions_and_state,
         ])
         .build(tauri::generate_context!())

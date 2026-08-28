@@ -21,7 +21,7 @@ default = []
 macos-private-api = ["tauri/macos-private-api"]
 
 [dependencies]
-tauri = { version = "2", features = ["tray-icon", "image-png", "image-ico"] }
+tauri = { version = "2", features = ["protocol-asset", "tray-icon", "image-png", "image-ico"] }
 tauri-plugin-autostart = "2"
 tauri-plugin-shell = "2"
 tauri-plugin-opener = "2"

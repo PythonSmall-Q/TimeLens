@@ -5,6 +5,7 @@
   "searchNoResult": "未找到匹配的設定項",
   "generalDesc": "語言與區域偏好",
   "appearanceDesc": "主題與視覺風格",
+  "accessibility": { "reducedMotion": "減少動畫", "compactWidgets": "精簡小元件顯示" },
   "trayIconDesc": "托盤或工作列圖示外觀",
   "trackingDesc": "監控、取樣與閒置設定",
   "startupDesc": "啟動行為與自動開啟選項",
@@ -40,7 +41,19 @@
     "widgetBackground": "小元件背景圖片",
     "choose": "選擇圖片",
     "clear": "清除",
-    "none": "預設"
+    "none": "預設",
+    "fit": "適配方式",
+    "cover": "覆蓋",
+    "contain": "完整顯示",
+    "stretch": "拉伸",
+    "overlay": "遮罩",
+    "appPreview": "TimeLens 預覽",
+    "widgetPreview": "小元件預覽",
+    "checkContrast": "檢查對比度",
+    "contrastPass": "對比度達到 AA（{{ratio}}:1）",
+    "contrastFail": "對比度需要調整（{{ratio}}:1）",
+    "contrastUnavailable": "無法測量對比度",
+    "exportDiagnostic": "匯出皮膚快照"
   },
   "trayIconStyle": {
     "label": "托盤圖標樣式",

@@ -5,6 +5,7 @@
   "searchNoResult": "No matching setting found",
   "generalDesc": "Language and region preferences",
   "appearanceDesc": "Theme and visual style",
+  "accessibility": { "reducedMotion": "Reduce motion", "compactWidgets": "Compact widget display" },
   "trayIconDesc": "Tray or taskbar icon appearance",
   "trackingDesc": "Monitoring, sampling, and idle settings",
   "startupDesc": "Launch behavior and auto-open options",
@@ -40,7 +41,19 @@
     "widgetBackground": "Widget background",
     "choose": "Choose image",
     "clear": "Clear",
-    "none": "Default"
+    "none": "Default",
+    "fit": "Fit",
+    "cover": "Cover",
+    "contain": "Contain",
+    "stretch": "Stretch",
+    "overlay": "Overlay",
+    "appPreview": "TimeLens preview",
+    "widgetPreview": "Widget preview",
+    "checkContrast": "Check contrast",
+    "contrastPass": "Contrast passes AA ({{ratio}}:1)",
+    "contrastFail": "Contrast needs attention ({{ratio}}:1)",
+    "contrastUnavailable": "Contrast could not be measured",
+    "exportDiagnostic": "Export skin snapshot"
   },
   "trayIconStyle": {
     "label": "Tray Icon Style",

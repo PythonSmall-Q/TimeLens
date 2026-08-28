@@ -614,6 +614,14 @@ pub fn set_widget_paused(
 }
 
 #[tauri::command]
+pub fn recover_widget(
+    widget_id: String,
+    kernel: State<'_, WidgetKernel>,
+) -> Result<(), String> {
+    kernel.recover(&widget_id)
+}
+
+#[tauri::command]
 pub fn reset_widget_permissions_and_state(
     widget_id: String,
     actor: Option<String>,

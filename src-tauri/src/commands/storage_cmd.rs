@@ -655,7 +655,7 @@ pub fn get_todos(db: State<DbState>) -> Result<Vec<TodoItem>, String> {
 }
 
 #[tauri::command]
-pub fn add_todo(content: String, db: State<DbState>) -> Result<TodoItem, String> {
+pub fn add_todo(content: String, db: State<DbState>, app: AppHandle) -> Result<TodoItem, String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
     // Place at the end
     let max_order: i64 = conn
@@ -667,6 +667,7 @@ pub fn add_todo(content: String, db: State<DbState>) -> Result<TodoItem, String>
         .unwrap_or(-1);
     let id = db::insert_todo(&conn, &content, max_order + 1).map_err(|e| e.to_string())?;
     let now = chrono::Local::now().format("%Y-%m-%dT%H:%M:%S").to_string();
+    crate::commands::widget_runtime_cmd::broadcast_widget_event(&app, "todo-changed", serde_json::json!({ "action": "add" }));
     Ok(TodoItem {
         id: Some(id),
         content,
@@ -677,15 +678,19 @@ pub fn add_todo(content: String, db: State<DbState>) -> Result<TodoItem, String>
 }
 
 #[tauri::command]
-pub fn toggle_todo(id: i64, db: State<DbState>) -> Result<(), String> {
+pub fn toggle_todo(id: i64, db: State<DbState>, app: AppHandle) -> Result<(), String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
-    db::toggle_todo(&conn, id).map_err(|e| e.to_string())
+    db::toggle_todo(&conn, id).map_err(|e| e.to_string())?;
+    crate::commands::widget_runtime_cmd::broadcast_widget_event(&app, "todo-changed", serde_json::json!({ "action": "toggle", "id": id }));
+    Ok(())
 }
 
 #[tauri::command]
-pub fn delete_todo(id: i64, db: State<DbState>) -> Result<(), String> {
+pub fn delete_todo(id: i64, db: State<DbState>, app: AppHandle) -> Result<(), String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
-    db::delete_todo(&conn, id).map_err(|e| e.to_string())
+    db::delete_todo(&conn, id).map_err(|e| e.to_string())?;
+    crate::commands::widget_runtime_cmd::broadcast_widget_event(&app, "todo-changed", serde_json::json!({ "action": "delete", "id": id }));
+    Ok(())
 }
 
 #[tauri::command]

@@ -16,6 +16,7 @@ import type {
   TodoItem,
   UsageGoal,
   WidgetConfig,
+  WidgetRuntimeHealth,
   MonitorStatus,
   ActiveWindowInfo,
   AppSettingsPayload,
@@ -354,11 +355,10 @@ export const repairDataIssues = (dryRun: boolean): Promise<RepairAssistantResult
 
 export const exportBackupV2 = (
   path: string,
-  passphrase?: string
+  passphrase?: string,
+  layoutPresets?: unknown
 ): Promise<BackupManifest> =>
-  passphrase === undefined
-    ? invoke("export_backup_v2", { path })
-    : invoke("export_backup_v2", { path, passphrase });
+  invoke("export_backup_v2", { path, passphrase, layoutPresets });
 
 export const importBackupV2Validate = (
   path: string,
@@ -479,6 +479,9 @@ export const getWidgetRegistry = (): Promise<WidgetRegistryResponse> =>
 // ── Widget DB config ──────────────────────────────────────────
 export const getAllWidgets = (): Promise<WidgetConfig[]> =>
   invoke("get_all_widgets");
+
+export const getWidgetRuntimeHealth = (widgetId: string): Promise<WidgetRuntimeHealth | null> =>
+  invoke("get_widget_runtime_health", { widgetId });
 
 export const saveWidgetConfig = (config: WidgetConfig): Promise<void> =>
   invoke("save_widget_config", { config });
@@ -626,6 +629,9 @@ export const importPetPack = (widgetId: string, srcDir: string): Promise<WidgetC
 
 export const setWidgetPaused = (widgetId: string, paused: boolean): Promise<void> =>
   invoke("set_widget_paused", { widgetId, paused });
+
+export const recoverWidget = (widgetId: string): Promise<void> =>
+  invoke("recover_widget", { widgetId });
 
 export const widgetQuery = <T = unknown>(
   request: WidgetQueryRequest

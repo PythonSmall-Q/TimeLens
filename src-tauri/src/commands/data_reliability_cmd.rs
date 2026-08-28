@@ -43,6 +43,7 @@ pub struct BackupBundleCounts {
     pub vscode_sessions: usize,
     pub api_tokens: usize,
     pub api_client_allowlist: usize,
+    pub layout_presets: usize,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -93,6 +94,8 @@ struct BackupBundle {
     vscode_sessions: Vec<VsCodeSession>,
     api_tokens: Vec<ApiTokenMetadata>,
     api_client_allowlist: Vec<ApiClientAllowlistEntry>,
+    #[serde(default)]
+    layout_presets: serde_json::Value,
 }
 
 impl Default for BackupBundle {
@@ -115,6 +118,7 @@ impl Default for BackupBundle {
             vscode_sessions: Vec::new(),
             api_tokens: Vec::new(),
             api_client_allowlist: Vec::new(),
+            layout_presets: serde_json::json!({ "version": 1, "presets": [] }),
         }
     }
 }
@@ -196,6 +200,7 @@ pub struct BackupApplyResult {
     pub imported_rows: usize,
     pub warnings: Vec<String>,
     pub new_profile_id: Option<String>,
+    pub layout_presets: serde_json::Value,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -612,6 +617,7 @@ fn build_bundle(conn: &rusqlite::Connection) -> Result<BackupBundle, String> {
         vscode_sessions,
         api_tokens,
         api_client_allowlist,
+        layout_presets: serde_json::json!({ "version": 1, "presets": [] }),
     })
 }
 
@@ -647,6 +653,7 @@ fn build_manifest(
             vscode_sessions: bundle.vscode_sessions.len(),
             api_tokens: bundle.api_tokens.len(),
             api_client_allowlist: bundle.api_client_allowlist.len(),
+            layout_presets: bundle.layout_presets.get("presets").and_then(|v| v.as_array()).map_or(0, Vec::len),
         },
         encrypted,
     }
@@ -1382,10 +1389,14 @@ pub fn get_data_health_summary(db: State<DbState>) -> Result<DataHealthSummary, 
 pub fn export_backup_v2(
     path: String,
     passphrase: Option<String>,
+    layout_presets: Option<serde_json::Value>,
     db: State<DbState>,
 ) -> Result<BackupManifest, String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
-    let bundle = build_bundle(&conn)?;
+    let mut bundle = build_bundle(&conn)?;
+    if let Some(presets) = layout_presets {
+        bundle.layout_presets = presets;
+    }
     let payload_json = bundle_to_json(&bundle)?;
 
     let (stored_payload, encrypted) = match passphrase {
@@ -1550,6 +1561,7 @@ pub fn import_backup_v2_apply(
     app: tauri::AppHandle,
 ) -> Result<BackupApplyResult, String> {
     let (manifest, bundle, _payload_json) = read_backup_package(&path, passphrase.as_deref())?;
+    let layout_presets = bundle.layout_presets.clone();
 
     match strategy.as_str() {
         "overwrite" => {
@@ -1564,6 +1576,7 @@ pub fn import_backup_v2_apply(
                 imported_rows,
                 warnings,
                 new_profile_id: None,
+                layout_presets,
             })
         }
         "merge" => {
@@ -1577,6 +1590,7 @@ pub fn import_backup_v2_apply(
                 imported_rows,
                 warnings,
                 new_profile_id: None,
+                layout_presets,
             })
         }
         "new_profile" => {

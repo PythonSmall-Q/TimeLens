@@ -5,6 +5,7 @@
   "searchNoResult": "未找到匹配的设置项",
   "generalDesc": "语言与区域偏好",
   "appearanceDesc": "主题与视觉风格",
+  "accessibility": { "reducedMotion": "减少动画", "compactWidgets": "紧凑小组件显示" },
   "trayIconDesc": "托盘或任务栏图标外观",
   "trackingDesc": "监控、采样与空闲设置",
   "startupDesc": "启动行为与自动打开选项",
@@ -40,7 +41,19 @@
     "widgetBackground": "小组件背景图片",
     "choose": "选择图片",
     "clear": "清除",
-    "none": "默认"
+    "none": "默认",
+    "fit": "适配方式",
+    "cover": "覆盖",
+    "contain": "完整显示",
+    "stretch": "拉伸",
+    "overlay": "遮罩",
+    "appPreview": "TimeLens 预览",
+    "widgetPreview": "小组件预览",
+    "checkContrast": "检查对比度",
+    "contrastPass": "对比度达到 AA（{{ratio}}:1）",
+    "contrastFail": "对比度需要调整（{{ratio}}:1）",
+    "contrastUnavailable": "无法测量对比度",
+    "exportDiagnostic": "导出皮肤快照"
   },
   "trayIconStyle": {
     "label": "托盘图标样式",

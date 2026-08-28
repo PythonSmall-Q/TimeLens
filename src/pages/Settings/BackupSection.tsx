@@ -5,6 +5,7 @@ import clsx from "clsx";
 import * as api from "@/services/tauriApi";
 import { useAnnouncer } from "@/hooks/useAnnouncer";
 import type { BackupPreview } from "@/types";
+import { WIDGET_PRESETS_STORAGE_KEY } from "@/pages/WidgetCenter/widgetExperience";
 
 function basename(path: string) {
   if (!path) return "";
@@ -151,6 +152,9 @@ export default function BackupSection() {
     setBackupMessage(null);
     try {
       const result = await api.importBackupV2Apply(backupPackagePath, backupStrategy, importPassphrase());
+      if (result.layout_presets && typeof result.layout_presets === "object") {
+        localStorage.setItem(WIDGET_PRESETS_STORAGE_KEY, JSON.stringify(result.layout_presets));
+      }
       const successText = result.new_profile_id
         ? t("backup.applySuccessProfile", { profile: result.new_profile_id })
         : t("backup.applySuccess", { count: result.imported_rows });
@@ -181,7 +185,14 @@ export default function BackupSection() {
     setBackupMessage(null);
     try {
       const passphrase = encryptExport ? backupPassphrase : undefined;
-      const manifest = await api.exportBackupV2(path, passphrase);
+      let layoutPresets: unknown = undefined;
+      try {
+        const raw = localStorage.getItem(WIDGET_PRESETS_STORAGE_KEY);
+        layoutPresets = raw ? JSON.parse(raw) : undefined;
+      } catch {
+        layoutPresets = undefined;
+      }
+      const manifest = await api.exportBackupV2(path, passphrase, layoutPresets);
       setBackupPackagePath(path);
       setBackupPreview({
         manifest,

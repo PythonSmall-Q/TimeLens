@@ -313,5 +313,9 @@
     "noLogs": "暂无日志。",
     "loadingManifest": "正在加载清单..."
   },
+  "presets": { "title": "布局预设", "description": "保存当前小组件的位置和尺寸。", "nameLabel": "预设名称", "namePlaceholder": "预设名称", "save": "保存", "apply": "应用", "delete": "删除 {{name}}", "export": "导出", "import": "导入", "schedule": "自动切换布局", "scheduleOff": "关闭", "scheduleTime": "按本地时间", "scheduleFocus": "按专注模式" },
+  "skin": { "perWidget": "小组件皮肤", "choose": "选择", "clear": "清除", "tooLarge": "图片大小不能超过 4 MB。" },
+  "presetDefaults": { "work": "工作", "focus": "专注", "break": "休息", "coding": "编码", "review": "复盘" },
+  "health": { "title": "小组件健康中心", "refresh": "刷新", "running": "运行中", "paused": "已暂停", "suspended": "已挂起", "lastRefresh": "最近心跳：{{value}}", "lastError": "最近错误：{{value}}", "resourceUsage": "资源使用", "memory": "内存", "cpu": "CPU 时间", "failures": "连续失败", "pausedState": "暂停状态", "suspendedUntil": "挂起截止：{{value}}", "yes": "是", "no": "否", "unavailable": "当前不可用", "recover": "恢复" },
   "comingSoon": "开发中"
 }

@@ -330,5 +330,9 @@
     "noLogs": "尚無紀錄。",
     "loadingManifest": "正在載入資訊清單..."
   },
+  "presets": { "title": "版面配置預設", "description": "儲存目前小元件的位置與大小。", "nameLabel": "預設名稱", "namePlaceholder": "預設名稱", "save": "儲存", "apply": "套用", "delete": "刪除 {{name}}", "export": "匯出", "import": "匯入", "schedule": "自動切換版面", "scheduleOff": "關閉", "scheduleTime": "依本機時間", "scheduleFocus": "依專注模式" },
+  "skin": { "perWidget": "小元件皮膚", "choose": "選擇", "clear": "清除", "tooLarge": "圖片大小不能超過 4 MB。" },
+  "presetDefaults": { "work": "工作", "focus": "專注", "break": "休息", "coding": "編碼", "review": "回顧" },
+  "health": { "title": "小元件健康中心", "refresh": "重新整理", "running": "執行中", "paused": "已暫停", "suspended": "已暫停運作", "lastRefresh": "最近心跳：{{value}}", "lastError": "最近錯誤：{{value}}", "resourceUsage": "資源使用量", "memory": "記憶體", "cpu": "CPU 時間", "failures": "連續失敗", "pausedState": "暫停狀態", "suspendedUntil": "暫停運作至：{{value}}", "yes": "是", "no": "否", "unavailable": "目前無法取得", "recover": "復原" },
   "comingSoon": "即將推出"
 }

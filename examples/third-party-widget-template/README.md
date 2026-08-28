@@ -1,6 +1,6 @@
 # Third-party Widget Template
 
-This template is a complete TypeScript showcase for the rewritten TimeLens widget runtime. It exposes buttons for the current WidgetClient APIs, legacy channel APIs, consent, local API access, and reserved network/media methods.
+This template is a complete TypeScript showcase for the rewritten TimeLens widget runtime. It exposes buttons for the current WidgetClient APIs, legacy channel APIs, consent, local API access, and Gateway-mediated network/media methods.
 
 ## Files
 
@@ -71,5 +71,5 @@ For faster iteration, use the Widget Dev Harness (dev mode only):
 - `Todo write lifecycle` adds, toggles, reorders, and deletes a temporary todo.
 - `Legacy read channel` exercises the compatibility read methods.
 - `Focus/settings writes` and `Local API call` require their declared scopes.
-- `Test reserved network/media` is expected to report unimplemented providers.
+- `Test network/media` exercises the implemented Gateway providers. Requests remain subject to permission, target policy, timeout, content-type, and response-size checks, so a denied result is expected for an unapproved or unsuitable URL.
 - See `docs/WIDGETS_DEV_GUIDE.md` for the current runtime guide and `docs/WIDGET_SDK_v2_MIGRATION.md` for v1/v2 migration.

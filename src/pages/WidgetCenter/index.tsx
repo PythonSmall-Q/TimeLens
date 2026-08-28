@@ -6,7 +6,7 @@ import {
   Clock, List, Timer, ExternalLink, Trash2, Plus, StickyNote, Activity,
   Puzzle, FolderOpen, ShieldCheck, PawPrint, Ruler, Upload, Wrench,
   Target, Lightbulb, BarChart3, TrendingUp, Globe, Pause, Play, RefreshCw,
-  Terminal, ChevronDown, ChevronUp, X,
+  Terminal, ChevronDown, ChevronUp, X, Save, HeartPulse, RotateCcw,
 } from "lucide-react";
 import { useWidgetStore } from "@/stores/widgetStore";
 import type {
@@ -22,6 +22,15 @@ import * as api from "@/services/tauriApi";
 import clsx from "clsx";
 import AsyncStateCard from "@/components/AsyncStateCard";
 import WidgetPermissionDialog from "./WidgetPermissionDialog";
+import {
+  applyWidgetPreset,
+  createWidgetPreset,
+  parseWidgetPresets,
+  readWidgetPresets,
+  saveWidgetPresets,
+  serializeWidgetPresets,
+  type WidgetLayoutPreset,
+} from "./widgetExperience";
 
 type InlineMessage = { kind: "ok" | "err"; text: string };
 type WidgetGroup = "utility" | "focus" | "insight" | "reflection";
@@ -71,6 +80,7 @@ function WidgetCard({
   const { openWidget, removeWidget, updateWidgetConfig } = useWidgetStore();
   const Icon = ICONS[config.widget_type as keyof typeof ICONS] ?? Clock;
   const petPackInputRef = useRef<HTMLInputElement | null>(null);
+  const skinInputRef = useRef<HTMLInputElement | null>(null);
   const [petWidth, setPetWidth] = useState(String(Math.round(config.width)));
   const [petHeight, setPetHeight] = useState(String(Math.round(config.height)));
   const [revokingPermissions, setRevokingPermissions] = useState(false);
@@ -79,6 +89,7 @@ function WidgetCard({
   const [errorLogOpen, setErrorLogOpen] = useState(false);
   const [errorLogs, setErrorLogs] = useState<WidgetErrorLogEntry[]>([]);
   const [errorFilter, setErrorFilter] = useState("");
+  const [widgetSkin, setWidgetSkin] = useState(() => localStorage.getItem(`timelens-widget-skin:${config.id}`) ?? "");
 
   useEffect(() => {
     setPetWidth(String(Math.round(config.width)));
@@ -129,6 +140,32 @@ function WidgetCard({
     } finally {
       event.target.value = "";
     }
+  };
+
+  const handleWidgetSkin = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || !file.type.startsWith("image/")) return;
+    if (file.size > 4 * 1024 * 1024) {
+      onNotify({ kind: "err", text: t("skin.tooLarge") });
+      return;
+    }
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+    if (!dataUrl) return;
+    localStorage.setItem(`timelens-widget-skin:${config.id}`, dataUrl);
+    setWidgetSkin(dataUrl);
+    void emit("timelens-widget-skin-changed", { widgetId: config.id, image: dataUrl });
+  };
+
+  const clearWidgetSkin = () => {
+    localStorage.removeItem(`timelens-widget-skin:${config.id}`);
+    setWidgetSkin("");
+    void emit("timelens-widget-skin-changed", { widgetId: config.id, image: "" });
   };
 
   const handleRevokePermissions = async () => {
@@ -251,6 +288,15 @@ function WidgetCard({
           <RefreshCw size={12} />
           {t("refreshNow")}
         </button>
+      </div>
+
+      <div className="flex items-center justify-between gap-2 rounded-lg border border-surface-border px-3 py-2 text-xs text-text-secondary">
+        <span>{t("skin.perWidget")}</span>
+        <div className="flex items-center gap-2">
+          <input ref={skinInputRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden" onChange={handleWidgetSkin} />
+          <button onClick={() => skinInputRef.current?.click()} className="text-accent-blue hover:underline">{t("skin.choose")}</button>
+          {widgetSkin && <button onClick={clearWidgetSkin} className="text-accent-red hover:underline">{t("skin.clear")}</button>}
+        </div>
       </div>
 
       {config.widget_type === "pet" && (
@@ -643,6 +689,14 @@ export default function WidgetCenter() {
   const [registryErrors, setRegistryErrors] = useState<WidgetRegistryLoadError[]>([]);
   const [permissionMatrixByWidget, setPermissionMatrixByWidget] = useState<Record<string, WidgetPermissionEntry[]>>({});
   const [permissionAuditByWidget, setPermissionAuditByWidget] = useState<Record<string, WidgetPermissionAuditEntry[]>>({});
+  const [presets, setPresets] = useState<WidgetLayoutPreset[]>([]);
+  const [presetName, setPresetName] = useState("");
+  const [presetSchedule, setPresetSchedule] = useState<"off" | "time" | "focus">(() => (localStorage.getItem("timelens-widget-preset-schedule") as "off" | "time" | "focus") ?? "off");
+  const [healthRefresh, setHealthRefresh] = useState(0);
+  const [errorLogsByWidget, setErrorLogsByWidget] = useState<Record<string, WidgetErrorLogEntry[]>>({});
+  const [runtimeHealthByWidget, setRuntimeHealthByWidget] = useState<Record<string, Awaited<ReturnType<typeof api.getWidgetRuntimeHealth>>>>({});
+  const presetImportRef = useRef<HTMLInputElement | null>(null);
+  const scheduledPresetRef = useRef("");
 
   // Permission dialog state
   const [permDialog, setPermDialog] = useState<{
@@ -709,6 +763,118 @@ export default function WidgetCenter() {
       window.clearInterval(timer);
     };
   }, [widgets, refreshPermissionData]);
+
+  useEffect(() => {
+    setPresets(readWidgetPresets());
+  }, []);
+
+  useEffect(() => {
+    if (widgets.length === 0 || presets.length > 0) return;
+    const defaults = ["work", "focus", "break", "coding", "review"].map((mode) =>
+      createWidgetPreset(t(`presetDefaults.${mode}`), widgets)
+    );
+    persistPresets(defaults);
+  }, [presets.length, t, widgets]);
+
+  useEffect(() => {
+    if (presetSchedule === "off" || presets.length === 0 || widgets.length === 0) {
+      scheduledPresetRef.current = "";
+      return;
+    }
+    let disposed = false;
+    const applyScheduledPreset = async () => {
+      const focusActive = presetSchedule === "focus" ? await api.getFocusModeActive().catch(() => false) : false;
+      const targetIndex = presetSchedule === "focus"
+        ? (focusActive ? 1 : 2)
+        : (new Date().getHours() >= 9 && new Date().getHours() < 18 ? 0 : 2);
+      const target = presets[targetIndex] ?? presets[0];
+      if (!disposed && target && scheduledPresetRef.current !== target.id) {
+        scheduledPresetRef.current = target.id;
+        const next = applyWidgetPreset(widgets, target);
+        await Promise.all(next.map((widget) => api.saveWidgetConfig(widget)));
+        await fetchWidgets();
+      }
+    };
+    void applyScheduledPreset();
+    const timer = window.setInterval(() => { void applyScheduledPreset(); }, 15000);
+    return () => { disposed = true; window.clearInterval(timer); };
+  }, [fetchWidgets, presetSchedule, presets, widgets]);
+
+  useEffect(() => {
+    let disposed = false;
+    const loadHealth = async () => {
+      const rows = await Promise.all(widgets.map(async (widget) => {
+        try { return [widget.id, await api.getWidgetErrorLog(widget.id, 5)] as const; }
+        catch { return [widget.id, []] as const; }
+      }));
+      if (!disposed) setErrorLogsByWidget(Object.fromEntries(rows));
+    };
+    void loadHealth();
+    const timer = window.setInterval(() => { void loadHealth(); }, 5000);
+    return () => { disposed = true; window.clearInterval(timer); };
+  }, [healthRefresh, widgets]);
+
+  useEffect(() => {
+    let disposed = false;
+    const loadRuntimeHealth = async () => {
+      const rows = await Promise.all(widgets.map(async (widget) => {
+        try { return [widget.id, await api.getWidgetRuntimeHealth(widget.id)] as const; }
+        catch { return [widget.id, null] as const; }
+      }));
+      if (!disposed) setRuntimeHealthByWidget(Object.fromEntries(rows));
+    };
+    void loadRuntimeHealth();
+    const timer = window.setInterval(() => { void loadRuntimeHealth(); }, 5000);
+    return () => { disposed = true; window.clearInterval(timer); };
+  }, [healthRefresh, widgets]);
+
+  const persistPresets = (next: WidgetLayoutPreset[]) => {
+    setPresets(next);
+    saveWidgetPresets(next);
+  };
+
+  const handleSavePreset = () => {
+    const name = presetName.trim();
+    if (!name || widgets.length === 0) return;
+    const existing = presets.filter((preset) => preset.name.toLocaleLowerCase() !== name.toLocaleLowerCase());
+    persistPresets([...existing, createWidgetPreset(name, widgets)]);
+    setPresetName("");
+  };
+
+  const handleExportPresets = () => {
+    const blob = new Blob([serializeWidgetPresets(presets)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "timelens-widget-layout-presets.json";
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportPresets = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    const imported = parseWidgetPresets(await file.text());
+    if (imported.length > 0) persistPresets(imported);
+  };
+
+  const handleApplyPreset = async (preset: WidgetLayoutPreset) => {
+    const next = applyWidgetPreset(widgets, preset);
+    await Promise.all(next.map((widget) => api.saveWidgetConfig(widget)));
+    await fetchWidgets();
+    void emit("timelens-widget-refresh");
+    setHealthRefresh((value) => value + 1);
+  };
+
+  const healthFor = (widget: WidgetConfig) => {
+    let heartbeat: { at?: string; event?: string } = {};
+    try {
+      heartbeat = JSON.parse(localStorage.getItem(`timelens-widget-heartbeat:${widget.id}`) ?? "{}") as typeof heartbeat;
+    } catch { /* use unavailable state */ }
+    const lastError = errorLogsByWidget[widget.id]?.[0];
+    return { heartbeat, lastError };
+  };
 
   const countByType = (type: string) =>
     widgets.filter((w) => w.widget_type === type).length;
@@ -840,6 +1006,76 @@ export default function WidgetCenter() {
           </button>
         </div>
       </div>
+
+      <section aria-labelledby="widget-presets-title" className="glass-card p-4 space-y-3">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <h2 id="widget-presets-title" className="text-sm font-semibold text-text-primary flex items-center gap-2">
+              <Save size={15} /> {t("presets.title")}
+            </h2>
+            <p className="text-xs text-text-muted mt-0.5">{t("presets.description")}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              value={presetName}
+              onChange={(event) => setPresetName(event.target.value)}
+              onKeyDown={(event) => { if (event.key === "Enter") handleSavePreset(); }}
+              placeholder={t("presets.namePlaceholder")}
+              aria-label={t("presets.nameLabel")}
+              className="ui-field w-40 text-xs"
+            />
+            <button onClick={handleSavePreset} disabled={!presetName.trim() || widgets.length === 0} className="btn-primary text-xs py-1.5 px-3">
+              <Save size={12} /> {t("presets.save")}
+            </button>
+            <button onClick={handleExportPresets} disabled={presets.length === 0} className="text-xs border border-surface-border rounded-lg px-2 py-1.5 disabled:opacity-50">{t("presets.export")}</button>
+            <button onClick={() => presetImportRef.current?.click()} className="text-xs border border-surface-border rounded-lg px-2 py-1.5">{t("presets.import")}</button>
+            <input ref={presetImportRef} type="file" accept="application/json,.json" className="hidden" onChange={handleImportPresets} />
+          </div>
+        </div>
+        <label className="flex items-center justify-between gap-3 text-xs text-text-secondary">
+          <span>{t("presets.schedule")}</span>
+          <select value={presetSchedule} onChange={(event) => { const value = event.target.value as typeof presetSchedule; setPresetSchedule(value); localStorage.setItem("timelens-widget-preset-schedule", value); }} className="ui-select text-xs">
+            <option value="off">{t("presets.scheduleOff")}</option>
+            <option value="time">{t("presets.scheduleTime")}</option>
+            <option value="focus">{t("presets.scheduleFocus")}</option>
+          </select>
+        </label>
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {presets.map((preset) => (
+            <div key={preset.id} className="flex items-center gap-1.5 shrink-0 rounded-lg border border-surface-border px-2 py-1.5">
+              <button onClick={() => void handleApplyPreset(preset)} className="text-xs text-text-primary hover:text-accent-blue" title={t("presets.apply")}>
+                {preset.name}
+              </button>
+              <button onClick={() => persistPresets(presets.filter((item) => item.id !== preset.id))} aria-label={t("presets.delete", { name: preset.name })} title={t("presets.delete", { name: preset.name })} className="text-text-muted hover:text-accent-red">
+                <X size={12} />
+              </button>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section aria-labelledby="widget-health-title" className="glass-card p-4 space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <h2 id="widget-health-title" className="text-sm font-semibold text-text-primary flex items-center gap-2"><HeartPulse size={15} /> {t("health.title")}</h2>
+          <button onClick={() => setHealthRefresh((value) => value + 1)} className="text-xs text-accent-blue flex items-center gap-1" title={t("health.refresh")}><RotateCcw size={12} /> {t("health.refresh")}</button>
+        </div>
+        <div className="grid gap-2 md:grid-cols-2">
+          {widgets.map((widget) => {
+            const { heartbeat, lastError } = healthFor(widget);
+            const runtimeHealth = runtimeHealthByWidget[widget.id];
+            const suspended = !!widget.suspended_until && new Date(widget.suspended_until).getTime() > Date.now();
+            return <div key={widget.id} className="rounded-lg border border-surface-border px-3 py-2 text-xs space-y-1">
+              <div className="flex items-center justify-between gap-2"><span className="font-medium text-text-primary">{t(TYPE_LABELS[widget.widget_type] ?? "clock.title")}</span><span className={suspended || widget.paused ? "text-yellow-600" : "text-accent-green"}>{suspended ? t("health.suspended") : widget.paused ? t("health.paused") : t("health.running")}</span></div>
+              <p className="text-text-muted">{t("health.lastRefresh", { value: runtimeHealth?.last_heartbeat_at ? new Date(runtimeHealth.last_heartbeat_at).toLocaleString() : heartbeat.at ? new Date(heartbeat.at).toLocaleString() : t("health.unavailable") })}</p>
+              <p className="text-text-muted">{t("health.memory")}: {runtimeHealth ? `${runtimeHealth.memory_used_mb} MB` : t("health.unavailable")} · {t("health.cpu")}: {runtimeHealth ? `${runtimeHealth.cpu_used_ms} ms` : t("health.unavailable")}</p>
+              <p className="text-text-muted">{t("health.failures")}: {widget.consecutive_failures ?? 0} · {t("health.pausedState")}: {widget.paused ? t("health.yes") : t("health.no")}</p>
+              {suspended && <p className="text-yellow-600">{t("health.suspendedUntil", { value: new Date(widget.suspended_until as string).toLocaleString() })}</p>}
+              {lastError && <p className="text-accent-red truncate" title={lastError.error}>{t("health.lastError", { value: lastError.error })}</p>}
+              {suspended && <button onClick={() => { void api.recoverWidget(widget.id).then(() => emit("timelens-widget-refresh", { widgetId: widget.id })); setHealthRefresh((value) => value + 1); }} className="text-accent-blue hover:underline">{t("health.recover")}</button>}
+            </div>;
+          })}
+        </div>
+      </section>
 
       {/* ── My Widgets tab ── */}
       {tab === "mine" && (

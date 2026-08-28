@@ -150,6 +150,12 @@ impl WidgetKernel {
         db::set_widget_paused(&conn, widget_id, paused).map_err(|e| e.to_string())
     }
 
+    pub fn recover(&self, widget_id: &str) -> Result<(), String> {
+        let conn = self.db.lock().map_err(|e| e.to_string())?;
+        db::reset_widget_consecutive_failures(&conn, widget_id).map_err(|e| e.to_string())?;
+        db::set_widget_paused(&conn, widget_id, false).map_err(|e| e.to_string())
+    }
+
     /// Record a heartbeat and update runtime health.
     pub fn heartbeat(
         &self,

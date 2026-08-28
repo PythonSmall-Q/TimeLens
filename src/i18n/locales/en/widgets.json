@@ -313,5 +313,9 @@
     "noLogs": "No logs yet.",
     "loadingManifest": "Loading manifest..."
   },
+  "presets": { "title": "Layout presets", "description": "Save the current widget positions and sizes.", "nameLabel": "Preset name", "namePlaceholder": "Preset name", "save": "Save", "apply": "Apply", "delete": "Delete {{name}}", "export": "Export", "import": "Import", "schedule": "Automatic layout", "scheduleOff": "Off", "scheduleTime": "By local time", "scheduleFocus": "By focus mode" },
+  "skin": { "perWidget": "Widget skin", "choose": "Choose", "clear": "Clear", "tooLarge": "Image must be 4 MB or smaller." },
+  "presetDefaults": { "work": "Work", "focus": "Focus", "break": "Break", "coding": "Coding", "review": "Review" },
+  "health": { "title": "Widget health", "refresh": "Refresh", "running": "Running", "paused": "Paused", "suspended": "Suspended", "lastRefresh": "Last heartbeat: {{value}}", "lastError": "Last error: {{value}}", "resourceUsage": "Resource usage", "memory": "Memory", "cpu": "CPU time", "failures": "Consecutive failures", "pausedState": "Paused", "suspendedUntil": "Suspended until: {{value}}", "yes": "yes", "no": "no", "unavailable": "Unavailable", "recover": "Recover" },
   "comingSoon": "Coming Soon"
 }
