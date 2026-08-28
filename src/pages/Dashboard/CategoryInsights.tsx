@@ -22,15 +22,12 @@ export default function CategoryInsights() {
   const { t } = useTranslation(["dashboard", "categories"]);
   const { categoryTotals, categoryDailyTotals } = useStatsStore();
 
-  const localizeCategory = (category: string) =>
-    t(`categories:presets.${category}`, { defaultValue: category } as Record<string, unknown>);
-
   const pieData = useMemo(
     () => categoryTotals.slice(0, 8).map((row) => ({
       ...row,
-      categoryLabel: localizeCategory(row.category),
+      categoryLabel: t(`categories:presets.${row.category}`, { defaultValue: row.category } as Record<string, unknown>),
     })),
-    [categoryTotals]
+    [categoryTotals, t]
   );
 
   const trendData = useMemo(() => {
@@ -100,7 +97,10 @@ export default function CategoryInsights() {
             <AreaChart data={trendData} margin={{ top: 6, right: 12, left: -20, bottom: 0 }}>
               <XAxis dataKey="date" tick={{ fill: "#6b7280", fontSize: 10 }} axisLine={false} tickLine={false} />
               <YAxis hide />
-              <Tooltip formatter={(v: number, name: string) => [formatDuration(v), localizeCategory(name)]} />
+              <Tooltip formatter={(v: number, name: string) => [
+                formatDuration(v),
+                t(`categories:presets.${name}`, { defaultValue: name } as Record<string, unknown>),
+              ]} />
               {categories.map((c, idx) => (
                 <Area
                   key={c}

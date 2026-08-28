@@ -10,7 +10,13 @@ import {
 } from "recharts";
 import { useStatsStore } from "@/stores/statsStore";
 
-const CustomTooltip = ({ active, payload, label }: any) => {
+interface HourlyTooltipProps {
+  active?: boolean;
+  label?: string | number;
+  payload?: Array<{ value?: number }>;
+}
+
+const CustomTooltip = ({ active, payload, label }: HourlyTooltipProps) => {
   if (active && payload && payload.length) {
     const minutes = Math.round((payload[0].value as number) / 60);
     return (

@@ -14,7 +14,7 @@ interface WidgetStore {
   updateWidgetConfig: (config: WidgetConfig) => Promise<void>;
 }
 
-export const useWidgetStore = create<WidgetStore>((set, get) => ({
+export const useWidgetStore = create<WidgetStore>((set) => ({
   widgets: [],
   loading: false,
 

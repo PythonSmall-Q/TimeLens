@@ -165,7 +165,7 @@ export default function WidgetWindow({ widgetId }: Props) {
       window.removeEventListener("mousedown", restoreOnMouseDown);
       if (positionSaveTimer.current) clearTimeout(positionSaveTimer.current);
     };
-  }, [widgetId]);
+  }, [widgetId, win]);
 
   useEffect(() => {
     let unlisten: (() => void) | undefined;

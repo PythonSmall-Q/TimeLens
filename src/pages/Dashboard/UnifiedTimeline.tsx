@@ -135,7 +135,7 @@ export default function UnifiedTimeline({ selectedDate, periodMode, rangeStart, 
     }
 
     return rows.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
-  }, [browserSessions, focusSessions, interruptions, periodMode, selectedDate, t]);
+  }, [browserSessions, focusSessions, interruptions, periodMode, rangeEnd, rangeStart, selectedDate, t]);
 
   const filtered = useMemo(() => {
     let rows = events;

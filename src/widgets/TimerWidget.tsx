@@ -72,7 +72,7 @@ export default function TimerWidget({ widgetId: _widgetId }: Props) {
 
   useEffect(() => {
     reset();
-  }, [mode, phase]);
+  }, [mode, phase, reset]);
 
   useEffect(() => {
     if (!running) {

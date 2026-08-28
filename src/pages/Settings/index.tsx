@@ -170,7 +170,7 @@ export default function Settings() {
   const [currentProfile, setCurrentProfile] = useState<string>("default");
   const [profileDialogOpen, setProfileDialogOpen] = useState(false);
   const [newProfileName, setNewProfileName] = useState("");
-  const [profilesBusy, setProfilesBusy] = useState(false);
+  const [profilesBusy, setProfilesBusy] = useState<boolean>();
 
   // v2.0.0 legacy data import state
   const [legacyDataInfo, setLegacyDataInfo] = useState<LegacyDataInfo | null>(null);
@@ -429,7 +429,7 @@ export default function Settings() {
       }
     };
     void loadWidgetPermissions();
-  }, []);
+  }, [excludeTimelens, setIdleTimePolicy, setIgnoreSystemProcesses, setTrackWindowTitles]);
 
   // Load per-widget auto-blur preferences when the widget list is known.
   useEffect(() => {
@@ -782,7 +782,7 @@ export default function Settings() {
     })();
   }, [legacyDataInfo, t, handleImportLegacyData, tauriConfirm]);
 
-  const handleCreateProfile = async () => {
+  async function handleCreateProfile() {
     const name = newProfileName.trim();
     if (!name) return;
     setProfilesBusy(true);
@@ -796,7 +796,7 @@ export default function Settings() {
     } finally {
       setProfilesBusy(false);
     }
-  };
+  }
 
   // v2.0.0 encryption
   const refreshEncryptionStatus = async () => {

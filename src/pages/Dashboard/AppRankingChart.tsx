@@ -11,7 +11,12 @@ import {
 import { useStatsStore } from "@/stores/statsStore";
 import { formatDuration, appColor } from "@/utils/format";
 
-const CustomTooltip = ({ active, payload }: any) => {
+interface AppRankingTooltipProps {
+  active?: boolean;
+  payload?: Array<{ payload: { app_name: string; total_seconds: number } }>;
+}
+
+const CustomTooltip = ({ active, payload }: AppRankingTooltipProps) => {
   if (active && payload && payload.length) {
     const { app_name, total_seconds } = payload[0].payload;
     return (
