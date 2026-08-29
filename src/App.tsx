@@ -128,13 +128,17 @@ export default function App() {
     root.style.setProperty("--timelens-app-overlay", skin.app ? String(skin.appOverlay / 100) : "0");
     root.style.setProperty("--timelens-widget-overlay", skin.widget ? String(skin.widgetOverlay / 100) : "0");
     root.style.setProperty("--timelens-skin-pattern", activePalette === "neutral-texture"
-      ? getNeutralTexture().css
+      ? getNeutralTexture("aurora").css
       : "none");
     const palette = getSkinPalette(activePalette);
     const paletteVars: Record<string, string> = {
       "--app-bg": palette.appBg, "--surface": palette.surface, "--surface-light": palette.surfaceLight,
       "--surface-card": palette.surfaceCard, "--surface-hover": palette.surfaceHover, "--surface-border": palette.surfaceBorder,
       "--text-primary": palette.textPrimary, "--text-secondary": palette.textSecondary, "--text-muted": palette.textMuted,
+      "--glass-bg": palette.glassBg, "--glass-light-bg": palette.glassLightBg,
+      "--field-hover-border": palette.fieldHoverBorder, "--field-focus-ring": palette.fieldFocusRing,
+      "--slider-border": palette.sliderBorder, "--scrollbar-thumb": palette.scrollbarThumb,
+      "--scrollbar-thumb-hover": palette.scrollbarThumbHover,
       "--accent-blue": palette.accentBlue, "--accent-purple": palette.accentPurple, "--accent-teal": palette.accentTeal,
       "--accent-green": palette.accentGreen, "--accent-red": palette.accentRed, "--accent-orange": palette.accentOrange,
     };

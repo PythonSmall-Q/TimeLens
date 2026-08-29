@@ -129,6 +129,7 @@ pub fn issue_widget_api_token(
         &conn,
         label,
         scopes.clone(),
+        vec![],
         None,
     )?;
 

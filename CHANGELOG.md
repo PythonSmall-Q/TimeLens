@@ -18,6 +18,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Official experience widgets** — added Skin Preview, Layout Switcher, Widget Health, and Focus Streak widgets.
 - **Widget diagnostics** — added redacted skin snapshot export, contrast checking, reduced-motion support, compact widget mode, and Widget Dev Harness diagnostics with capability simulation, hash inspection, logs, and auto-reload.
 - **Update flow tests** — added coverage for update checking, download confirmation, download progress, install confirmation, and unavailable updater states.
+- **Scoped Local API credentials** — API credentials now have a nickname and independently configured data-access and operation permissions, with revocation and one-time secret reveal/copy behavior.
+- **Local API permission picker** — Settings now provides localized multi-select controls for the Local API's supported read, subscription, and write scopes.
 
 ### Changed
 
@@ -31,6 +33,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Third-party widget recovery** — failed widgets now show recovery guidance and a real remount/retry action.
 - **Update confirmation policy** — automatic and manual update checks now use the same explicit flow: confirm download first, then confirm installation after download completes.
 - **Cross-window events** — todo, focus, active-window, goal, interruption, skin, and widget-refresh events now update relevant windows without requiring a full app restart.
+- **Extension Bridge compatibility** — legacy extension bridge keys remain fully authorized for existing integrations but are no longer exposed in Settings.
+- **Settings presentation** — neutral texture options include an aurora gradient, and Settings surfaces use lighter, transparent grouping backgrounds so the active skin remains visible.
+- **Themed switches** — Settings toggles use the active palette's accent color, including the default blue palette, instead of native white controls.
 
 ### Fixed
 

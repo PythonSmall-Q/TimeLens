@@ -668,8 +668,11 @@ export interface UsageAnomalyMarker {
 
 export interface ApiTokenMetadata {
   id: string;
+  nickname: string;
   label: string;
   scopes: string[];
+  data_scopes: string[];
+  operation_scopes: string[];
   created_at: string;
   expires_at: string | null;
   revoked_at: string | null;
@@ -680,8 +683,11 @@ export interface ApiTokenMetadata {
 export interface IssuedApiToken {
   id: string;
   token: string;
+  nickname: string;
   label: string;
   scopes: string[];
+  data_scopes: string[];
+  operation_scopes: string[];
   created_at: string;
   expires_at: string | null;
 }

@@ -33,7 +33,7 @@ export default function SettingsCard({
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : undefined}
       className={clsx(
-        "glass-card p-4 space-y-4",
+        "glass-card settings-card p-4 space-y-4",
         onClick &&
           "cursor-pointer border border-surface-border hover:border-accent-blue/40 hover:bg-surface-hover transition-colors text-left",
         className

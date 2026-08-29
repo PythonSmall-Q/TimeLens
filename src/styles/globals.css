@@ -57,22 +57,25 @@ html {
 
 html,
 body {
-  background-image: var(--timelens-skin-pattern, none);
   margin: 0;
   padding: 0;
   background: var(--app-bg);
   background-image:
-    radial-gradient(900px 480px at -12% -18%, rgba(78, 165, 160, 0.16), transparent 62%),
-    radial-gradient(860px 440px at 112% -24%, rgba(224, 144, 80, 0.14), transparent 60%),
-    linear-gradient(170deg, rgba(108, 142, 191, 0.08), transparent 42%);
-  background-image:
+    var(--timelens-skin-pattern, none),
     linear-gradient(rgba(20, 24, 36, var(--timelens-app-overlay, 0.62)), rgba(20, 24, 36, var(--timelens-app-overlay, 0.62))),
     var(--timelens-app-background-image, none),
     radial-gradient(900px 480px at -12% -18%, rgba(78, 165, 160, 0.16), transparent 62%),
     radial-gradient(860px 440px at 112% -24%, rgba(224, 144, 80, 0.14), transparent 60%),
     linear-gradient(170deg, rgba(108, 142, 191, 0.08), transparent 42%);
-  background-size: cover, var(--timelens-app-background-fit, cover), auto, auto, auto;
-  background-position: center, center, center, center, center;
+  background-size:
+    auto,
+    cover,
+    var(--timelens-app-background-fit, cover),
+    auto,
+    auto,
+    auto;
+  background-position: center, center, center, center, center, center;
+  background-repeat: repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat;
   background-attachment: fixed;
   color: var(--text-primary);
   height: 100%;
@@ -118,8 +121,8 @@ html.compact-widgets .widget-root {
 .glass-card {
   @apply rounded-2xl border border-white/10 shadow-glass;
   background: var(--glass-bg);
-  -webkit-backdrop-filter: blur(16px);
-  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(8px) saturate(1.08);
+  backdrop-filter: blur(8px) saturate(1.08);
   box-shadow:
     0 14px 36px rgba(10, 17, 30, 0.28),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
@@ -134,18 +137,36 @@ html.compact-widgets .widget-root {
   border-color: rgba(255, 255, 255, 0.16);
 }
 
+.settings-card {
+  background: color-mix(in srgb, var(--surface-card) 42%, transparent);
+  -webkit-backdrop-filter: blur(3px) saturate(1.03);
+  backdrop-filter: blur(3px) saturate(1.03);
+}
+
+.settings-card .bg-surface-hover\/40 {
+  background-color: transparent !important;
+}
+
 .app-shell {
   position: relative;
   isolation: isolate;
   background-color: transparent !important;
   background-image:
+    var(--timelens-skin-pattern, none),
     linear-gradient(rgba(20, 24, 36, var(--timelens-app-overlay, 0.62)), rgba(20, 24, 36, var(--timelens-app-overlay, 0.62))),
     var(--timelens-app-background-image, none),
     radial-gradient(900px 480px at -12% -18%, rgba(78, 165, 160, 0.16), transparent 62%),
     radial-gradient(860px 440px at 112% -24%, rgba(224, 144, 80, 0.14), transparent 60%),
     linear-gradient(170deg, rgba(108, 142, 191, 0.08), transparent 42%);
-  background-size: cover, var(--timelens-app-background-fit, cover), auto, auto, auto;
-  background-position: center, center, center, center, center;
+  background-size:
+    auto,
+    cover,
+    var(--timelens-app-background-fit, cover),
+    auto,
+    auto,
+    auto;
+  background-position: center, center, center, center, center, center;
+  background-repeat: repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat;
   background-attachment: fixed;
 }
 
@@ -186,8 +207,8 @@ html.compact-widgets .widget-root {
 
 .glass-card-light {
   background: var(--glass-light-bg);
-  -webkit-backdrop-filter: blur(16px);
-  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(8px) saturate(1.08);
+  backdrop-filter: blur(8px) saturate(1.08);
   @apply rounded-2xl border border-white/10;
 }
 
@@ -329,9 +350,9 @@ html.compact-widgets .widget-root {
   width: 14px;
   height: 14px;
   border-radius: 999px;
-  border: 2px solid #eaf2ff;
-  background: #6c8ebf;
-  box-shadow: 0 0 0 2px rgba(108, 142, 191, 0.3);
+  border: 2px solid rgba(255, 255, 255, 0.96);
+  background: var(--accent-blue, #6c8ebf);
+  box-shadow: 0 0 0 2px var(--field-focus-ring, rgba(108, 142, 191, 0.3));
   cursor: pointer;
 }
 
@@ -339,19 +360,67 @@ html.compact-widgets .widget-root {
   width: 14px;
   height: 14px;
   border-radius: 999px;
-  border: 2px solid #eaf2ff;
-  background: #6c8ebf;
-  box-shadow: 0 0 0 2px rgba(108, 142, 191, 0.3);
+  border: 2px solid rgba(255, 255, 255, 0.96);
+  background: var(--accent-blue, #6c8ebf);
+  box-shadow: 0 0 0 2px var(--field-focus-ring, rgba(108, 142, 191, 0.3));
   cursor: pointer;
 }
 
 .ui-checkbox {
-  width: 1rem;
-  height: 1rem;
-  border-radius: 6px;
+  -webkit-appearance: none;
+  appearance: none;
+  position: relative;
+  display: inline-block;
+  width: 2.5rem;
+  height: 1.4rem;
+  border-radius: 999px;
   border: 1px solid var(--surface-border);
-  accent-color: #6c8ebf;
-  background: var(--surface-card);
+  background:
+    radial-gradient(circle at 22% 50%, rgba(255, 255, 255, 0.96) 0 24%, transparent 25%),
+    linear-gradient(90deg, var(--surface-hover, #323b52) 0 100%);
+  background-size: 38% 100%, 100% 100%;
+  background-repeat: no-repeat;
+  background-position: 14% center, center;
+  cursor: pointer;
+  transition: background-position 180ms ease, box-shadow 180ms ease, border-color 180ms ease, filter 180ms ease;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.ui-checkbox:checked {
+  border-color: var(--accent-blue, #6c8ebf);
+  background:
+    radial-gradient(circle at 78% 50%, rgba(255, 255, 255, 0.96) 0 24%, transparent 25%),
+    linear-gradient(90deg, var(--accent-blue, #6c8ebf) 0 100%);
+  background-size: 38% 100%, 100% 100%;
+  background-repeat: no-repeat;
+  background-position: 86% center, center;
+  box-shadow: 0 0 0 2px var(--field-focus-ring, rgba(108, 142, 191, 0.22));
+  filter: saturate(1.1) brightness(1.05);
+}
+
+.ui-checkbox:focus-visible {
+  outline: 2px solid var(--accent-blue, #6c8ebf);
+  outline-offset: 2px;
+}
+
+.ui-toggle {
+  border: 1px solid var(--surface-border);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.ui-toggle.bg-accent-blue {
+  background-color: color-mix(in srgb, var(--accent-blue) 24%, var(--surface-card)) !important;
+  border-color: var(--accent-blue) !important;
+}
+
+.ui-toggle-thumb {
+  background-color: var(--accent-blue, #6c8ebf);
+  border: 2px solid color-mix(in srgb, var(--surface-card) 70%, var(--accent-blue));
+}
+
+.ui-toggle:focus-visible {
+  outline: 2px solid var(--accent-blue, #6c8ebf);
+  outline-offset: 2px;
 }
 
 /* ── Buttons ───────────────────────────────────────────────── */

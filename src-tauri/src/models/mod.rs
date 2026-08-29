@@ -330,8 +330,11 @@ pub struct ActiveWindowInfo {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ApiTokenMetadata {
     pub id: String,
+    pub nickname: String,
     pub label: String,
     pub scopes: Vec<String>,
+    pub data_scopes: Vec<String>,
+    pub operation_scopes: Vec<String>,
     pub created_at: String,
     pub expires_at: Option<String>,
     pub revoked_at: Option<String>,
@@ -345,8 +348,11 @@ pub struct ApiTokenMetadata {
 pub struct IssuedApiToken {
     pub id: String,
     pub token: String,
+    pub nickname: String,
     pub label: String,
     pub scopes: Vec<String>,
+    pub data_scopes: Vec<String>,
+    pub operation_scopes: Vec<String>,
     pub created_at: String,
     pub expires_at: Option<String>,
 }

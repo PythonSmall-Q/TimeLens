@@ -5,7 +5,7 @@ import { convertFileSrc } from "@tauri-apps/api/core";
 import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
 import { useSettingsStore } from "@/stores/settingsStore";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
-import { Moon, Sun, Activity, Database, Info, Rocket, Keyboard, PanelsTopLeft, ArrowLeft, Search, Lock, Copy, RotateCw, User, Shield, Droplet, Sparkles, Image, Palette } from "lucide-react";
+import { Moon, Sun, Activity, Database, Info, Rocket, Keyboard, PanelsTopLeft, ArrowLeft, Search, Lock, Copy, User, Shield, Droplet, Sparkles, Image, Palette } from "lucide-react";
 import clsx from "clsx";
 import * as api from "@/services/tauriApi";
 import { APP_VERSION } from "../../version";
@@ -108,9 +108,6 @@ export default function Settings() {
   const [executableOptions, setExecutableOptions] = useState<ExecutableOption[]>([]);
   const [ignoredApps, setIgnoredAppsState] = useState<string[]>([]);
   const [excludePickerValue, setExcludePickerValue] = useState("");
-  const [extensionBridgeKey, setExtensionBridgeKey] = useState<string>("");
-  const [extensionBridgeLoading, setExtensionBridgeLoading] = useState(false);
-  const [extensionBridgeKeyRotatedAt, setExtensionBridgeKeyRotatedAt] = useState<string>("");
   const [localApiSecurity, setLocalApiSecurity] = useState<LocalApiSecuritySettings>({
     token_required: false,
     allowlist_enforced: false,
@@ -120,7 +117,8 @@ export default function Settings() {
   const [apiTokens, setApiTokens] = useState<ApiTokenMetadata[]>([]);
   const [apiAuditLogs, setApiAuditLogs] = useState<ApiAuditLogEntry[]>([]);
   const [newTokenLabel, setNewTokenLabel] = useState("vscode-local-client");
-  const [newTokenScopes, setNewTokenScopes] = useState("session:write,usage:read");
+  const [newTokenDataScopes, setNewTokenDataScopes] = useState<string[]>(["screen-time:read", "vscode:read"]);
+  const [newTokenOperationScopes, setNewTokenOperationScopes] = useState<string[]>(["vscode:write"]);
   const [lastIssuedToken, setLastIssuedToken] = useState<string | null>(null);
   const [apiGovernanceBusy, setApiGovernanceBusy] = useState<
     null | "issue" | "refresh" | "allowlist" | "settings"
@@ -300,10 +298,6 @@ export default function Settings() {
         setTrackWindowTitles(s.track_window_titles);
         setShortcutState(s.shortcuts);
       })
-      .catch(() => {});
-
-    api.getExtensionBridgeKey()
-      .then(setExtensionBridgeKey)
       .catch(() => {});
 
     api.getLocalApiSecuritySettings()
@@ -529,11 +523,11 @@ export default function Settings() {
     setApiGovernanceBusy("issue");
     setApiGovernanceMessage(null);
     try {
-      const scopes = newTokenScopes
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
-      const issued = await api.issueApiToken(newTokenLabel.trim(), scopes);
+      const issued = await api.issueApiToken(
+        newTokenLabel.trim(),
+        newTokenDataScopes,
+        newTokenOperationScopes
+      );
       setLastIssuedToken(issued.token);
       const tokens = await api.listApiTokens();
       setApiTokens(tokens);
@@ -865,7 +859,6 @@ export default function Settings() {
     { key: "dataHealth", title: t("dataHealth.title"), description: t("dataHealthDesc"), icon: Database, keywords: [t("dataHealth.integrity"), t("dataHealth.applyRepair")] },
     { key: "backup", title: t("backup.title"), description: t("backupDesc"), icon: Database, keywords: [t("backup.exportAction"), t("backup.applyAction")] },
     { key: "retention", title: t("retention.title"), description: t("retentionDesc"), icon: Rocket, keywords: [t("retention.current"), t("retention.runNow")] },
-    { key: "profiles", title: t("profiles.title"), description: t("profilesDesc"), icon: User, keywords: [t("profiles.current"), t("profiles.importLegacy")] },
     { key: "encryption", title: t("encryption.title"), description: t("encryptionDesc"), icon: Shield, keywords: [t("encryption.status"), t("encryption.enable")] },
     { key: "transparency", title: t("transparency.title"), description: t("transparencyDesc"), icon: Info, keywords: [t("transparency.active"), t("transparency.fields")] },
     { key: "extensionBridge", title: t("extensionBridge.title"), description: t("extensionBridgeDesc"), icon: Lock, keywords: [t("extensionBridge.key"), "bridge", "extension"] },
@@ -1218,12 +1211,6 @@ export default function Settings() {
               {t("privacyCenter.openDataHealth")}
             </button>
             <button
-              onClick={() => setActiveSection("profiles")}
-              className="text-xs px-3 py-1.5 rounded-xl border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
-            >
-              {t("privacyCenter.openProfiles")}
-            </button>
-            <button
               onClick={() => setActiveSection("encryption")}
               className="text-xs px-3 py-1.5 rounded-xl border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
             >
@@ -1499,13 +1486,13 @@ export default function Settings() {
                 }}
                 title={t("startup.launchAtStartup")}
                 className={clsx(
-                  "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+                  "ui-toggle relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
                   launchAtStartup ? "bg-accent-blue" : "bg-surface-hover"
                 )}
               >
                 <span
                   className={clsx(
-                    "inline-block h-4 w-4 rounded-full bg-white shadow transition-transform",
+                    "ui-toggle-thumb inline-block h-4 w-4 rounded-full shadow transition-transform",
                     launchAtStartup ? "translate-x-6" : "translate-x-1"
                   )}
                 />
@@ -1520,13 +1507,13 @@ export default function Settings() {
                 }}
                 title={t("startup.silentStartup")}
                 className={clsx(
-                  "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+                  "ui-toggle relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
                   silentStartup ? "bg-accent-blue" : "bg-surface-hover"
                 )}
               >
                 <span
                   className={clsx(
-                    "inline-block h-4 w-4 rounded-full bg-white shadow transition-transform",
+                    "ui-toggle-thumb inline-block h-4 w-4 rounded-full shadow transition-transform",
                     silentStartup ? "translate-x-6" : "translate-x-1"
                   )}
                 />
@@ -1543,13 +1530,13 @@ export default function Settings() {
             }}
             title={t("startup.autoOpenWidgets")}
             className={clsx(
-              "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+              "ui-toggle relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
               autoOpenWidgets ? "bg-accent-blue" : "bg-surface-hover"
             )}
           >
             <span
               className={clsx(
-                "inline-block h-4 w-4 rounded-full bg-white shadow transition-transform",
+                "ui-toggle-thumb inline-block h-4 w-4 rounded-full shadow transition-transform",
                 autoOpenWidgets ? "translate-x-6" : "translate-x-1"
               )}
             />
@@ -2363,54 +2350,7 @@ export default function Settings() {
       {/* Extension Bridge */}
       {activeSection === "extensionBridge" && (
       <SettingsCard icon={Lock} title={t("extensionBridge.title")} description={t("extensionBridgeDesc")}>
-        <SettingsRow label={t("extensionBridge.key")}>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-mono text-text-secondary break-all whitespace-normal">{extensionBridgeKey || t("extensionBridge.none")}</span>
-            {extensionBridgeKey && (
-              <>
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(extensionBridgeKey);
-                    window.dispatchEvent(new CustomEvent("timelens-copy-success"));
-                  }}
-                  className="p-1.5 hover:bg-surface-hover rounded-lg transition-colors"
-                  title={t("extensionBridge.copyKey")}
-                >
-                  <Copy size={13} className="text-accent-blue" />
-                </button>
-                <button
-                  onClick={async () => {
-                    setExtensionBridgeLoading(true);
-                    try {
-                      const newKey = await api.rotateExtensionBridgeKey();
-                      setExtensionBridgeKey(newKey);
-                      setExtensionBridgeKeyRotatedAt(new Date().toISOString());
-                      window.dispatchEvent(new CustomEvent("timelens-key-rotated"));
-                    } catch (err) {
-                      console.error("Failed to rotate key:", err);
-                    } finally {
-                      setExtensionBridgeLoading(false);
-                    }
-                  }}
-                  disabled={extensionBridgeLoading}
-                  className="p-1.5 hover:bg-surface-hover rounded-lg transition-colors disabled:opacity-50"
-                  title={t("extensionBridge.rotateKey")}
-                >
-                  <RotateCw size={13} className="text-accent-blue" />
-                </button>
-              </>
-            )}
-          </div>
-        </SettingsRow>
-        <p className="text-xs text-text-muted text-right">{t("extensionBridge.hint")}</p>
-        <div className="rounded-lg border border-surface-border bg-surface-hover/40 p-3 text-xs text-text-muted space-y-1">
-          <p>{t("extensionBridge.description")}</p>
-          {extensionBridgeKeyRotatedAt && (
-            <p>{t("extensionBridge.lastRotated", { time: new Date(extensionBridgeKeyRotatedAt).toLocaleString() })}</p>
-          )}
-        </div>
-
-        <div className="rounded-lg border border-surface-border bg-surface-hover/40 p-3 space-y-3">
+        <div className="rounded-lg border border-surface-border p-3 space-y-3">
           <div className="text-xs font-semibold text-text-primary">{t("apiSecurity.title")}</div>
           <div className="grid gap-2 sm:grid-cols-3">
             <label className="text-xs text-text-secondary rounded-lg border border-surface-border px-3 py-2 flex items-center justify-between">
@@ -2468,15 +2408,48 @@ export default function Settings() {
                 placeholder="vscode-local-client"
               />
             </label>
-            <label className="text-xs text-text-secondary space-y-1">
-              <span>{t("apiSecurity.scopes")}</span>
-              <input
-                value={newTokenScopes}
-                onChange={(e) => setNewTokenScopes(e.target.value)}
-                className="ui-field w-full"
-                placeholder={t("apiSecurity.scopesPlaceholder")}
-              />
-            </label>
+            <div className="text-xs text-text-secondary space-y-2">
+              <span className="block">{t("apiSecurity.dataScopes")}</span>
+              <div className="grid grid-cols-2 gap-1.5">
+                {[
+                  ["screen-time:read", t("apiSecurity.scopeScreenTimeRead")],
+                  ["browser:read", t("apiSecurity.scopeBrowserRead")],
+                  ["vscode:read", t("apiSecurity.scopeVsCodeRead")],
+                  ["active-window:subscribe", t("apiSecurity.scopeActiveWindow")],
+                ].map(([scope, label]) => (
+                  <label key={scope} className="flex items-center gap-2 rounded-lg border border-surface-border px-2 py-1.5 cursor-pointer hover:bg-surface-hover/50">
+                    <input
+                      type="checkbox"
+                      className="ui-checkbox !h-4 !w-7"
+                      checked={newTokenDataScopes.includes(scope)}
+                      onChange={() => setNewTokenDataScopes((current) => current.includes(scope)
+                        ? current.filter((item) => item !== scope)
+                        : [...current, scope])}
+                    />
+                    <span className="truncate">{label}</span>
+                  </label>
+                ))}
+              </div>
+              <span className="block pt-1">{t("apiSecurity.operationScopes")}</span>
+              <div className="grid grid-cols-2 gap-1.5">
+                {[
+                  ["browser:write", t("apiSecurity.scopeBrowserWrite")],
+                  ["vscode:write", t("apiSecurity.scopeVsCodeWrite")],
+                ].map(([scope, label]) => (
+                  <label key={scope} className="flex items-center gap-2 rounded-lg border border-surface-border px-2 py-1.5 cursor-pointer hover:bg-surface-hover/50">
+                    <input
+                      type="checkbox"
+                      className="ui-checkbox !h-4 !w-7"
+                      checked={newTokenOperationScopes.includes(scope)}
+                      onChange={() => setNewTokenOperationScopes((current) => current.includes(scope)
+                        ? current.filter((item) => item !== scope)
+                        : [...current, scope])}
+                    />
+                    <span className="truncate">{label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2 justify-end">
@@ -2558,7 +2531,8 @@ export default function Settings() {
                       )}
                     </div>
                   </div>
-                  <p className="mt-1">{t("apiSecurity.scopesLabel", { scopes: token.scopes.join(", ") || t("apiSecurity.none") })}</p>
+                  <p className="mt-1">{t("apiSecurity.scopesLabel", { scopes: [...token.data_scopes, ...token.operation_scopes].join(", ") || t("apiSecurity.none") })}</p>
+                  {token.nickname && <p className="mt-1 text-[10px] text-text-muted">nickname: {token.nickname}</p>}
                   <p>{t("apiSecurity.createdAt", { value: new Date(token.created_at).toLocaleString() })}</p>
                   {token.last_used_at && <p>{t("apiSecurity.lastUsedAt", { value: new Date(token.last_used_at).toLocaleString() })}</p>}
                 </div>

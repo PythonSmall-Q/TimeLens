@@ -1180,6 +1180,36 @@ fn migration_013_llm_conversations(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
+fn migration_014_api_token_permissions(conn: &Connection) -> Result<()> {
+    conn.execute(
+        "ALTER TABLE api_tokens ADD COLUMN nickname TEXT NOT NULL DEFAULT ''",
+        [],
+    )?;
+    conn.execute(
+        "ALTER TABLE api_tokens ADD COLUMN data_scopes_json TEXT NOT NULL DEFAULT '[]'",
+        [],
+    )?;
+    conn.execute(
+        "ALTER TABLE api_tokens ADD COLUMN operation_scopes_json TEXT NOT NULL DEFAULT '[]'",
+        [],
+    )?;
+
+    conn.execute(
+        "UPDATE api_tokens SET nickname = label WHERE nickname = '' OR nickname IS NULL",
+        [],
+    )?;
+    conn.execute(
+        "UPDATE api_tokens SET data_scopes_json = scopes_json WHERE data_scopes_json = '[]' OR data_scopes_json IS NULL",
+        [],
+    )?;
+    conn.execute(
+        "UPDATE api_tokens SET operation_scopes_json = '[]' WHERE operation_scopes_json IS NULL",
+        [],
+    )?;
+
+    Ok(())
+}
+
 /// The ordered list of all migrations.
 const MIGRATIONS: &[Migration] = &[
     Migration::new(1, "baseline_schema", migration_001_baseline),
@@ -1214,6 +1244,11 @@ const MIGRATIONS: &[Migration] = &[
         13,
         "llm_conversations",
         migration_013_llm_conversations,
+    ),
+    Migration::new(
+        14,
+        "api_token_permissions",
+        migration_014_api_token_permissions,
     ),
 ];
 

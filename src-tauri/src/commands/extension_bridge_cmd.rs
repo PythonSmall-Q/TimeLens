@@ -55,13 +55,31 @@ pub(crate) fn hash_token(token: &str) -> String {
 pub(crate) fn issue_api_token_impl(
     db: &Connection,
     label: String,
-    scopes: Vec<String>,
+    data_scopes: Vec<String>,
+    operation_scopes: Vec<String>,
     expires_at: Option<String>,
 ) -> Result<IssuedApiToken, String> {
     let trimmed_label = label.trim();
     if trimmed_label.is_empty() {
         return Err("label cannot be empty".to_string());
     }
+
+    let nickname = trimmed_label.to_string();
+    let normalized_data: Vec<String> = data_scopes
+        .into_iter()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+    let normalized_operations: Vec<String> = operation_scopes
+        .into_iter()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+    let scopes = {
+        let mut merged = normalized_data.clone();
+        merged.extend(normalized_operations.iter().cloned());
+        merged
+    };
 
     let token_id = Uuid::new_v4().to_string();
     let secret = format!("{}.{}", Uuid::new_v4(), Uuid::new_v4());
@@ -76,8 +94,11 @@ pub(crate) fn issue_api_token_impl(
     db::insert_api_token(
         db,
         &token_id,
+        &nickname,
         trimmed_label,
         &token_hash,
+        &normalized_data,
+        &normalized_operations,
         &normalized_scopes,
         &now,
         expires_at.as_deref(),
@@ -87,8 +108,11 @@ pub(crate) fn issue_api_token_impl(
     Ok(IssuedApiToken {
         id: token_id,
         token: secret,
+        nickname: nickname.clone(),
         label: trimmed_label.to_string(),
         scopes: normalized_scopes,
+        data_scopes: normalized_data,
+        operation_scopes: normalized_operations,
         created_at: now,
         expires_at,
     })
@@ -97,14 +121,15 @@ pub(crate) fn issue_api_token_impl(
 #[tauri::command]
 pub fn issue_api_token(
     label: String,
-    scopes: Vec<String>,
+    data_scopes: Vec<String>,
+    operation_scopes: Vec<String>,
     expires_at: Option<String>,
     db_state: tauri::State<super::storage_cmd::DbState>,
 ) -> Result<IssuedApiToken, String> {
     let db = db_state
         .lock()
         .map_err(|e| format!("Database lock error: {}", e))?;
-    issue_api_token_impl(&db, label, scopes, expires_at)
+    issue_api_token_impl(&db, label, data_scopes, operation_scopes, expires_at)
 }
 
 #[tauri::command]
@@ -127,7 +152,8 @@ pub fn rotate_api_token(
     issue_api_token_impl(
         &db,
         existing.label,
-        existing.scopes,
+        existing.data_scopes,
+        existing.operation_scopes,
         expires_at.or(existing.expires_at),
     )
 }
@@ -321,5 +347,30 @@ mod tests {
         assert!(verify_request_signature(body, &signature, key));
         assert!(!verify_request_signature(b"wrong body", &signature, key));
         assert!(!verify_request_signature(body, "wrong signature", key));
+    }
+
+    #[test]
+    fn test_issue_api_token_tracks_nickname_and_grants() {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        crate::db::initialize(&conn).unwrap();
+
+        let issued = issue_api_token_impl(
+            &conn,
+            "vscode-local-client".to_string(),
+            vec!["usage:read".to_string()],
+            vec!["session:write".to_string()],
+            Some("2099-01-01T00:00:00+00:00".to_string()),
+        )
+        .unwrap();
+
+        assert_eq!(issued.nickname, "vscode-local-client");
+        assert_eq!(issued.data_scopes, vec!["usage:read"]);
+        assert_eq!(issued.operation_scopes, vec!["session:write"]);
+
+        let listed = crate::db::list_api_tokens(&conn).unwrap();
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].nickname, "vscode-local-client");
+        assert_eq!(listed[0].data_scopes, vec!["usage:read"]);
+        assert_eq!(listed[0].operation_scopes, vec!["session:write"]);
     }
 }

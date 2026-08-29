@@ -849,10 +849,11 @@ export const rotateExtensionBridgeKey = (): Promise<string> =>
 
 export const issueApiToken = (
   label: string,
-  scopes: string[],
+  dataScopes: string[],
+  operationScopes: string[],
   expiresAt?: string
 ): Promise<IssuedApiToken> =>
-  invoke("issue_api_token", { label, scopes, expiresAt });
+  invoke("issue_api_token", { label, dataScopes, operationScopes, expiresAt });
 
 export const rotateApiToken = (
   tokenId: string,

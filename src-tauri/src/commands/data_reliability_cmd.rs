@@ -564,14 +564,17 @@ fn build_bundle(conn: &rusqlite::Connection) -> Result<BackupBundle, String> {
                 let scopes_json: String = row.get(3)?;
                 Ok(ApiTokenMetadata {
                     id: row.get(0)?,
-                    label: row.get(1)?,
-                    token_hash: row.get(2)?,
+                    nickname: row.get(1)?,
+                    label: row.get(2)?,
+                    token_hash: row.get(3)?,
+                    data_scopes: parse_scopes_json(&row.get::<_, String>(4)?),
+                    operation_scopes: parse_scopes_json(&row.get::<_, String>(5)?),
                     scopes: parse_scopes_json(&scopes_json),
-                    created_at: row.get(4)?,
-                    expires_at: row.get(5)?,
-                    revoked_at: row.get(6)?,
-                    last_used_at: row.get(7)?,
-                    last_client_id: row.get(8)?,
+                    created_at: row.get(7)?,
+                    expires_at: row.get(8)?,
+                    revoked_at: row.get(9)?,
+                    last_used_at: row.get(10)?,
+                    last_client_id: row.get(11)?,
                 })
             })
             .map_err(|e| e.to_string())?;

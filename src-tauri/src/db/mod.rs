@@ -1226,18 +1226,23 @@ fn parse_scopes_json(raw: String) -> Vec<String> {
 pub fn insert_api_token(
     conn: &Connection,
     id: &str,
+    nickname: &str,
     label: &str,
     token_hash: &str,
+    data_scopes: &[String],
+    operation_scopes: &[String],
     scopes: &[String],
     created_at: &str,
     expires_at: Option<&str>,
 ) -> Result<()> {
+    let data_scopes_json = serde_json::to_string(data_scopes).unwrap_or_else(|_| "[]".to_string());
+    let operation_scopes_json = serde_json::to_string(operation_scopes).unwrap_or_else(|_| "[]".to_string());
     let scopes_json = serde_json::to_string(scopes).unwrap_or_else(|_| "[]".to_string());
     conn.execute(
         "INSERT INTO api_tokens
-         (id, label, token_hash, scopes_json, created_at, expires_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-        params![id, label, token_hash, scopes_json, created_at, expires_at],
+         (id, nickname, label, token_hash, data_scopes_json, operation_scopes_json, scopes_json, created_at, expires_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+        params![id, nickname, label, token_hash, data_scopes_json, operation_scopes_json, scopes_json, created_at, expires_at],
     )?;
     Ok(())
 }
@@ -1247,23 +1252,26 @@ pub fn get_api_token_by_id(
     id: &str,
 ) -> Result<Option<crate::models::ApiTokenMetadata>> {
     let mut stmt = conn.prepare(
-        "SELECT id, label, token_hash, scopes_json, created_at, expires_at, revoked_at, last_used_at, last_client_id
+        "SELECT id, nickname, label, token_hash, data_scopes_json, operation_scopes_json, scopes_json, created_at, expires_at, revoked_at, last_used_at, last_client_id
          FROM api_tokens
          WHERE id = ?1",
     )?;
     let mut rows = stmt.query(params![id])?;
     if let Some(row) = rows.next()? {
-        let scopes_json: String = row.get(3)?;
+        let scopes_json: String = row.get(6)?;
         return Ok(Some(crate::models::ApiTokenMetadata {
             id: row.get(0)?,
-            label: row.get(1)?,
-            token_hash: row.get(2)?,
+            nickname: row.get(1)?,
+            label: row.get(2)?,
+            token_hash: row.get(3)?,
+            data_scopes: parse_scopes_json(row.get(4)?),
+            operation_scopes: parse_scopes_json(row.get(5)?),
             scopes: parse_scopes_json(scopes_json),
-            created_at: row.get(4)?,
-            expires_at: row.get(5)?,
-            revoked_at: row.get(6)?,
-            last_used_at: row.get(7)?,
-            last_client_id: row.get(8)?,
+            created_at: row.get(7)?,
+            expires_at: row.get(8)?,
+            revoked_at: row.get(9)?,
+            last_used_at: row.get(10)?,
+            last_client_id: row.get(11)?,
         }));
     }
     Ok(None)
@@ -1271,22 +1279,25 @@ pub fn get_api_token_by_id(
 
 pub fn list_api_tokens(conn: &Connection) -> Result<Vec<crate::models::ApiTokenMetadata>> {
     let mut stmt = conn.prepare(
-        "SELECT id, label, token_hash, scopes_json, created_at, expires_at, revoked_at, last_used_at, last_client_id
+        "SELECT id, nickname, label, token_hash, data_scopes_json, operation_scopes_json, scopes_json, created_at, expires_at, revoked_at, last_used_at, last_client_id
          FROM api_tokens
          ORDER BY created_at DESC",
     )?;
     let rows = stmt.query_map([], |row| {
-        let scopes_json: String = row.get(3)?;
+        let scopes_json: String = row.get(6)?;
         Ok(crate::models::ApiTokenMetadata {
             id: row.get(0)?,
-            label: row.get(1)?,
-            token_hash: row.get(2)?,
+            nickname: row.get(1)?,
+            label: row.get(2)?,
+            token_hash: row.get(3)?,
+            data_scopes: parse_scopes_json(row.get(4)?),
+            operation_scopes: parse_scopes_json(row.get(5)?),
             scopes: parse_scopes_json(scopes_json),
-            created_at: row.get(4)?,
-            expires_at: row.get(5)?,
-            revoked_at: row.get(6)?,
-            last_used_at: row.get(7)?,
-            last_client_id: row.get(8)?,
+            created_at: row.get(7)?,
+            expires_at: row.get(8)?,
+            revoked_at: row.get(9)?,
+            last_used_at: row.get(10)?,
+            last_client_id: row.get(11)?,
         })
     })?;
     rows.collect()
@@ -1328,7 +1339,7 @@ pub fn find_active_api_token_by_hash(
     now: &str,
 ) -> Result<Option<crate::models::ApiTokenMetadata>> {
     let mut stmt = conn.prepare(
-        "SELECT id, label, token_hash, scopes_json, created_at, expires_at, revoked_at, last_used_at, last_client_id
+                "SELECT id, nickname, label, token_hash, data_scopes_json, operation_scopes_json, scopes_json, created_at, expires_at, revoked_at, last_used_at, last_client_id
          FROM api_tokens
          WHERE token_hash = ?1
            AND revoked_at IS NULL
@@ -1337,17 +1348,20 @@ pub fn find_active_api_token_by_hash(
     )?;
     let mut rows = stmt.query(params![token_hash, now])?;
     if let Some(row) = rows.next()? {
-        let scopes_json: String = row.get(3)?;
+        let scopes_json: String = row.get(6)?;
         return Ok(Some(crate::models::ApiTokenMetadata {
             id: row.get(0)?,
-            label: row.get(1)?,
-            token_hash: row.get(2)?,
+            nickname: row.get(1)?,
+            label: row.get(2)?,
+            token_hash: row.get(3)?,
+            data_scopes: parse_scopes_json(row.get(4)?),
+            operation_scopes: parse_scopes_json(row.get(5)?),
             scopes: parse_scopes_json(scopes_json),
-            created_at: row.get(4)?,
-            expires_at: row.get(5)?,
-            revoked_at: row.get(6)?,
-            last_used_at: row.get(7)?,
-            last_client_id: row.get(8)?,
+            created_at: row.get(7)?,
+            expires_at: row.get(8)?,
+            revoked_at: row.get(9)?,
+            last_used_at: row.get(10)?,
+            last_client_id: row.get(11)?,
         }));
     }
     Ok(None)

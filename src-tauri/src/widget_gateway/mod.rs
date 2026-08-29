@@ -475,6 +475,7 @@ impl WidgetGateway {
             &conn,
             format!("Widget: {}", request.widget_id),
             granted_scopes,
+            vec![],
             None,
         )?;
         drop(conn);
