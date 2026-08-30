@@ -503,16 +503,16 @@ export default function BrowserUsage() {
           </a>
 
           {/* Date preset selector */}
-          <div className="flex gap-1.5 bg-surface-hover rounded-xl p-1">
+          <div className="flex gap-1.5 bg-surface-card border border-surface-border rounded-xl p-1 shadow-xs">
             {PRESETS.map((p) => (
               <button
                 key={p}
                 onClick={() => handlePresetChange(p)}
                 className={clsx(
-                  "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors",
+                  "px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150",
                   preset === p
-                    ? "bg-accent-blue text-white shadow"
-                    : "text-text-secondary hover:text-text-primary"
+                    ? "bg-accent-blue/15 text-accent-blue border border-accent-blue/30 shadow-xs"
+                    : "text-text-secondary border border-transparent hover:text-accent-blue hover:bg-accent-blue/10"
                 )}
               >
                 {t(`browserUsage:${p}`)}

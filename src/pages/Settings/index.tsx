@@ -5,7 +5,7 @@ import { convertFileSrc } from "@tauri-apps/api/core";
 import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
 import { useSettingsStore } from "@/stores/settingsStore";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
-import { Moon, Sun, Activity, Database, Info, Rocket, Keyboard, PanelsTopLeft, ArrowLeft, Search, Lock, Copy, User, Shield, Droplet, Sparkles, Image, Palette } from "lucide-react";
+import { Moon, Sun, Activity, Database, Info, Rocket, Keyboard, PanelsTopLeft, ArrowLeft, Search, Lock, Copy, User, Shield, Droplet, Sparkles, Image, Palette, Zap } from "lucide-react";
 import clsx from "clsx";
 import * as api from "@/services/tauriApi";
 import { APP_VERSION } from "../../version";
@@ -223,8 +223,11 @@ export default function Settings() {
     setNotificationCooldownMin,
     reducedMotion,
     compactWidgets,
-    setReducedMotion,
     setCompactWidgets,
+    animationMode,
+    setAnimationMode,
+    animationConfig,
+    setAnimationConfig,
     updateMode,
     setUpdateMode,
   } = useSettingsStore();
@@ -847,7 +850,7 @@ export default function Settings() {
     keywords: string[];
   }> = [
     { key: "general", title: t("general"), description: t("generalDesc"), icon: Sun, keywords: [t("language")] },
-    { key: "appearance", title: t("appearance"), description: t("appearanceDesc"), icon: Moon, keywords: [t("theme.label"), t("skin.appBackground"), t("skin.widgetBackground")] },
+    { key: "appearance", title: t("appearance"), description: t("appearanceDesc"), icon: Moon, keywords: [t("theme.label"), t("skin.appBackground"), t("skin.widgetBackground"), t("animation.title"), "motion", "animation"] },
     { key: "aiAssistant", title: t("aiAssistant.title"), description: t("aiAssistant.description"), icon: Sparkles, keywords: [t("aiAssistant.provider"), t("aiAssistant.apiKey"), "llm", "ai"] },
     { key: "trayIcon", title: t("trayIconStyle.label"), description: t("trayIconDesc"), icon: PanelsTopLeft, keywords: [t("trayIconStyle.auto"), t("trayIconStyle.color"), t("trayIconStyle.black"), t("trayIconStyle.white")] },
     { key: "privacyCenter", title: t("privacyCenter.title"), description: t("privacyCenterDesc"), icon: Lock, keywords: [t("privacyCenter.subtitle"), t("apiSecurity.title"), t("backup.title"), t("transparency.title")] },
@@ -913,7 +916,7 @@ export default function Settings() {
       {activeSection && (
         <button
           onClick={() => setActiveSection(null)}
-          className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
+          className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl border border-surface-border text-text-secondary hover:bg-accent-blue/10 hover:text-accent-blue transition-colors"
         >
           <ArrowLeft size={13} />
           {t("common:previous")}
@@ -941,8 +944,8 @@ export default function Settings() {
                 className={clsx(
                   "px-3 py-1.5 rounded-lg text-xs border transition-colors",
                   theme === th
-                    ? "border-accent-blue bg-accent-blue/15 text-accent-blue"
-                    : "border-surface-border text-text-muted hover:text-text-secondary"
+                    ? "border-accent-blue bg-accent-blue/15 text-accent-blue font-medium"
+                    : "border-surface-border text-text-muted hover:text-accent-blue hover:bg-accent-blue/10"
                 )}
               >
                 {t(`theme.${th}`)}
@@ -960,7 +963,7 @@ export default function Settings() {
                 aria-label={t(`skin.palettes.${palette.id}`)}
                 className={clsx(
                   "flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-xs transition-colors",
-                  skinPalette === palette.id ? "border-accent-blue bg-accent-blue/15 text-accent-blue" : "border-surface-border text-text-muted hover:text-text-secondary"
+                  skinPalette === palette.id ? "border-accent-blue bg-accent-blue/15 text-accent-blue font-medium" : "border-surface-border text-text-muted hover:text-accent-blue hover:bg-accent-blue/10"
                 )}
               >
                 <Palette size={12} />
@@ -972,12 +975,65 @@ export default function Settings() {
             ))}
           </div>
         </SettingsRow>
-        <SettingsRow label={t("accessibility.reducedMotion")}>
-          <input type="checkbox" className="ui-checkbox" checked={reducedMotion} onChange={(event) => setReducedMotion(event.target.checked)} aria-label={t("accessibility.reducedMotion")} />
-        </SettingsRow>
         <SettingsRow label={t("accessibility.compactWidgets")}>
           <input type="checkbox" className="ui-checkbox" checked={compactWidgets} onChange={(event) => setCompactWidgets(event.target.checked)} aria-label={t("accessibility.compactWidgets")} />
         </SettingsRow>
+
+        {/* Animation & Motion Controls */}
+        <div className="pt-3 border-t border-surface-border/60 space-y-3">
+          <div className="flex items-center gap-2">
+            <Zap size={15} className="text-accent-blue shrink-0" />
+            <div>
+              <h4 className="text-xs font-semibold text-text-primary">{t("animation.title")}</h4>
+              <p className="text-[11px] text-text-muted">{t("animation.description")}</p>
+            </div>
+          </div>
+
+          <SettingsRow label={t("animation.mode")}>
+            <div className="flex flex-wrap gap-1.5 justify-end">
+              {(["full", "reduced", "disabled"] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setAnimationMode(m)}
+                  className={clsx(
+                    "px-2.5 py-1 rounded-lg text-xs border transition-colors",
+                    animationMode === m
+                      ? "border-accent-blue bg-accent-blue/15 text-accent-blue font-medium"
+                      : "border-surface-border text-text-muted hover:text-accent-blue hover:bg-accent-blue/10"
+                  )}
+                >
+                  {t(m === "full" ? "animation.modeFull" : m === "reduced" ? "animation.modeReduced" : "animation.modeDisabled")}
+                </button>
+              ))}
+            </div>
+          </SettingsRow>
+
+          {/* Animation Control List (Flat SettingsRows, no grey container background) */}
+          {[
+            { key: "pageTransitions", titleKey: "animation.pageTransitions", hintKey: "animation.pageTransitionsHint" },
+            { key: "cardHover", titleKey: "animation.cardHover", hintKey: "animation.cardHoverHint" },
+            { key: "modalAnimations", titleKey: "animation.modalAnimations", hintKey: "animation.modalAnimationsHint" },
+            { key: "widgetAnimations", titleKey: "animation.widgetAnimations", hintKey: "animation.widgetAnimationsHint" },
+            { key: "chartAnimations", titleKey: "animation.chartAnimations", hintKey: "animation.chartAnimationsHint" },
+            { key: "pulseEffects", titleKey: "animation.pulseEffects", hintKey: "animation.pulseEffectsHint" },
+          ].map((opt) => {
+            const k = opt.key as keyof typeof animationConfig;
+            const isChecked = animationMode !== "disabled" && (animationConfig ? animationConfig[k] : true);
+            return (
+              <SettingsRow key={opt.key} label={t(opt.titleKey)}>
+                <input
+                  type="checkbox"
+                  className="ui-checkbox shrink-0"
+                  disabled={animationMode === "disabled"}
+                  checked={isChecked}
+                  onChange={(e) => setAnimationConfig({ [k]: e.target.checked })}
+                  aria-label={t(opt.titleKey)}
+                />
+              </SettingsRow>
+            );
+          })}
+        </div>
         <div className="flex flex-wrap justify-end gap-2">
           <button
             onClick={() => {
@@ -1188,31 +1244,31 @@ export default function Settings() {
           <div className="flex flex-wrap gap-2 justify-end">
             <button
               onClick={() => setActiveSection("tracking")}
-              className="text-xs px-3 py-1.5 rounded-xl border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
+              className="text-xs px-3 py-1.5 rounded-xl border border-surface-border text-text-secondary hover:bg-accent-blue/10 hover:text-accent-blue transition-colors"
             >
               {t("privacyCenter.openTracking")}
             </button>
             <button
               onClick={() => setActiveSection("extensionBridge")}
-              className="text-xs px-3 py-1.5 rounded-xl border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
+              className="text-xs px-3 py-1.5 rounded-xl border border-surface-border text-text-secondary hover:bg-accent-blue/10 hover:text-accent-blue transition-colors"
             >
               {t("privacyCenter.openApiSecurity")}
             </button>
             <button
               onClick={() => setActiveSection("backup")}
-              className="text-xs px-3 py-1.5 rounded-xl border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
+              className="text-xs px-3 py-1.5 rounded-xl border border-surface-border text-text-secondary hover:bg-accent-blue/10 hover:text-accent-blue transition-colors"
             >
               {t("privacyCenter.openBackup")}
             </button>
             <button
               onClick={() => setActiveSection("dataHealth")}
-              className="text-xs px-3 py-1.5 rounded-xl border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
+              className="text-xs px-3 py-1.5 rounded-xl border border-surface-border text-text-secondary hover:bg-accent-blue/10 hover:text-accent-blue transition-colors"
             >
               {t("privacyCenter.openDataHealth")}
             </button>
             <button
               onClick={() => setActiveSection("encryption")}
-              className="text-xs px-3 py-1.5 rounded-xl border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
+              className="text-xs px-3 py-1.5 rounded-xl border border-surface-border text-text-secondary hover:bg-accent-blue/10 hover:text-accent-blue transition-colors"
             >
               {t("privacyCenter.openEncryption")}
             </button>
@@ -1614,7 +1670,7 @@ export default function Settings() {
               <div className="flex justify-end">
                 <button
                   onClick={() => setAutoBlurDialogOpen(false)}
-                  className="px-4 py-2 rounded-xl text-sm font-medium bg-accent-blue text-white hover:bg-accent-blue/90 transition-colors"
+                  className="btn-primary"
                 >
                   {t("common:confirm")}
                 </button>
@@ -1777,7 +1833,7 @@ export default function Settings() {
               return (
                 <label
                   key={path}
-                  className="flex items-start gap-2 px-3 py-2 text-xs text-text-secondary hover:bg-surface-hover cursor-pointer"
+                  className="flex items-start gap-2 px-3 py-2 text-xs text-text-secondary hover:bg-accent-blue/10 cursor-pointer"
                 >
                   <input
                     type="checkbox"
@@ -1851,7 +1907,7 @@ export default function Settings() {
           <button
             onClick={previewRepairAssistant}
             disabled={repairing}
-            className="text-xs px-3 py-1.5 rounded-xl border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
+            className="text-xs px-3 py-1.5 rounded-xl border border-surface-border text-text-secondary hover:bg-accent-blue/10 hover:text-accent-blue transition-colors"
           >
             {t("dataHealth.previewRepair")}
           </button>
@@ -1897,21 +1953,21 @@ export default function Settings() {
             <button
               onClick={runCheckDataIntegrity}
               disabled={repairing}
-              className="text-xs px-3 py-1.5 rounded-xl border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
+              className="text-xs px-3 py-1.5 rounded-xl border border-surface-border text-text-secondary hover:bg-accent-blue/10 hover:text-accent-blue transition-colors"
             >
               {t("dataHealth.checkIntegrity")}
             </button>
             <button
               onClick={runScanDataGaps}
               disabled={repairing}
-              className="text-xs px-3 py-1.5 rounded-xl border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
+              className="text-xs px-3 py-1.5 rounded-xl border border-surface-border text-text-secondary hover:bg-accent-blue/10 hover:text-accent-blue transition-colors"
             >
               {t("dataHealth.scanGaps")}
             </button>
             <button
               onClick={runCheckOrphanRows}
               disabled={repairing}
-              className="text-xs px-3 py-1.5 rounded-xl border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
+              className="text-xs px-3 py-1.5 rounded-xl border border-surface-border text-text-secondary hover:bg-accent-blue/10 hover:text-accent-blue transition-colors"
             >
               {t("dataHealth.checkOrphanRows")}
             </button>
@@ -1987,7 +2043,7 @@ export default function Settings() {
             <button
               onClick={refreshMigrationStatusNow}
               disabled={migrationBusy}
-              className="text-xs px-3 py-1.5 rounded-xl border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
+              className="text-xs px-3 py-1.5 rounded-xl border border-surface-border text-text-secondary hover:bg-accent-blue/10 hover:text-accent-blue transition-colors"
             >
               {t("dataHealth.refresh")}
             </button>
@@ -2059,7 +2115,7 @@ export default function Settings() {
                   "px-3 py-1.5 rounded-lg text-xs border transition-colors",
                   retentionInfo?.policy === policy
                     ? "border-accent-blue bg-accent-blue/15 text-accent-blue"
-                    : "border-surface-border text-text-muted hover:text-text-secondary"
+                    : "border-surface-border text-text-muted hover:text-accent-blue hover:bg-accent-blue/10"
                 )}
               >
                 {t(`retention.${policy}`)}
@@ -2223,7 +2279,7 @@ export default function Settings() {
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => { setProfileDialogOpen(false); setNewProfileName(""); }}
-                className="text-xs px-3 py-1.5 rounded-xl border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
+                className="text-xs px-3 py-1.5 rounded-xl border border-surface-border text-text-secondary hover:bg-accent-blue/10 hover:text-accent-blue transition-colors"
               >
                 {t("profiles.cancel")}
               </button>
@@ -2272,7 +2328,7 @@ export default function Settings() {
           <button
             onClick={handleDisableEncryption}
             disabled={encryptionBusy || !encryptionStatus?.enabled}
-            className="text-xs px-3 py-1.5 rounded-xl border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
+            className="text-xs px-3 py-1.5 rounded-xl border border-surface-border text-text-secondary hover:bg-accent-blue/10 hover:text-accent-blue transition-colors"
           >
             {encryptionBusy ? t("encryption.working") : t("encryption.disable")}
           </button>

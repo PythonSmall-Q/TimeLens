@@ -23,7 +23,7 @@ describe("TimerWidget", () => {
     await userEvent.click(screen.getByRole("button", { name: "Countdown" }));
 
     await waitFor(() => {
-      expect(screen.getByText("Countdown")).toHaveClass("bg-accent-blue");
+      expect(screen.getByText("Countdown")).toHaveClass("text-accent-blue");
     });
   });
 

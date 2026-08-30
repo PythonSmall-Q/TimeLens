@@ -224,10 +224,14 @@ export default function GlobalSearch({ open, onClose }: Props) {
       role="dialog"
       aria-modal="true"
       aria-label={t("common:search")}
-      className="fixed inset-0 z-50 flex items-start justify-center pt-20 bg-black/50 backdrop-blur-sm"
+      data-modal-overlay
+      className="fixed inset-0 z-50 flex items-start justify-center pt-20 bg-black/60 backdrop-blur-md transition-opacity duration-200"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="w-full max-w-xl rounded-2xl bg-surface-light shadow-2xl overflow-hidden border border-surface-border">
+      <div
+        data-modal-content
+        className="w-full max-w-xl rounded-2xl bg-surface-light shadow-2xl overflow-hidden border border-surface-border/80 transition-all duration-200 transform scale-100"
+      >
         {/* Input */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-surface-border bg-surface-light">
           <Search size={16} className="text-text-muted flex-shrink-0" />

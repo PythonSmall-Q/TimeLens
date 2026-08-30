@@ -4,6 +4,17 @@ import i18n from "@/i18n/config";
 import * as api from "@/services/tauriApi";
 import type { SkinPaletteId } from "@/utils/skinPalettes";
 
+export type AnimationMode = "full" | "reduced" | "disabled";
+
+export interface AnimationConfig {
+  pageTransitions: boolean;
+  cardHover: boolean;
+  modalAnimations: boolean;
+  widgetAnimations: boolean;
+  chartAnimations: boolean;
+  pulseEffects: boolean;
+}
+
 const safeSettingsStorage = createJSONStorage(() => ({
   getItem: (name: string) => {
     try {
@@ -46,6 +57,8 @@ interface SettingsState {
   notificationCooldownMin: number;
   reducedMotion: boolean;
   compactWidgets: boolean;
+  animationMode: AnimationMode;
+  animationConfig: AnimationConfig;
   setLanguage: (lang: string) => void;
   setTheme: (theme: "dark" | "light" | "system") => void;
   setAppBackgroundImage: (path: string) => void;
@@ -71,6 +84,8 @@ interface SettingsState {
   setNotificationCooldownMin: (minutes: number) => void;
   setReducedMotion: (enabled: boolean) => void;
   setCompactWidgets: (enabled: boolean) => void;
+  setAnimationMode: (mode: AnimationMode) => void;
+  setAnimationConfig: (config: Partial<AnimationConfig>) => void;
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -101,6 +116,15 @@ export const useSettingsStore = create<SettingsState>()(
       notificationCooldownMin: 15,
       reducedMotion: false,
       compactWidgets: false,
+      animationMode: "full",
+      animationConfig: {
+        pageTransitions: true,
+        cardHover: true,
+        modalAnimations: true,
+        widgetAnimations: true,
+        chartAnimations: true,
+        pulseEffects: true,
+      },
 
       setLanguage: (lang) => {
         set({ language: lang });
@@ -208,9 +232,24 @@ export const useSettingsStore = create<SettingsState>()(
       setNotificationCooldownMin: (notificationCooldownMin) =>
         set({ notificationCooldownMin: Math.max(0, Math.min(240, notificationCooldownMin)) }),
 
-      setReducedMotion: (reducedMotion) => set({ reducedMotion }),
+      setReducedMotion: (reducedMotion) =>
+        set({
+          reducedMotion,
+          animationMode: reducedMotion ? "reduced" : "full",
+        }),
 
       setCompactWidgets: (compactWidgets) => set({ compactWidgets }),
+
+      setAnimationMode: (animationMode) =>
+        set({
+          animationMode,
+          reducedMotion: animationMode === "reduced" || animationMode === "disabled",
+        }),
+
+      setAnimationConfig: (config) =>
+        set((state) => ({
+          animationConfig: { ...state.animationConfig, ...config },
+        })),
     }),
     {
       name: "timelens-settings",
@@ -225,6 +264,19 @@ export const useSettingsStore = create<SettingsState>()(
         if (!("updateMode" in state) && "autoCheckUpdates" in state) {
           state.updateMode = state.autoCheckUpdates === true ? "notify" : "off";
           delete state.autoCheckUpdates;
+        }
+        if (!("animationMode" in state)) {
+          state.animationMode = state.reducedMotion === true ? "reduced" : "full";
+        }
+        if (!("animationConfig" in state) || typeof state.animationConfig !== "object") {
+          state.animationConfig = {
+            pageTransitions: true,
+            cardHover: true,
+            modalAnimations: true,
+            widgetAnimations: true,
+            chartAnimations: true,
+            pulseEffects: true,
+          };
         }
         return state;
       },

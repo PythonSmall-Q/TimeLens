@@ -704,6 +704,10 @@ export default function WidgetCenter() {
   const presetImportRef = useRef<HTMLInputElement | null>(null);
   const scheduledPresetRef = useRef("");
 
+  // Collapsible cards state (collapsed by default to preserve list space)
+  const [presetsOpen, setPresetsOpen] = useState(false);
+  const [healthOpen, setHealthOpen] = useState(false);
+
   // Permission dialog state
   const [permDialog, setPermDialog] = useState<{
     open: boolean;
@@ -986,17 +990,22 @@ export default function WidgetCenter() {
         </div>
 
         {/* Tab switcher */}
-        <div className="flex gap-1.5 bg-surface-hover rounded-xl p-1">
+        <div className="flex gap-1.5 bg-surface-card border border-surface-border rounded-xl p-1 shadow-xs">
           <button
             onClick={() => setTab("mine")}
             className={clsx(
-              "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors",
-              tab === "mine" ? "bg-accent-blue text-white shadow" : "text-text-secondary hover:text-text-primary"
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150",
+              tab === "mine"
+                ? "bg-accent-blue/15 text-accent-blue border border-accent-blue/30 shadow-xs"
+                : "text-text-secondary border border-transparent hover:text-accent-blue hover:bg-accent-blue/10"
             )}
           >
             <List size={12} /> {t("myWidgetsTab")}
             {widgets.length > 0 && (
-              <span className="ml-0.5 px-1.5 py-0.5 bg-white/20 rounded-full text-[10px]">
+              <span className={clsx(
+                "ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold",
+                tab === "mine" ? "bg-accent-blue/20 text-accent-blue" : "bg-surface-hover text-text-muted"
+              )}>
                 {widgets.length}
               </span>
             )}
@@ -1004,8 +1013,10 @@ export default function WidgetCenter() {
           <button
             onClick={() => setTab("selfAdd")}
             className={clsx(
-              "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors",
-              tab === "selfAdd" ? "bg-accent-blue text-white shadow" : "text-text-secondary hover:text-text-primary"
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150",
+              tab === "selfAdd"
+                ? "bg-accent-blue/15 text-accent-blue border border-accent-blue/30 shadow-xs"
+                : "text-text-secondary border border-transparent hover:text-accent-blue hover:bg-accent-blue/10"
             )}
           >
             <Plus size={12} /> {t("selfAdd")}
@@ -1013,74 +1024,135 @@ export default function WidgetCenter() {
         </div>
       </div>
 
-      <section aria-labelledby="widget-presets-title" className="glass-card p-4 space-y-3">
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div>
-            <h2 id="widget-presets-title" className="text-sm font-semibold text-text-primary flex items-center gap-2">
-              <Save size={15} /> {t("presets.title")}
-            </h2>
-            <p className="text-xs text-text-muted mt-0.5">{t("presets.description")}</p>
-          </div>
+      <section aria-labelledby="widget-presets-title" className="glass-card p-3 space-y-2">
+        <div
+          className="flex items-center justify-between gap-3 cursor-pointer select-none"
+          onClick={() => setPresetsOpen((v) => !v)}
+        >
           <div className="flex items-center gap-2">
-            <input
-              value={presetName}
-              onChange={(event) => setPresetName(event.target.value)}
-              onKeyDown={(event) => { if (event.key === "Enter") handleSavePreset(); }}
-              placeholder={t("presets.namePlaceholder")}
-              aria-label={t("presets.nameLabel")}
-              className="ui-field w-40 text-xs"
-            />
-            <button onClick={handleSavePreset} disabled={!presetName.trim() || widgets.length === 0} className="btn-primary text-xs py-1.5 px-3">
-              <Save size={12} /> {t("presets.save")}
-            </button>
-            <button onClick={handleExportPresets} disabled={presets.length === 0} className="text-xs border border-surface-border rounded-lg px-2 py-1.5 disabled:opacity-50">{t("presets.export")}</button>
-            <button onClick={() => presetImportRef.current?.click()} className="text-xs border border-surface-border rounded-lg px-2 py-1.5">{t("presets.import")}</button>
-            <input ref={presetImportRef} type="file" accept="application/json,.json" className="hidden" onChange={handleImportPresets} />
-          </div>
-        </div>
-        <label className="flex items-center justify-between gap-3 text-xs text-text-secondary">
-          <span>{t("presets.schedule")}</span>
-          <select value={presetSchedule} onChange={(event) => { const value = event.target.value as typeof presetSchedule; setPresetSchedule(value); localStorage.setItem("timelens-widget-preset-schedule", value); }} className="ui-select text-xs">
-            <option value="off">{t("presets.scheduleOff")}</option>
-            <option value="time">{t("presets.scheduleTime")}</option>
-            <option value="focus">{t("presets.scheduleFocus")}</option>
-          </select>
-        </label>
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          {presets.map((preset) => (
-            <div key={preset.id} className="flex items-center gap-1.5 shrink-0 rounded-lg border border-surface-border px-2 py-1.5">
-              <button onClick={() => void handleApplyPreset(preset)} className="text-xs text-text-primary hover:text-accent-blue" title={t("presets.apply")}>
-                {preset.name}
-              </button>
-              <button onClick={() => persistPresets(presets.filter((item) => item.id !== preset.id))} aria-label={t("presets.delete", { name: preset.name })} title={t("presets.delete", { name: preset.name })} className="text-text-muted hover:text-accent-red">
-                <X size={12} />
-              </button>
+            <span className="p-1.5 rounded-lg bg-accent-blue/10 text-accent-blue">
+              <Save size={14} />
+            </span>
+            <div>
+              <h2 id="widget-presets-title" className="text-xs font-semibold text-text-primary flex items-center gap-2">
+                {t("presets.title")}
+                {presets.length > 0 && (
+                  <span className="px-1.5 py-0.5 rounded-full bg-surface-hover text-text-muted text-[10px]">
+                    {presets.length}
+                  </span>
+                )}
+              </h2>
+              <p className="text-[11px] text-text-muted">{t("presets.description")}</p>
             </div>
-          ))}
+          </div>
+          <button
+            type="button"
+            className="text-text-muted hover:text-text-primary p-1"
+            aria-label={presetsOpen ? t("common:collapse") : t("common:expand")}
+          >
+            {presetsOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          </button>
         </div>
+
+        {presetsOpen && (
+          <div className="pt-2 border-t border-surface-border/50 space-y-3">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap">
+                <input
+                  value={presetName}
+                  onChange={(event) => setPresetName(event.target.value)}
+                  onKeyDown={(event) => { if (event.key === "Enter") handleSavePreset(); }}
+                  placeholder={t("presets.namePlaceholder")}
+                  aria-label={t("presets.nameLabel")}
+                  className="ui-field w-40 text-xs"
+                />
+                <button onClick={handleSavePreset} disabled={!presetName.trim() || widgets.length === 0} className="btn-primary text-xs py-1.5 px-3">
+                  <Save size={12} /> {t("presets.save")}
+                </button>
+                <button onClick={handleExportPresets} disabled={presets.length === 0} className="text-xs border border-surface-border rounded-lg px-2 py-1.5 disabled:opacity-50">{t("presets.export")}</button>
+                <button onClick={() => presetImportRef.current?.click()} className="text-xs border border-surface-border rounded-lg px-2 py-1.5">{t("presets.import")}</button>
+                <input ref={presetImportRef} type="file" accept="application/json,.json" className="hidden" onChange={handleImportPresets} />
+              </div>
+            </div>
+            <label className="flex items-center justify-between gap-3 text-xs text-text-secondary">
+              <span>{t("presets.schedule")}</span>
+              <select value={presetSchedule} onChange={(event) => { const value = event.target.value as typeof presetSchedule; setPresetSchedule(value); localStorage.setItem("timelens-widget-preset-schedule", value); }} className="ui-select text-xs">
+                <option value="off">{t("presets.scheduleOff")}</option>
+                <option value="time">{t("presets.scheduleTime")}</option>
+                <option value="focus">{t("presets.scheduleFocus")}</option>
+              </select>
+            </label>
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {presets.map((preset) => (
+                <div key={preset.id} className="flex items-center gap-1.5 shrink-0 rounded-lg border border-surface-border px-2 py-1.5">
+                  <button onClick={() => void handleApplyPreset(preset)} className="text-xs text-text-primary hover:text-accent-blue" title={t("presets.apply")}>
+                    {preset.name}
+                  </button>
+                  <button onClick={() => persistPresets(presets.filter((item) => item.id !== preset.id))} aria-label={t("presets.delete", { name: preset.name })} title={t("presets.delete", { name: preset.name })} className="text-text-muted hover:text-accent-red">
+                    <X size={12} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </section>
 
-      <section aria-labelledby="widget-health-title" className="glass-card p-4 space-y-3">
-        <div className="flex items-center justify-between gap-3">
-          <h2 id="widget-health-title" className="text-sm font-semibold text-text-primary flex items-center gap-2"><HeartPulse size={15} /> {t("health.title")}</h2>
-          <button onClick={() => setHealthRefresh((value) => value + 1)} className="text-xs text-accent-blue flex items-center gap-1" title={t("health.refresh")}><RotateCcw size={12} /> {t("health.refresh")}</button>
+      <section aria-labelledby="widget-health-title" className="glass-card p-3 space-y-2">
+        <div
+          className="flex items-center justify-between gap-3 cursor-pointer select-none"
+          onClick={() => setHealthOpen((v) => !v)}
+        >
+          <div className="flex items-center gap-2">
+            <span className="p-1.5 rounded-lg bg-accent-blue/10 text-accent-blue">
+              <HeartPulse size={14} />
+            </span>
+            <div>
+              <h2 id="widget-health-title" className="text-xs font-semibold text-text-primary flex items-center gap-2">
+                {t("health.title")}
+              </h2>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {healthOpen && (
+              <button
+                onClick={(e) => { e.stopPropagation(); setHealthRefresh((value) => value + 1); }}
+                className="text-xs text-accent-blue flex items-center gap-1"
+                title={t("health.refresh")}
+              >
+                <RotateCcw size={12} /> {t("health.refresh")}
+              </button>
+            )}
+            <button
+              type="button"
+              className="text-text-muted hover:text-text-primary p-1"
+              aria-label={healthOpen ? t("common:collapse") : t("common:expand")}
+            >
+              {healthOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            </button>
+          </div>
         </div>
-        <div className="grid gap-2 md:grid-cols-2">
-          {widgets.map((widget) => {
-            const { heartbeat, lastError } = healthFor(widget);
-            const runtimeHealth = runtimeHealthByWidget[widget.id];
-            const suspended = !!widget.suspended_until && new Date(widget.suspended_until).getTime() > Date.now();
-            return <div key={widget.id} className="rounded-lg border border-surface-border px-3 py-2 text-xs space-y-1">
-              <div className="flex items-center justify-between gap-2"><span className="font-medium text-text-primary">{t(TYPE_LABELS[widget.widget_type] ?? "clock.title")}</span><span className={suspended || widget.paused ? "text-yellow-600" : "text-accent-green"}>{suspended ? t("health.suspended") : widget.paused ? t("health.paused") : t("health.running")}</span></div>
-              <p className="text-text-muted">{t("health.lastRefresh", { value: runtimeHealth?.last_heartbeat_at ? new Date(runtimeHealth.last_heartbeat_at).toLocaleString() : heartbeat.at ? new Date(heartbeat.at).toLocaleString() : t("health.unavailable") })}</p>
-              <p className="text-text-muted">{t("health.memory")}: {runtimeHealth ? `${runtimeHealth.memory_used_mb} MB` : t("health.unavailable")} · {t("health.cpu")}: {runtimeHealth ? `${runtimeHealth.cpu_used_ms} ms` : t("health.unavailable")}</p>
-              <p className="text-text-muted">{t("health.failures")}: {widget.consecutive_failures ?? 0} · {t("health.pausedState")}: {widget.paused ? t("health.yes") : t("health.no")}</p>
-              {suspended && <p className="text-yellow-600">{t("health.suspendedUntil", { value: new Date(widget.suspended_until as string).toLocaleString() })}</p>}
-              {lastError && <p className="text-accent-red truncate" title={lastError.error}>{t("health.lastError", { value: lastError.error })}</p>}
-              {suspended && <button onClick={() => { void api.recoverWidget(widget.id).then(() => emit("timelens-widget-refresh", { widgetId: widget.id })); setHealthRefresh((value) => value + 1); }} className="text-accent-blue hover:underline">{t("health.recover")}</button>}
-            </div>;
-          })}
-        </div>
+
+        {healthOpen && (
+          <div className="pt-2 border-t border-surface-border/50">
+            <div className="grid gap-2 md:grid-cols-2">
+              {widgets.map((widget) => {
+                const { heartbeat, lastError } = healthFor(widget);
+                const runtimeHealth = runtimeHealthByWidget[widget.id];
+                const suspended = !!widget.suspended_until && new Date(widget.suspended_until).getTime() > Date.now();
+                return <div key={widget.id} className="rounded-lg border border-surface-border px-3 py-2 text-xs space-y-1">
+                  <div className="flex items-center justify-between gap-2"><span className="font-medium text-text-primary">{t(TYPE_LABELS[widget.widget_type] ?? "clock.title")}</span><span className={suspended || widget.paused ? "text-yellow-600" : "text-accent-green"}>{suspended ? t("health.suspended") : widget.paused ? t("health.paused") : t("health.running")}</span></div>
+                  <p className="text-text-muted">{t("health.lastRefresh", { value: runtimeHealth?.last_heartbeat_at ? new Date(runtimeHealth.last_heartbeat_at).toLocaleString() : heartbeat.at ? new Date(heartbeat.at).toLocaleString() : t("health.unavailable") })}</p>
+                  <p className="text-text-muted">{t("health.memory")}: {runtimeHealth ? `${runtimeHealth.memory_used_mb} MB` : t("health.unavailable")} · {t("health.cpu")}: {runtimeHealth ? `${runtimeHealth.cpu_used_ms} ms` : t("health.unavailable")}</p>
+                  <p className="text-text-muted">{t("health.failures")}: {widget.consecutive_failures ?? 0} · {t("health.pausedState")}: {widget.paused ? t("health.yes") : t("health.no")}</p>
+                  {suspended && <p className="text-yellow-600">{t("health.suspendedUntil", { value: new Date(widget.suspended_until as string).toLocaleString() })}</p>}
+                  {lastError && <p className="text-accent-red truncate" title={lastError.error}>{t("health.lastError", { value: lastError.error })}</p>}
+                  {suspended && <button onClick={() => { void api.recoverWidget(widget.id).then(() => emit("timelens-widget-refresh", { widgetId: widget.id })); setHealthRefresh((value) => value + 1); }} className="text-accent-blue hover:underline">{t("health.recover")}</button>}
+                </div>;
+              })}
+            </div>
+          </div>
+        )}
       </section>
 
       {/* ── My Widgets tab ── */}

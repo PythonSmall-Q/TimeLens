@@ -80,14 +80,14 @@ export default function QuickCaptureWidget({ widgetId }: Props) {
         </button>
       </div>
 
-      <div className="flex gap-1 mb-2 bg-surface-hover rounded-lg p-1">
+      <div className="flex gap-1 mb-2 bg-surface-card border border-surface-border rounded-lg p-1 shadow-xs">
         <button
           onClick={() => setMode("todo")}
           className={clsx(
-            "flex-1 flex items-center justify-center gap-1.5 text-xs py-1 rounded-md transition-colors",
+            "flex-1 flex items-center justify-center gap-1.5 text-xs py-1 rounded-md transition-all duration-150",
             mode === "todo"
-              ? "bg-accent-blue text-white font-medium"
-              : "text-text-muted hover:text-text-secondary"
+              ? "bg-accent-blue/15 text-accent-blue border border-accent-blue/30 font-semibold shadow-xs"
+              : "text-text-muted hover:text-accent-blue hover:bg-accent-blue/10"
           )}
         >
           <ListTodo size={12} />
@@ -96,10 +96,10 @@ export default function QuickCaptureWidget({ widgetId }: Props) {
         <button
           onClick={() => setMode("note")}
           className={clsx(
-            "flex-1 flex items-center justify-center gap-1.5 text-xs py-1 rounded-md transition-colors",
+            "flex-1 flex items-center justify-center gap-1.5 text-xs py-1 rounded-md transition-all duration-150",
             mode === "note"
-              ? "bg-accent-green text-white font-medium"
-              : "text-text-muted hover:text-text-secondary"
+              ? "bg-accent-blue/15 text-accent-blue border border-accent-blue/30 font-semibold shadow-xs"
+              : "text-text-muted hover:text-accent-blue hover:bg-accent-blue/10"
           )}
         >
           <StickyNote size={12} />

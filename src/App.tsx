@@ -31,6 +31,15 @@ export default function App() {
   const [activePalette, setActivePalette] = useState(skinPalette);
   const reducedMotion = useSettingsStore((s) => s.reducedMotion);
   const compactWidgets = useSettingsStore((s) => s.compactWidgets);
+  const animationMode = useSettingsStore((s) => s.animationMode) || (reducedMotion ? "reduced" : "full");
+
+  const pageTransitions = useSettingsStore((s) => s.animationConfig?.pageTransitions ?? true);
+  const cardHover = useSettingsStore((s) => s.animationConfig?.cardHover ?? true);
+  const modalAnimations = useSettingsStore((s) => s.animationConfig?.modalAnimations ?? true);
+  const widgetAnimations = useSettingsStore((s) => s.animationConfig?.widgetAnimations ?? true);
+  const chartAnimations = useSettingsStore((s) => s.animationConfig?.chartAnimations ?? true);
+  const pulseEffects = useSettingsStore((s) => s.animationConfig?.pulseEffects ?? true);
+
   const [skin, setSkin] = useState({
     app: appBackgroundImage,
     widget: widgetBackgroundImage,
@@ -56,9 +65,22 @@ export default function App() {
 
   useEffect(() => {
     const root = document.documentElement;
-    root.classList.toggle("reduce-motion", reducedMotion);
+    const isReduced = animationMode === "reduced" || reducedMotion;
+    const isDisabled = animationMode === "disabled";
+
+    root.classList.toggle("reduce-motion", isReduced || isDisabled);
+    root.classList.toggle("animation-mode-disabled", isDisabled);
+    root.classList.toggle("animation-mode-reduced", animationMode === "reduced");
+    root.classList.toggle("animation-mode-full", animationMode === "full");
     root.classList.toggle("compact-widgets", compactWidgets);
-  }, [compactWidgets, reducedMotion]);
+
+    root.classList.toggle("no-page-transitions", isDisabled || !pageTransitions);
+    root.classList.toggle("no-card-hover", isDisabled || !cardHover);
+    root.classList.toggle("no-modal-animations", isDisabled || !modalAnimations);
+    root.classList.toggle("no-widget-animations", isDisabled || !widgetAnimations);
+    root.classList.toggle("no-chart-animations", isDisabled || !chartAnimations);
+    root.classList.toggle("no-pulse-effects", isDisabled || !pulseEffects);
+  }, [animationMode, cardHover, chartAnimations, compactWidgets, modalAnimations, pageTransitions, pulseEffects, reducedMotion, widgetAnimations]);
 
   useEffect(() => {
     const root = document.documentElement;

@@ -78,7 +78,7 @@ export default function ExePickerInput({
 
   return (
     <div ref={wrapRef} className={clsx("relative z-[100]", className)}>
-      <div className="flex gap-1">
+      <div className="flex gap-1.5">
         <input
           type="text"
           className="ui-field flex-1"
@@ -95,25 +95,25 @@ export default function ExePickerInput({
           onClick={browseFile}
           title={t("browseExecutable")}
           aria-label={t("browseExecutable")}
-          className="px-2.5 rounded-lg border border-surface-border text-text-muted hover:text-text-primary hover:bg-surface-hover transition-colors flex-shrink-0"
+          className="px-3 rounded-xl border border-surface-border text-text-muted hover:text-text-primary hover:bg-accent-blue/10 hover:border-accent-blue/40 transition-colors flex-shrink-0 flex items-center justify-center"
         >
           <FolderOpen size={15} />
         </button>
       </div>
 
       {open && query && filtered.length > 0 && (
-        <div className="absolute z-[110] left-0 right-0 mt-1 max-h-60 overflow-y-auto rounded-xl border border-surface-border bg-surface-card shadow-xl divide-y divide-surface-border">
+        <div className="absolute z-[110] left-0 right-0 mt-1.5 max-h-60 overflow-y-auto rounded-xl border border-surface-border/80 bg-surface-card/95 backdrop-blur-md shadow-2xl divide-y divide-surface-border/40">
           {filtered.slice(0, 25).map((row) => (
             <button
               key={row.exe_path}
               type="button"
               onMouseDown={() => pick(row)}
               className={clsx(
-                "w-full flex flex-col items-start px-3 py-2 text-xs hover:bg-surface-hover transition-colors text-left"
+                "w-full flex flex-col items-start px-3.5 py-2 text-xs hover:bg-surface-hover/80 active:bg-accent-blue/15 transition-colors text-left"
               )}
             >
               <span className="text-text-primary font-medium">{row.app_name}</span>
-              <span className="text-text-muted truncate max-w-full" title={row.exe_path}>
+              <span className="text-text-muted truncate max-w-full text-[11px]" title={row.exe_path}>
                 {row.exe_path}
               </span>
             </button>
@@ -121,8 +121,8 @@ export default function ExePickerInput({
         </div>
       )}
       {open && query && filtered.length === 0 && (
-        <div className="absolute z-[110] left-0 right-0 mt-1 rounded-xl border border-surface-border bg-surface-card shadow-xl">
-          <p className="px-3 py-3 text-xs text-text-muted">{t("noAppsFoundBrowse")}</p>
+        <div className="absolute z-[110] left-0 right-0 mt-1.5 rounded-xl border border-surface-border/80 bg-surface-card/95 backdrop-blur-md shadow-2xl">
+          <p className="px-3.5 py-3 text-xs text-text-muted">{t("noAppsFoundBrowse")}</p>
         </div>
       )}
     </div>

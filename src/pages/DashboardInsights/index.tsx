@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import clsx from "clsx";
 import InsightWorkspace from "@/pages/Dashboard/InsightWorkspace";
 import UnifiedTimeline from "@/pages/Dashboard/UnifiedTimeline";
 import * as api from "@/services/tauriApi";
@@ -419,17 +420,17 @@ export default function DashboardInsights() {
           >
             {t("dashboard:insightFilters.backToToday")}
           </button>
-          <div className="flex gap-1.5 bg-surface-hover rounded-xl p-1">
+          <div className="flex gap-1.5 bg-surface-card border border-surface-border rounded-xl p-1 shadow-xs">
             {(["day", "week", "month"] as PeriodMode[]).map((mode) => (
               <button
                 key={mode}
                 onClick={() => applyModePreset(mode)}
-                className={[
-                  "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors",
+                className={clsx(
+                  "px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150",
                   periodMode === mode
-                    ? "bg-accent-blue text-white shadow"
-                    : "text-text-secondary hover:text-text-primary",
-                ].join(" ")}
+                    ? "bg-accent-blue/15 text-accent-blue border border-accent-blue/30 shadow-xs"
+                    : "text-text-secondary border border-transparent hover:text-accent-blue hover:bg-accent-blue/10"
+                )}
               >
                 {t(`dashboard:insightFilters.${mode}`)}
               </button>
@@ -567,17 +568,17 @@ export default function DashboardInsights() {
           <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className="text-sm font-semibold text-text-primary">{t("dashboard:whatChangedTitle")}</h3>
-              <div className="flex gap-1 bg-surface-hover rounded-lg p-0.5">
+              <div className="flex gap-1 bg-surface-card border border-surface-border rounded-lg p-0.5 shadow-xs">
                 {(["apps", "categories", "projects"] as ComparisonTab[]).map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setComparisonTab(tab)}
-                    className={[
-                      "px-2 py-1 rounded-md text-xs font-medium transition-colors",
+                    className={clsx(
+                      "px-2.5 py-1 rounded-md text-xs font-semibold transition-all duration-150",
                       comparisonTab === tab
-                        ? "bg-accent-blue text-white"
-                        : "text-text-secondary hover:text-text-primary",
-                    ].join(" ")}
+                        ? "bg-accent-blue/15 text-accent-blue border border-accent-blue/30 shadow-xs"
+                        : "text-text-secondary border border-transparent hover:text-accent-blue hover:bg-accent-blue/10"
+                    )}
                   >
                     {t(`dashboard:comparisonTab${tab[0].toUpperCase()}${tab.slice(1)}`)}
                   </button>

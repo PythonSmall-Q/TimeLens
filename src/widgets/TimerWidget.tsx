@@ -158,16 +158,16 @@ export default function TimerWidget({ widgetId: _widgetId }: Props) {
       </div>
 
       {/* Mode tabs */}
-      <div className="flex gap-1 mb-2 bg-surface-hover rounded-lg p-1">
+      <div className="flex gap-1 mb-2 bg-surface-card border border-surface-border rounded-lg p-1 shadow-xs">
         {TABS.map(({ label, value }) => (
           <button
             key={value}
             onClick={() => setMode(value)}
             className={clsx(
-              "flex-1 text-xs py-1 rounded-md transition-colors",
+              "flex-1 text-xs py-1 rounded-md transition-all duration-150",
               mode === value
-                ? "bg-accent-blue text-white font-medium"
-                : "text-text-muted hover:text-text-secondary"
+                ? "bg-accent-blue/15 text-accent-blue border border-accent-blue/30 font-semibold shadow-xs"
+                : "text-text-muted hover:text-accent-blue hover:bg-accent-blue/10"
             )}
           >
             {label}

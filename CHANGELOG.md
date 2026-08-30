@@ -2,7 +2,6 @@
 
 All notable changes to TimeLens are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
-
 ---
 
 ## [2.3.0] - 2026-08-28
@@ -20,6 +19,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Update flow tests** — added coverage for update checking, download confirmation, download progress, install confirmation, and unavailable updater states.
 - **Scoped Local API credentials** — API credentials now have a nickname and independently configured data-access and operation permissions, with revocation and one-time secret reveal/copy behavior.
 - **Local API permission picker** — Settings now provides localized multi-select controls for the Local API's supported read, subscription, and write scopes.
+- **Animation & Motion Control Center** — Added user-selectable motion preset controls (`Full Animations`, `Reduced Motion`, `Disable All Animations`) in Settings.
+- **Granular Animation Controls List** — Added independent toggle options for 6 specific motion categories:
+  - Page & Tab Transitions
+  - Card Hover & Micro-interactions
+  - Modal & Dialog Animations
+  - Widget Window Motion
+  - Chart & Data Animations
+  - Pulse & Status Effects
+- **Multi-language Support (i18n)** — Added full translation strings for all animation modes and granular toggle items across English (`en`), Simplified Chinese (`zh-CN`), and Traditional Chinese (`zh-TW`).
+
 
 ### Changed
 
@@ -36,6 +45,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Extension Bridge compatibility** — legacy extension bridge keys remain fully authorized for existing integrations but are no longer exposed in Settings.
 - **Settings presentation** — neutral texture options include an aurora gradient, and Settings surfaces use lighter, transparent grouping backgrounds so the active skin remains visible.
 - **Themed switches** — Settings toggles use the active palette's accent color, including the default blue palette, instead of native white controls.
+- **UI & UX Design Polish** — Refined card, button, and settings control designs with improved glassmorphism backdrop blur and top-border highlights (`inset 0 1px 0 rgba(255, 255, 255, 0.1)`).
+- **Smoother Apple-Style Easing** — Applied modern cubic-bezier easing (`cubic-bezier(0.16, 1, 0.3, 1)`) for micro-interactions and page entry transitions.
+- **High-Contrast Segmented Controls & Tab Buttons** — Replaced low-contrast white-on-light selection states with high-contrast `bg-accent-blue/15 text-accent-blue border border-accent-blue/30` styling across Widget Center, Browser Usage, Dashboard Insights, Quick Capture, and Timer widgets.
+- **Unified Hover Micro-Interactions** — Standardized hover states across sidebars, search buttons, settings items, and tab options to use consistent soft blue tinting (`bg-accent-blue/10 text-accent-blue`).
+- **Collapsible Widget Center Layout** — Compacted top "Layout Presets" and "Widget Health Center" cards into collapsible sections (collapsed by default) to maximize space for the main widget list.
 
 ### Fixed
 
@@ -50,6 +64,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **CodeQL Rust extraction** — changed the Rust CodeQL job to `manual` build mode and moved the Cargo build after CodeQL initialization.
 - **Cryptographic value detection** — changed Argon2 output-buffer initialization so CodeQL no longer reports the derived-key buffer as a hard-coded cryptographic value.
 - **Manual update notification** — fixed Settings > About so a manually detected update opens the same confirmation dialog used by automatic checks.
+- **kbd Shortcut Contrast** — Replaced dark purple keycap badge backgrounds in search inputs with high-contrast card borders (`bg-surface-card border border-surface-border text-text-secondary`) for clear visibility in both light and dark modes.
+- **Sidebar Hover CSS Specificity** — Removed CSS `!important` overrides that interfered with hover state specificity on navigation items.
+- **Settings Card Background Noise** — Removed dark container card background wrappers around motion controls, making animation options render seamlessly as standard SettingsRows.
+- **Removed Motion Bounce & Translate Y Shifts** — Eliminated unwanted button/card jump, scale, and translateY bouncing on click and setting toggle events.
 
 ### Security
 
@@ -57,14 +75,6 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Gateway request governance** — network, media, local API, and notification requests continue through permission checks, audit logging, timeouts, response limits, and normalized errors.
 - **Dependency audit** — `npm audit --audit-level=high` reports zero vulnerabilities for the v2.3.0 dependency tree.
 
-### Tests
-
-- Frontend tests: **71 passed**.
-- TypeScript typecheck: passed.
-- ESLint: 0 errors; 8 existing warnings remain.
-- Rust `cargo check`: passed.
-- Rust unit tests compile successfully, but execution is blocked on the current Windows environment by `0xc0000139 STATUS_ENTRYPOINT_NOT_FOUND` during test-process startup.
-- `git diff --check`: passed.
 
 ---
 

@@ -35,7 +35,7 @@ export default function SettingsCard({
       className={clsx(
         "glass-card settings-card p-4 space-y-4",
         onClick &&
-          "cursor-pointer border border-surface-border hover:border-accent-blue/40 hover:bg-surface-hover transition-colors text-left",
+          "cursor-pointer border border-surface-border hover:border-accent-blue/40 hover:bg-accent-blue/10 transition-colors text-left",
         className
       )}
     >

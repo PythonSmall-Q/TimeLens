@@ -58,13 +58,13 @@ export default function Sidebar({ onOpenSearch }: Props) {
         <button
           onClick={onOpenSearch}
           className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-text-muted
-                     border border-surface-border hover:bg-surface-hover hover:text-text-secondary transition-colors"
+                     border border-surface-border hover:bg-accent-blue/10 hover:text-accent-blue transition-colors"
           title={t("common:openGlobalSearch")}
           aria-label={t("common:openGlobalSearch")}
         >
           <Search size={13} />
           <span className="flex-1 text-left">{t("common:search")}</span>
-          <kbd className="text-[10px] px-1 py-0.5 rounded bg-surface-hover">Ctrl K</kbd>
+          <kbd className="text-[10px] px-1.5 py-0.5 rounded bg-surface-card border border-surface-border text-text-secondary">Ctrl K</kbd>
         </button>
       </div>
 
@@ -79,7 +79,7 @@ export default function Sidebar({ onOpenSearch }: Props) {
                 "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors",
                 isActive
                   ? "bg-accent-blue/20 text-accent-blue font-medium"
-                  : "text-text-secondary hover:text-text-primary hover:bg-surface-hover"
+                  : "text-text-secondary hover:text-accent-blue hover:bg-accent-blue/10"
               )
             }
           >

@@ -228,7 +228,7 @@ export default function BackupSection() {
             const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
             downloadTextFile(`timelens-export-${stamp}.csv`, csv, "text/csv;charset=utf-8");
           }}
-          className="text-xs px-3 py-2 rounded-lg border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
+          className="text-xs px-3 py-2 rounded-lg border border-surface-border text-text-secondary hover:bg-accent-blue/10 hover:text-accent-blue transition-colors"
         >
           {t("data.exportCsv")}
         </button>
@@ -238,11 +238,11 @@ export default function BackupSection() {
             const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
             downloadTextFile(`timelens-backup-${stamp}.json`, json, "application/json;charset=utf-8");
           }}
-          className="text-xs px-3 py-2 rounded-lg border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors"
+          className="text-xs px-3 py-2 rounded-lg border border-surface-border text-text-secondary hover:bg-accent-blue/10 hover:text-accent-blue transition-colors"
         >
           {t("data.exportJson")}
         </button>
-        <label className="text-xs px-3 py-2 rounded-lg border border-surface-border text-text-secondary hover:bg-surface-hover transition-colors cursor-pointer text-center">
+        <label className="text-xs px-3 py-2 rounded-lg border border-surface-border text-text-secondary hover:bg-accent-blue/10 hover:text-accent-blue transition-colors cursor-pointer text-center">
           {t("data.importJson")}
           <input
             type="file"
