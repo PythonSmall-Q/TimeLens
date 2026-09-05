@@ -562,7 +562,7 @@ export default function LlmInsights() {
               <select
                 value={range}
                 onChange={(e) => setRange(e.target.value as AnalysisRange)}
-                className="ui-field text-xs h-8 py-0 pr-7"
+                className="ui-field text-xs h-9 min-h-9 py-0 leading-5 pr-7"
                 disabled={loading}
               >
                 {(

@@ -14,6 +14,7 @@ import type {
   VsCodeStatsSummary,
 } from "@/types";
 import * as api from "@/services/tauriApi";
+import { todayString } from "@/utils/format";
 
 export type PeriodMode = "day" | "week" | "month";
 
@@ -71,7 +72,7 @@ interface StatsState {
   fetchVsCodeStatsForRange: (startDate: string, endDate: string) => Promise<void>;
 }
 
-const todayStr = () => new Date().toISOString().slice(0, 10);
+const todayStr = todayString;
 
 export const useStatsStore = create<StatsState>((set, get) => ({
   todayTotals: [],

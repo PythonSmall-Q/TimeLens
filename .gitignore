@@ -37,6 +37,7 @@ src-tauri/windows/msix-staging/AppxManifest.xml
 coverage/
 
 # Environment
+ai-memory/
 .env
 .env.local
 .env.production
