@@ -73,3 +73,120 @@ pub fn spawn_config_watcher(app_handle: AppHandle) {
         }
     });
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::llm::config::{AnalysisRange, LlmDataSharing, LlmProvider};
+    use std::collections::HashMap;
+
+    /// Unique per-test temp directory so parallel tests never share a config file.
+    fn temp_config_dir(test_name: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "timelens-llm-config-test-{}-{}",
+            test_name,
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    fn sample_config() -> LlmConfig {
+        let mut providers = HashMap::new();
+        providers.insert(
+            "local".to_string(),
+            LlmProvider {
+                name: "Local LLM".to_string(),
+                nickname: Some("Work Laptop".to_string()),
+                base_url: "http://localhost:11434/v1".to_string(),
+                model: "llama3.1".to_string(),
+                api_key: Some("sk-local-secret".to_string()),
+                builtin: false,
+                referral_url: None,
+            },
+        );
+        providers.insert(
+            "openai".to_string(),
+            LlmProvider {
+                name: "OpenAI".to_string(),
+                nickname: None,
+                base_url: "https://api.openai.com/v1".to_string(),
+                model: "gpt-4o-mini".to_string(),
+                api_key: Some("sk-openai-secret".to_string()),
+                builtin: true,
+                referral_url: Some("https://platform.openai.com".to_string()),
+            },
+        );
+
+        LlmConfig {
+            active_provider_id: Some("local".to_string()),
+            providers,
+            data_sharing: LlmDataSharing {
+                total_time: true,
+                top_apps: false,
+                categories: true,
+                focus_time: false,
+                goals: true,
+                interruptions: false,
+            },
+            default_range: AnalysisRange::Last7Days,
+        }
+    }
+
+    #[test]
+    fn save_and_load_config_roundtrips_all_fields() {
+        let dir = temp_config_dir("roundtrip");
+        let path = dir.join("llm_config.toml");
+
+        let config = sample_config();
+        save_config(&path, &config).expect("save_config should succeed");
+        assert!(path.is_file(), "config file should exist after save");
+
+        let loaded = load_config(&path).expect("load_config should succeed");
+        assert_eq!(loaded, config);
+
+        assert_eq!(loaded.active_provider_id.as_deref(), Some("local"));
+        assert_eq!(loaded.providers.len(), 2);
+
+        let local = loaded.providers.get("local").expect("local provider");
+        assert_eq!(local.name, "Local LLM");
+        assert_eq!(local.nickname.as_deref(), Some("Work Laptop"));
+        assert_eq!(local.base_url, "http://localhost:11434/v1");
+        assert_eq!(local.model, "llama3.1");
+        assert_eq!(local.api_key.as_deref(), Some("sk-local-secret"));
+        assert!(!local.builtin);
+        assert_eq!(local.referral_url, None);
+
+        let openai = loaded.providers.get("openai").expect("openai provider");
+        assert_eq!(openai.nickname, None);
+        assert!(openai.builtin);
+        assert_eq!(openai.api_key.as_deref(), Some("sk-openai-secret"));
+        assert_eq!(
+            openai.referral_url.as_deref(),
+            Some("https://platform.openai.com")
+        );
+
+        assert!(loaded.data_sharing.total_time);
+        assert!(!loaded.data_sharing.top_apps);
+        assert!(loaded.data_sharing.categories);
+        assert!(!loaded.data_sharing.focus_time);
+        assert!(loaded.data_sharing.goals);
+        assert!(!loaded.data_sharing.interruptions);
+
+        assert_eq!(loaded.default_range, AnalysisRange::Last7Days);
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn load_config_returns_default_when_file_missing() {
+        let dir = temp_config_dir("missing");
+        let path = dir.join("sub").join("llm_config.toml");
+
+        let loaded = load_config(&path).expect("missing file should yield default config");
+        assert_eq!(loaded, LlmConfig::default());
+        assert!(loaded.providers.contains_key("orcarouter"));
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+}

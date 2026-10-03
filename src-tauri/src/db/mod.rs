@@ -2461,3 +2461,163 @@ pub fn clear_widget_runtime_data(conn: &Connection, widget_id: &str) -> Result<(
     )?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_db() -> Connection {
+        let conn = Connection::open_in_memory().unwrap();
+        initialize(&conn).unwrap();
+        conn
+    }
+
+    /// Insert an app_usage segment whose activity starts at `first_seen`.
+    fn seed_segment(conn: &Connection, date: &str, app: &str, first_seen: &str) {
+        insert_app_usage(
+            conn,
+            date,
+            app,
+            &format!("C:\\apps\\{}.exe", app.to_ascii_lowercase()),
+            &format!("{} - window", app),
+            60,
+            first_seen,
+            first_seen,
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn interruption_periods_empty_when_no_usage() {
+        let conn = test_db();
+        let periods = get_interruption_periods(&conn, "2024-01-01").unwrap();
+        assert!(periods.is_empty());
+    }
+
+    #[test]
+    fn interruption_periods_no_fragment_when_fewer_than_four_switches_in_window() {
+        let conn = test_db();
+        let date = "2024-01-01";
+        // Three segments within one 5-minute window: below the >= 4 threshold.
+        for (app, ts) in [
+            ("alpha", "2024-01-01T14:00:00"),
+            ("beta", "2024-01-01T14:01:00"),
+            ("gamma", "2024-01-01T14:02:00"),
+        ] {
+            seed_segment(&conn, date, app, ts);
+        }
+
+        let periods = get_interruption_periods(&conn, date).unwrap();
+        assert_eq!(periods.len(), 1);
+        assert_eq!(periods[0].hour, 14);
+        assert_eq!(periods[0].switch_count, 3);
+        assert_eq!(periods[0].fragment_score, 0.0);
+    }
+
+    #[test]
+    fn interruption_periods_detects_fragment_with_exactly_four_switches_in_window() {
+        let conn = test_db();
+        let date = "2024-01-01";
+        for (app, ts) in [
+            ("alpha", "2024-01-01T14:00:00"),
+            ("beta", "2024-01-01T14:01:00"),
+            ("gamma", "2024-01-01T14:02:00"),
+            ("delta", "2024-01-01T14:03:00"),
+        ] {
+            seed_segment(&conn, date, app, ts);
+        }
+
+        let periods = get_interruption_periods(&conn, date).unwrap();
+        assert_eq!(periods.len(), 1);
+        assert_eq!(periods[0].hour, 14);
+        assert_eq!(periods[0].switch_count, 4);
+        // Only the window starting at 14:00:00 contains all 4 switches.
+        assert_eq!(periods[0].fragment_score, 0.25);
+    }
+
+    #[test]
+    fn interruption_periods_window_boundary_is_inclusive() {
+        let conn = test_db();
+        let date = "2024-01-01";
+        // Fourth switch exactly 300 s after the first: still inside the window.
+        for (app, ts) in [
+            ("alpha", "2024-01-01T09:00:00"),
+            ("beta", "2024-01-01T09:01:00"),
+            ("gamma", "2024-01-01T09:02:00"),
+            ("delta", "2024-01-01T09:05:00"),
+        ] {
+            seed_segment(&conn, date, app, ts);
+        }
+
+        let periods = get_interruption_periods(&conn, date).unwrap();
+        assert_eq!(periods.len(), 1);
+        assert_eq!(periods[0].hour, 9);
+        assert_eq!(periods[0].switch_count, 4);
+        assert_eq!(periods[0].fragment_score, 0.25);
+
+        // One second past the window edge: no fragment anymore.
+        let conn = test_db();
+        for (app, ts) in [
+            ("alpha", "2024-01-01T09:00:00"),
+            ("beta", "2024-01-01T09:01:00"),
+            ("gamma", "2024-01-01T09:02:00"),
+            ("delta", "2024-01-01T09:05:01"),
+        ] {
+            seed_segment(&conn, date, app, ts);
+        }
+
+        let periods = get_interruption_periods(&conn, date).unwrap();
+        assert_eq!(periods.len(), 1);
+        assert_eq!(periods[0].hour, 9);
+        assert_eq!(periods[0].switch_count, 4);
+        assert_eq!(periods[0].fragment_score, 0.0);
+    }
+
+    #[test]
+    fn interruption_periods_no_fragment_when_switches_spread_beyond_window() {
+        let conn = test_db();
+        let date = "2024-01-01";
+        // Four switches, each more than 5 minutes after the previous one.
+        for (app, ts) in [
+            ("alpha", "2024-01-01T14:00:00"),
+            ("beta", "2024-01-01T14:06:00"),
+            ("gamma", "2024-01-01T14:12:00"),
+            ("delta", "2024-01-01T14:18:00"),
+        ] {
+            seed_segment(&conn, date, app, ts);
+        }
+
+        let periods = get_interruption_periods(&conn, date).unwrap();
+        assert_eq!(periods.len(), 1);
+        assert_eq!(periods[0].hour, 14);
+        assert_eq!(periods[0].switch_count, 4);
+        assert_eq!(periods[0].fragment_score, 0.0);
+    }
+
+    #[test]
+    fn interruption_periods_groups_fragments_by_start_hour() {
+        let conn = test_db();
+        let date = "2024-01-01";
+        // Four switches straddling the 14:00 -> 15:00 boundary. The fragment is
+        // attributed to the hour the window starts in (14), hour 15 has none.
+        for (app, ts) in [
+            ("alpha", "2024-01-01T14:58:00"),
+            ("beta", "2024-01-01T14:59:00"),
+            ("gamma", "2024-01-01T15:00:00"),
+            ("delta", "2024-01-01T15:01:00"),
+        ] {
+            seed_segment(&conn, date, app, ts);
+        }
+
+        let periods = get_interruption_periods(&conn, date).unwrap();
+        assert_eq!(periods.len(), 2);
+
+        let hour14 = periods.iter().find(|p| p.hour == 14).unwrap();
+        assert_eq!(hour14.switch_count, 2);
+        assert_eq!(hour14.fragment_score, 0.5);
+
+        let hour15 = periods.iter().find(|p| p.hour == 15).unwrap();
+        assert_eq!(hour15.switch_count, 2);
+        assert_eq!(hour15.fragment_score, 0.0);
+    }
+}

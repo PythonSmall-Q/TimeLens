@@ -407,7 +407,7 @@ export default function LlmInsights() {
   };
 
   const visibleConversations = useMemo(() => {
-    const list = conversations.filter((c) => showArchived || c.archived === showArchived);
+    const list = conversations.filter((c) => c.archived === showArchived);
     return list.sort((a, b) => {
       if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
       return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
