@@ -168,7 +168,7 @@ export default function Settings() {
   const [currentProfile, setCurrentProfile] = useState<string>("default");
   const [profileDialogOpen, setProfileDialogOpen] = useState(false);
   const [newProfileName, setNewProfileName] = useState("");
-  const [profilesBusy, setProfilesBusy] = useState<boolean>();
+  const [profilesBusy, setProfilesBusy] = useState<boolean>(false);
 
   // v2.0.0 legacy data import state
   const [legacyDataInfo, setLegacyDataInfo] = useState<LegacyDataInfo | null>(null);
