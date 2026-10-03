@@ -520,12 +520,16 @@ pub fn build_widget_window_sync(app: &AppHandle, config: &WidgetConfig) -> Resul
     let (x, y) =
         compute_spawn_position(app, config.x, config.y, width, height, config.monitor_index);
 
-    WebviewWindowBuilder::new(app, &config.id, url)
+    let builder = WebviewWindowBuilder::new(app, &config.id, url)
         .title(&format!("TimeLens - {}", config.widget_type))
         .inner_size(width, height)
         .position(x, y)
-        .decorations(false)
-        .transparent(true)
+        .decorations(false);
+    // `WebviewWindowBuilder::transparent` only exists on Windows and Linux;
+    // macOS requires the private API feature, so widget windows stay opaque there.
+    #[cfg(not(target_os = "macos"))]
+    let builder = builder.transparent(true);
+    builder
         .always_on_top(config.always_on_top_mode == "always")
         .skip_taskbar(false)
         .resizable(true)
