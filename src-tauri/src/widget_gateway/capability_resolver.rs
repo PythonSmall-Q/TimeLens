@@ -8,7 +8,7 @@ pub fn required_scope(request: &WidgetGatewayRequest) -> Option<&'static str> {
     match request.request_type {
         WidgetGatewayRequestType::Query => match request.scope.as_str() {
             "metrics" | "sessions" | "categories" | "projects" | "tags" | "goals" | "rules"
-            | "focus" => Some("screen-time:read"),
+            | "focus" | "interruptions" | "hourly" => Some("screen-time:read"),
             "todos" => Some("todo:read"),
             "browser" => Some("browser:read"),
             _ => None,
@@ -20,13 +20,26 @@ pub fn required_scope(request: &WidgetGatewayRequest) -> Option<&'static str> {
         WidgetGatewayRequestType::LocalApiCall => Some("local-api:call"),
         WidgetGatewayRequestType::FocusModeWrite => Some("settings:write"),
         WidgetGatewayRequestType::TodoWrite => Some("todo:write"),
+        WidgetGatewayRequestType::FocusSessionWrite => Some("settings:write"),
         WidgetGatewayRequestType::NotificationSend => Some("notification:send"),
-        WidgetGatewayRequestType::NetworkFetch | WidgetGatewayRequestType::MediaLoad => {
-            // v4 scopes are used directly for network/media.
-            None
-        }
+        WidgetGatewayRequestType::NetworkFetch => match resource_scheme(request) {
+            "http" => Some("network.general.http"),
+            _ => Some("network.general.https"),
+        },
+        WidgetGatewayRequestType::MediaLoad => Some("media.image.remote.read"),
         WidgetGatewayRequestType::RuntimeInfo => None,
     }
+}
+
+/// Scheme of the request resource hint, defaulting to https.
+fn resource_scheme(request: &WidgetGatewayRequest) -> &str {
+    request
+        .resource_hint
+        .as_deref()
+        .and_then(|hint| hint.split_once(':'))
+        .map(|(scheme, _)| scheme)
+        .filter(|scheme| !scheme.is_empty())
+        .unwrap_or("https")
 }
 
 /// Human-readable display name for a query namespace.
@@ -42,6 +55,9 @@ pub fn namespace_display(namespace: &str) -> String {
         "focus" => "focus state".to_string(),
         "todos" => "todo list".to_string(),
         "browser" => "browser activity".to_string(),
+        "interruptions" => "interruption periods".to_string(),
+        "hourly" => "hourly usage".to_string(),
+        "health" => "widget health".to_string(),
         _ => namespace.to_string(),
     }
 }

@@ -27,6 +27,8 @@ export default function App() {
   const widgetBackgroundFit = useSettingsStore((s) => s.widgetBackgroundFit);
   const appBackgroundOverlay = useSettingsStore((s) => s.appBackgroundOverlay);
   const widgetBackgroundOverlay = useSettingsStore((s) => s.widgetBackgroundOverlay);
+  const appBackgroundBlur = useSettingsStore((s) => s.appBackgroundBlur);
+  const widgetBackgroundBlur = useSettingsStore((s) => s.widgetBackgroundBlur);
   const skinPalette = useSettingsStore((s) => s.skinPalette);
   const [activePalette, setActivePalette] = useState(skinPalette);
   const reducedMotion = useSettingsStore((s) => s.reducedMotion);
@@ -47,6 +49,8 @@ export default function App() {
     widgetFit: widgetBackgroundFit,
     appOverlay: appBackgroundOverlay,
     widgetOverlay: widgetBackgroundOverlay,
+    appBlur: appBackgroundBlur,
+    widgetBlur: widgetBackgroundBlur,
   });
 
   useEffect(() => {
@@ -118,8 +122,10 @@ export default function App() {
       widgetFit: widgetBackgroundFit,
       appOverlay: appBackgroundOverlay,
       widgetOverlay: widgetBackgroundOverlay,
+      appBlur: appBackgroundBlur,
+      widgetBlur: widgetBackgroundBlur,
     });
-  }, [appBackgroundFit, appBackgroundImage, appBackgroundOverlay, widgetBackgroundFit, widgetBackgroundImage, widgetBackgroundOverlay]);
+  }, [appBackgroundBlur, appBackgroundFit, appBackgroundImage, appBackgroundOverlay, widgetBackgroundBlur, widgetBackgroundFit, widgetBackgroundImage, widgetBackgroundOverlay]);
 
   useEffect(() => {
     let unlisten: (() => void) | undefined;
@@ -131,6 +137,8 @@ export default function App() {
         widgetFit: event.payload?.widgetFit ?? previous.widgetFit,
         appOverlay: event.payload?.appOverlay ?? previous.appOverlay,
         widgetOverlay: event.payload?.widgetOverlay ?? previous.widgetOverlay,
+        appBlur: event.payload?.appBlur ?? previous.appBlur,
+        widgetBlur: event.payload?.widgetBlur ?? previous.widgetBlur,
       }));
       if (event.payload?.skinPalette) {
         setActivePalette(event.payload.skinPalette);
@@ -149,6 +157,8 @@ export default function App() {
     root.style.setProperty("--timelens-widget-background-fit", skin.widgetFit === "stretch" ? "100% 100%" : skin.widgetFit);
     root.style.setProperty("--timelens-app-overlay", skin.app ? String(skin.appOverlay / 100) : "0");
     root.style.setProperty("--timelens-widget-overlay", skin.widget ? String(skin.widgetOverlay / 100) : "0");
+    root.style.setProperty("--timelens-app-blur", String(skin.appBlur));
+    root.style.setProperty("--timelens-widget-blur", String(skin.widgetBlur));
     root.style.setProperty("--timelens-skin-pattern", activePalette === "neutral-texture"
       ? getNeutralTexture("aurora").css
       : "none");

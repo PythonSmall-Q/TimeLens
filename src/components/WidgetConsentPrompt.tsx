@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ShieldCheck, X } from "lucide-react";
+import { AlertTriangle, Info, ShieldCheck, X } from "lucide-react";
 
 interface Props {
   open: boolean;
   widgetName: string;
   scope: string;
   message?: string;
+  riskLevel?: "low" | "medium" | "high";
   onAccept: (remember: boolean) => void;
   onDeny: (remember: boolean) => void;
   onClose?: () => void;
@@ -17,6 +18,7 @@ export default function WidgetConsentPrompt({
   widgetName,
   scope,
   message,
+  riskLevel,
   onAccept,
   onDeny,
   onClose,
@@ -50,6 +52,19 @@ export default function WidgetConsentPrompt({
         <p className="mb-2 text-xs text-[var(--text-muted)]">
           {t("consentPrompt.description", { widget: widgetName })}
         </p>
+
+        {riskLevel === "high" && (
+          <div className="mb-3 flex items-start gap-2 rounded-lg border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
+            <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" />
+            <span>{t("consentPrompt.riskHigh")}</span>
+          </div>
+        )}
+        {riskLevel === "medium" && (
+          <div className="mb-3 flex items-start gap-2 rounded-lg border border-surface-border bg-[var(--surface-subtle)] px-3 py-2 text-xs text-[var(--text-secondary)]">
+            <Info size={14} className="mt-0.5 flex-shrink-0" />
+            <span>{t("consentPrompt.riskMedium")}</span>
+          </div>
+        )}
 
         <div className="mb-4 rounded-lg bg-[var(--surface-subtle)] px-3 py-2 text-xs">
           <div className="font-medium text-[var(--text-primary)]">

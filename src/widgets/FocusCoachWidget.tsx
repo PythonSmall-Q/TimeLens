@@ -4,7 +4,7 @@ import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { X, Play, Square, Target, Zap, AlertCircle } from "lucide-react";
 import * as api from "@/services/tauriApi";
 import type { FocusSession } from "@/types";
-import { formatDuration, todayString, localDateTimeString } from "@/utils/format";
+import { formatDuration, todayString } from "@/utils/format";
 import { useWidgetErrorReporter } from "@/hooks/useWidgetErrorReporter";
 import { useWidgetClient } from "@/hooks/useWidgetClient";
 import clsx from "clsx";
@@ -105,19 +105,13 @@ export default function FocusCoachWidget({ widgetId }: Props) {
 
     try {
       if (activeSession?.id != null) {
-        await api.stopFocusSession(activeSession.id);
+        await client.stopFocusSession(activeSession.id);
         setActiveSession(null);
       } else {
         const reason = t("focusCoach.manualReason");
-        const id = await api.startFocusSession(reason, "manual");
-        const startedAt = localDateTimeString();
-        setActiveSession({
-          id,
-          started_at: startedAt,
-          ended_at: null,
-          trigger_type: "manual",
-          reason,
-        });
+        await client.startFocusSession({ trigger_type: "manual", reason });
+        // The gateway does not return the new session id; re-sync from the sessions query.
+        await refresh();
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

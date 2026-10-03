@@ -38,6 +38,7 @@ interface PendingConsent {
   id: string;
   scope: string;
   message: string;
+  riskLevel: "low" | "medium" | "high";
   resolve: (granted: boolean) => void;
 }
 
@@ -88,12 +89,13 @@ export default function ExternalWidgetHost({ widgetId, widgetType }: Props) {
     return new WidgetClient({
       widgetId,
       widgetType,
-      onConsentRequired: (scope, _riskLevel, message) => {
+      onConsentRequired: (scope, riskLevel, message) => {
         return new Promise((resolve) => {
           const consent: PendingConsent = {
             id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
             scope,
             message,
+            riskLevel,
             resolve,
           };
           setPendingConsents((prev) => {
@@ -116,9 +118,9 @@ export default function ExternalWidgetHost({ widgetId, widgetType }: Props) {
 
     try {
       if (granted) {
-        await api.widgetGrantConsent(widgetId, activeConsent.scope, remember, "low");
+        await api.widgetGrantConsent(widgetId, activeConsent.scope, remember, activeConsent.riskLevel);
       } else {
-        await api.widgetDenyConsent(widgetId, activeConsent.scope, remember, "low");
+        await api.widgetDenyConsent(widgetId, activeConsent.scope, remember, activeConsent.riskLevel);
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -296,6 +298,7 @@ export default function ExternalWidgetHost({ widgetId, widgetType }: Props) {
           widgetName={registryItem?.display_name ?? widgetType}
           scope={activeConsent.scope}
           message={activeConsent.message}
+          riskLevel={activeConsent.riskLevel}
           onAccept={(remember) => void handleConsentDecision(true, remember)}
           onDeny={(remember) => void handleConsentDecision(false, remember)}
           onClose={() => void handleConsentDecision(false, false)}

@@ -35,6 +35,9 @@
     "light": "Hell",
     "system": "System"
   },
+  "skin": {
+    "blur": "Blur"
+  },
   "trayIconStyle": {
     "label": "Tray-Symbolstil",
     "auto": "Auto",

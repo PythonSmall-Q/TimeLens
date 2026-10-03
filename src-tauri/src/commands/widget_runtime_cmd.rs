@@ -643,9 +643,15 @@ pub fn recover_widget(
 pub fn reset_widget_permissions_and_state(
     widget_id: String,
     actor: Option<String>,
+    app: AppHandle,
     kernel: State<'_, WidgetKernel>,
 ) -> Result<(), String> {
-    kernel.reset_permissions_and_state(&widget_id, actor.as_deref())
+    kernel.reset_permissions_and_state(&widget_id, actor.as_deref())?;
+    let _ = app.emit(
+        "widget-permission-revoked",
+        serde_json::json!({ "widgetId": widget_id, "scope": null, "all": true }),
+    );
+    Ok(())
 }
 
 // ── New gateway-facing commands ───────────────────────────────
@@ -689,9 +695,22 @@ pub fn widget_revoke_consent(
     widget_id: String,
     scope: String,
     app: AppHandle,
+    db: State<'_, DbState>,
     kernel: State<'_, WidgetKernel>,
 ) -> Result<(), String> {
     kernel.gateway().revoke_consent(&widget_id, &scope)?;
+    {
+        let conn = db.lock().map_err(|e| e.to_string())?;
+        let _ = crate::widget_gateway::audit_emitter::emit(
+            &conn,
+            &widget_id,
+            &scope,
+            "revoke",
+            "revoked",
+            None,
+            None,
+        );
+    }
     let _ = app.emit(
         "widget-permission-revoked",
         serde_json::json!({ "widgetId": widget_id, "scope": scope, "all": false }),
@@ -924,6 +943,56 @@ mod tests {
         assert!(db::get_widget_state(&conn, "cleanup-test", "key").unwrap().is_none());
         assert!(db::get_widget_subscriptions(&conn, "cleanup-test").unwrap().is_empty());
         assert!(db::get_widget_error_log(&conn, "cleanup-test", 10).unwrap().is_empty());
+    }
+
+    #[test]
+    fn reset_permissions_and_state_revokes_all_consent_decisions() {
+        let db = test_db();
+        let kernel = WidgetKernel::new(db.clone(), WidgetCallRateLimiter::new());
+        {
+            let conn = db.lock().unwrap();
+            db::upsert_widget_config(&conn, &sample_widget_config("reset-consent")).unwrap();
+            db::set_widget_permissions(
+                &conn,
+                "reset-consent",
+                &["screen-time:read".to_string()],
+                None,
+            )
+            .unwrap();
+            db::set_widget_consent_decision(
+                &conn,
+                "reset-consent",
+                "screen-time:read",
+                "granted",
+                true,
+                "low",
+                "runtime_prompt",
+            )
+            .unwrap();
+            db::set_widget_consent_decision(
+                &conn,
+                "reset-consent",
+                "network.fetch",
+                "granted",
+                false,
+                "high",
+                "runtime_prompt",
+            )
+            .unwrap();
+        }
+
+        kernel
+            .reset_permissions_and_state("reset-consent", Some("test"))
+            .unwrap();
+
+        let conn = db.lock().unwrap();
+        assert!(db::get_widget_permissions(&conn, "reset-consent")
+            .unwrap()
+            .is_empty());
+        let decisions = db::get_widget_consent_decisions(&conn, "reset-consent").unwrap();
+        assert_eq!(decisions.len(), 2);
+        assert!(decisions.iter().all(|d| d.decision == "denied"));
+        assert!(decisions.iter().all(|d| d.revoked_at.is_some()));
     }
 
     // ── Validation gate: contract tests ─────────────────────────

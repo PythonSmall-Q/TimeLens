@@ -209,6 +209,70 @@ describe("WidgetClient", () => {
     expect(mockGatewayRequest).toHaveBeenCalledTimes(2);
   });
 
+  it("passes the gateway error scope to onConsentRequired when consent is required", async () => {
+    mockGatewayRequest
+      .mockResolvedValueOnce({
+        request_id: "r1",
+        status: "denied",
+        error: {
+          code: "consent_required",
+          message: "consent needed for this domain",
+          scope: "network:domain:example.com",
+          recoverable: true,
+        },
+      })
+      .mockResolvedValueOnce(successResponse({ total: 9 }));
+
+    const onConsentRequired = vi.fn().mockResolvedValue(true);
+    const client = new WidgetClient({
+      widgetId: "w1",
+      widgetType: "test",
+      onConsentRequired,
+    });
+
+    const result = await client.query("metrics");
+    expect(result).toEqual({ total: 9 });
+    expect(onConsentRequired).toHaveBeenCalledWith(
+      "network:domain:example.com",
+      "medium",
+      "consent needed for this domain",
+    );
+    expect(mockGatewayRequest).toHaveBeenCalledTimes(2);
+  });
+
+  it("flags remote video media consent prompts as high risk", async () => {
+    mockGatewayRequest
+      .mockResolvedValueOnce({
+        request_id: "r1",
+        status: "denied",
+        error: {
+          code: "consent_required",
+          message: "consent needed for remote video",
+          scope: "media.video.remote.read",
+          recoverable: true,
+        },
+      })
+      .mockResolvedValueOnce(successResponse({
+        kind: "data_url",
+        content_type: "video/mp4",
+        url: "data:video/mp4;base64,AA==",
+      }));
+
+    const onConsentRequired = vi.fn().mockResolvedValue(true);
+    const client = new WidgetClient({
+      widgetId: "w1",
+      widgetType: "test",
+      onConsentRequired,
+    });
+
+    await client.loadMedia("https://example.com/video.mp4");
+    expect(onConsentRequired).toHaveBeenCalledWith(
+      "media.video.remote.read",
+      "high",
+      "consent needed for remote video",
+    );
+  });
+
   it("does not retry when user denies consent", async () => {
     mockGatewayRequest.mockResolvedValue(
       deniedResponse("permission_denied", "please grant"),

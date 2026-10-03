@@ -17,7 +17,7 @@ export default function Sidebar({ onOpenSearch }: Props) {
   const showCurrentApp = periodMode === "day" && selectedDate === todayString();
 
   return (
-    <aside className="flex flex-col h-full w-56 bg-surface-light border-r border-surface-border select-none">
+    <aside className="app-sidebar flex flex-col h-full w-56 border-r border-surface-border select-none">
       {/* Logo */}
       <div className="flex items-center gap-3 px-5 py-5 border-b border-surface-border">
         <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-accent-blue to-accent-purple flex items-center justify-center shadow-glow">

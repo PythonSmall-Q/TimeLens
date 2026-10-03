@@ -21,8 +21,26 @@ describe("FocusCoachWidget", () => {
   });
 
   it("starts a focus session when clicking start", async () => {
-    mockTauriApi.widgetGatewayRequest.mockResolvedValue(successResponse([]));
-    mockTauriApi.startFocusSession.mockResolvedValue(42);
+    const today = new Date().toISOString().slice(0, 10);
+    let started = false;
+    mockTauriApi.widgetGatewayRequest.mockImplementation(async (request: { request_type?: string }) => {
+      if (request.request_type === "focus_session_write") {
+        started = true;
+        return successResponse(null);
+      }
+      if (started) {
+        return successResponse([
+          {
+            id: 42,
+            started_at: `${today}T09:00:00`,
+            ended_at: null,
+            trigger_type: "manual",
+            reason: "focus",
+          },
+        ]);
+      }
+      return successResponse([]);
+    });
     renderWithProviders(<FocusCoachWidget widgetId="focus-test" />);
 
     await waitFor(() => {
@@ -32,7 +50,12 @@ describe("FocusCoachWidget", () => {
     await userEvent.click(screen.getByRole("button", { name: "Start focus" }));
 
     await waitFor(() => {
-      expect(mockTauriApi.startFocusSession).toHaveBeenCalled();
+      expect(mockTauriApi.widgetGatewayRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          request_type: "focus_session_write",
+          payload: expect.objectContaining({ action: "start", trigger_type: "manual" }),
+        })
+      );
     });
     await waitFor(() => {
       expect(screen.getByText("Stop focus")).toBeInTheDocument();
@@ -41,8 +64,11 @@ describe("FocusCoachWidget", () => {
 
   it("stops the active focus session", async () => {
     const today = new Date().toISOString().slice(0, 10);
-    mockTauriApi.widgetGatewayRequest.mockResolvedValue(
-      successResponse([
+    mockTauriApi.widgetGatewayRequest.mockImplementation(async (request: { request_type?: string }) => {
+      if (request.request_type === "focus_session_write") {
+        return successResponse(null);
+      }
+      return successResponse([
         {
           id: 7,
           started_at: `${today}T09:00:00`,
@@ -50,9 +76,8 @@ describe("FocusCoachWidget", () => {
           trigger_type: "manual",
           reason: "focus",
         },
-      ])
-    );
-    mockTauriApi.stopFocusSession.mockResolvedValue(undefined);
+      ]);
+    });
     renderWithProviders(<FocusCoachWidget widgetId="focus-test" />);
 
     await waitFor(() => {
@@ -62,7 +87,11 @@ describe("FocusCoachWidget", () => {
     await userEvent.click(screen.getByRole("button", { name: "Stop focus" }));
 
     await waitFor(() => {
-      expect(mockTauriApi.stopFocusSession).toHaveBeenCalledWith(7);
+      const writes = mockTauriApi.widgetGatewayRequest.mock.calls
+        .map(([request]) => request as { request_type?: string; payload?: unknown })
+        .filter((request) => request.request_type === "focus_session_write");
+      expect(writes.length).toBeGreaterThan(0);
+      expect(writes[0].payload).toMatchObject({ action: "stop", id: 7 });
     });
   });
 });

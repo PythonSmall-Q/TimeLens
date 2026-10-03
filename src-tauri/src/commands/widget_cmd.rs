@@ -8,7 +8,10 @@ use uuid::Uuid;
 use crate::commands::storage_cmd::DbState;
 use crate::db;
 use crate::models::{WidgetConfig, WidgetRuntimeHealth};
-use crate::widget_registry::{get_widget_by_type, load_widget_registry, WidgetRegistryResponse};
+use crate::widget_registry::{
+    expand_capability_to_permissions, get_widget_by_type, load_widget_registry,
+    WidgetRegistryItem, WidgetRegistryResponse,
+};
 
 fn short_id() -> String {
     Uuid::new_v4().to_string()[..8].to_string()
@@ -284,6 +287,81 @@ fn compute_spawn_position(
     (candidate.x, candidate.y)
 }
 
+/// Derive the runtime permission scopes an official widget needs from its
+/// registry capabilities. Third-party items yield an empty set so sync logic
+/// never touches them.
+fn required_permissions_for_item(item: &WidgetRegistryItem) -> Vec<String> {
+    if item.source != "official" {
+        return Vec::new();
+    }
+    item.capabilities
+        .iter()
+        .flat_map(|cap| expand_capability_to_permissions(cap))
+        .map(|s| s.to_string())
+        .collect::<std::collections::HashSet<_>>()
+        .into_iter()
+        .collect()
+}
+
+/// Grant any official-widget permission scopes that are missing for a widget.
+///
+/// Runs at widget create/open and at startup restore so widgets created
+/// before a capability was declared still receive its scopes. Scopes whose
+/// latest audit action is `revoke` (user-revoked) are left revoked.
+pub fn ensure_official_widget_permissions(
+    app: &AppHandle,
+    db: &DbState,
+    widget_id: &str,
+    widget_type: &str,
+) -> Result<(), String> {
+    let Some(item) = get_widget_by_type(app, widget_type) else {
+        return Ok(());
+    };
+    let required = required_permissions_for_item(&item);
+    if required.is_empty() {
+        return Ok(());
+    }
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    sync_missing_widget_permissions(&conn, widget_id, &required)
+}
+
+/// Grant `required_permissions` that are not already held, preserving any
+/// extra existing scopes and never re-granting user-revoked ones.
+fn sync_missing_widget_permissions(
+    conn: &rusqlite::Connection,
+    widget_id: &str,
+    required_permissions: &[String],
+) -> Result<(), String> {
+    let existing = db::get_widget_permissions(conn, widget_id).map_err(|e| e.to_string())?;
+    let audit =
+        db::get_widget_permission_audit_log(conn, widget_id, 200).map_err(|e| e.to_string())?;
+    // Audit log is ordered newest-first, so the first entry per scope wins.
+    let mut latest_action: std::collections::HashMap<&str, &str> = std::collections::HashMap::new();
+    for entry in &audit {
+        latest_action
+            .entry(entry.permission.as_str())
+            .or_insert(entry.action.as_str());
+    }
+    let to_add: Vec<String> = required_permissions
+        .iter()
+        .filter(|p| {
+            !existing.iter().any(|e| e == *p)
+                && latest_action.get(p.as_str()) != Some(&"revoke")
+        })
+        .cloned()
+        .collect();
+    if to_add.is_empty() {
+        return Ok(());
+    }
+    // set_widget_permissions replaces the whole set, so pass the full union.
+    let mut union = existing;
+    union.extend(to_add);
+    union.sort();
+    union.dedup();
+    db::set_widget_permissions(conn, widget_id, &union, Some("permission-sync"))
+        .map_err(|e| e.to_string())
+}
+
 /// Create a floating widget window and return its config id.
 #[tauri::command]
 pub async fn create_widget(
@@ -330,32 +408,18 @@ pub async fn create_widget(
     build_widget_window(&app, &config)?;
 
     // Grant default permissions derived from official widget capabilities.
-    if let Some(item) = get_widget_by_type(&app, &widget_type) {
-        let default_permissions: Vec<String> = item
-            .capabilities
-            .iter()
-            .flat_map(|cap| crate::widget_registry::expand_capability_to_permissions(cap))
-            .map(|s| s.to_string())
-            .collect::<std::collections::HashSet<_>>()
-            .into_iter()
-            .collect();
-        if !default_permissions.is_empty() {
-            let conn = db.lock().map_err(|e| e.to_string())?;
-            let _ = crate::db::set_widget_permissions(
-                &conn,
-                &id,
-                &default_permissions,
-                Some("widget-create"),
-            );
-        }
-    }
+    let _ = ensure_official_widget_permissions(&app, &db, &id, &widget_type);
 
     Ok(config)
 }
 
 /// Re-open a previously saved widget window.
 #[tauri::command]
-pub async fn open_widget(config: WidgetConfig, app: AppHandle) -> Result<(), String> {
+pub async fn open_widget(
+    config: WidgetConfig,
+    app: AppHandle,
+    db: tauri::State<'_, DbState>,
+) -> Result<(), String> {
     // If already open, just focus it
     if let Some(win) = app.get_webview_window(&config.id) {
         win.show().map_err(|e| e.to_string())?;
@@ -363,6 +427,7 @@ pub async fn open_widget(config: WidgetConfig, app: AppHandle) -> Result<(), Str
         return Ok(());
     }
     build_widget_window(&app, &config)?;
+    let _ = ensure_official_widget_permissions(&app, &db, &config.id, &config.widget_type);
     Ok(())
 }
 
@@ -469,4 +534,112 @@ pub fn build_widget_window_sync(app: &AppHandle, config: &WidgetConfig) -> Resul
         .map_err(|e| e.to_string())?;
 
     Ok(())
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db;
+
+    fn test_conn() -> rusqlite::Connection {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        db::initialize(&conn).unwrap();
+        conn
+    }
+
+    fn s(value: &str) -> String {
+        value.to_string()
+    }
+
+    #[test]
+    fn test_reconcile_grants_missing_scopes_on_empty_widget() {
+        let conn = test_conn();
+        let required = vec![s("screen-time:read"), s("todo:read"), s("todo:write")];
+        sync_missing_widget_permissions(&conn, "todo-abc", &required).unwrap();
+        let perms = db::get_widget_permissions(&conn, "todo-abc").unwrap();
+        assert_eq!(perms, required);
+        // Idempotent: a second run adds nothing and keeps the same set.
+        sync_missing_widget_permissions(&conn, "todo-abc", &required).unwrap();
+        assert_eq!(db::get_widget_permissions(&conn, "todo-abc").unwrap(), perms);
+    }
+
+    #[test]
+    fn test_reconcile_preserves_existing_extra_scopes() {
+        let conn = test_conn();
+        db::set_widget_permissions(&conn, "todo-abc", &[s("local-api:call")], Some("user"))
+            .unwrap();
+        let required = vec![s("todo:read"), s("todo:write")];
+        sync_missing_widget_permissions(&conn, "todo-abc", &required).unwrap();
+        let perms = db::get_widget_permissions(&conn, "todo-abc").unwrap();
+        assert_eq!(perms.len(), 3);
+        assert!(perms.contains(&s("local-api:call")));
+        assert!(perms.contains(&s("todo:read")));
+        assert!(perms.contains(&s("todo:write")));
+    }
+
+    #[test]
+    fn test_reconcile_does_not_regrant_user_revoked_scope() {
+        let conn = test_conn();
+        let full = vec![s("screen-time:read"), s("todo:read"), s("todo:write")];
+        db::set_widget_permissions(&conn, "todo-abc", &full, Some("widget-create")).unwrap();
+        // User revokes todo:write via the permissions UI.
+        db::set_widget_permissions(
+            &conn,
+            "todo-abc",
+            &[s("screen-time:read"), s("todo:read")],
+            Some("user"),
+        )
+        .unwrap();
+        sync_missing_widget_permissions(&conn, "todo-abc", &full).unwrap();
+        let perms = db::get_widget_permissions(&conn, "todo-abc").unwrap();
+        assert!(perms.contains(&s("screen-time:read")));
+        assert!(perms.contains(&s("todo:read")));
+        assert!(!perms.contains(&s("todo:write")));
+    }
+
+    #[test]
+    fn test_reconcile_regrants_when_latest_audit_action_is_grant() {
+        let conn = test_conn();
+        let required = vec![s("settings:write")];
+        db::set_widget_permissions(&conn, "focus-coach-abc", &required, Some("widget-create"))
+            .unwrap();
+        db::set_widget_permissions(&conn, "focus-coach-abc", &[], Some("user")).unwrap();
+        // User grants it again; latest audit action is now 'grant' even if the
+        // row later disappears (e.g. legacy migration wiped it).
+        db::set_widget_permissions(&conn, "focus-coach-abc", &required, Some("user")).unwrap();
+        conn.execute(
+            "DELETE FROM widget_permissions WHERE widget_id = ?1 AND permission = ?2",
+            rusqlite::params!["focus-coach-abc", "settings:write"],
+        )
+        .unwrap();
+        sync_missing_widget_permissions(&conn, "focus-coach-abc", &required).unwrap();
+        assert!(db::get_widget_permissions(&conn, "focus-coach-abc")
+            .unwrap()
+            .contains(&s("settings:write")));
+    }
+
+    #[test]
+    fn test_required_permissions_skips_non_official_and_unknown_types() {
+        let third_party = WidgetRegistryItem {
+            widget_type: s("custom"),
+            source: s("third-party"),
+            capabilities: vec![s("read_metrics")],
+            ..Default::default()
+        };
+        assert!(required_permissions_for_item(&third_party).is_empty());
+
+        let official = WidgetRegistryItem {
+            widget_type: s("todo"),
+            source: s("official"),
+            capabilities: vec![s("read_metrics"), s("write_data")],
+            ..Default::default()
+        };
+        let perms = required_permissions_for_item(&official);
+        assert_eq!(perms.len(), 4);
+        assert!(perms.contains(&s("screen-time:read")));
+        assert!(perms.contains(&s("todo:read")));
+        assert!(perms.contains(&s("todo:write")));
+        assert!(perms.contains(&s("settings:write")));
+    }
 }

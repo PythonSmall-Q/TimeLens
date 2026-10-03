@@ -188,6 +188,8 @@ export default function Settings() {
     widgetBackgroundFit,
     appBackgroundOverlay,
     widgetBackgroundOverlay,
+    appBackgroundBlur,
+    widgetBackgroundBlur,
     skinPalette,
     setAppBackgroundImage,
     setWidgetBackgroundImage,
@@ -195,6 +197,8 @@ export default function Settings() {
     setWidgetBackgroundFit,
     setAppBackgroundOverlay,
     setWidgetBackgroundOverlay,
+    setAppBackgroundBlur,
+    setWidgetBackgroundBlur,
     setSkinPalette,
     monitoringActive,
     setMonitoringActive,
@@ -244,6 +248,8 @@ export default function Settings() {
       widgetFit: widgetBackgroundFit,
       appOverlay: appBackgroundOverlay,
       widgetOverlay: widgetBackgroundOverlay,
+      appBlur: appBackgroundBlur,
+      widgetBlur: widgetBackgroundBlur,
     });
   };
 
@@ -251,13 +257,16 @@ export default function Settings() {
     kind: "app" | "widget",
     fit: "cover" | "contain" | "stretch",
     overlay: number,
+    blur: number,
   ) => {
     if (kind === "app") {
       setAppBackgroundFit(fit);
       setAppBackgroundOverlay(overlay);
+      setAppBackgroundBlur(blur);
     } else {
       setWidgetBackgroundFit(fit);
       setWidgetBackgroundOverlay(overlay);
+      setWidgetBackgroundBlur(blur);
     }
     void emit("timelens-skin-changed", {
       app: appBackgroundImage,
@@ -266,6 +275,8 @@ export default function Settings() {
       widgetFit: kind === "widget" ? fit : widgetBackgroundFit,
       appOverlay: kind === "app" ? overlay : appBackgroundOverlay,
       widgetOverlay: kind === "widget" ? overlay : widgetBackgroundOverlay,
+      appBlur: kind === "app" ? blur : appBackgroundBlur,
+      widgetBlur: kind === "widget" ? blur : widgetBackgroundBlur,
     });
   };
 
@@ -1047,7 +1058,7 @@ export default function Settings() {
           >{t("skin.checkContrast")}</button>
           <button
             onClick={() => {
-              const diagnostic = { version: 1, theme, appearance: { appBackground: !!appBackgroundImage, widgetBackground: !!widgetBackgroundImage, appFit: appBackgroundFit, widgetFit: widgetBackgroundFit, appOverlay: appBackgroundOverlay, widgetOverlay: widgetBackgroundOverlay, reducedMotion, compactWidgets } };
+              const diagnostic = { version: 1, theme, appearance: { appBackground: !!appBackgroundImage, widgetBackground: !!widgetBackgroundImage, appFit: appBackgroundFit, widgetFit: widgetBackgroundFit, appOverlay: appBackgroundOverlay, widgetOverlay: widgetBackgroundOverlay, appBlur: appBackgroundBlur, widgetBlur: widgetBackgroundBlur, reducedMotion, compactWidgets } };
               const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
               const blob = new Blob([JSON.stringify(diagnostic, null, 2)], { type: "application/json" });
               const url = URL.createObjectURL(blob);
@@ -1101,16 +1112,16 @@ export default function Settings() {
         </SettingsRow>
         <div className="grid gap-3 rounded-xl border border-surface-border bg-surface-hover/30 p-3 sm:grid-cols-2">
           {([
-            ["app", t("skin.appBackground"), appBackgroundFit, appBackgroundOverlay],
-            ["widget", t("skin.widgetBackground"), widgetBackgroundFit, widgetBackgroundOverlay],
-          ] as const).map(([kind, label, fit, overlay]) => (
+            ["app", t("skin.appBackground"), appBackgroundFit, appBackgroundOverlay, appBackgroundBlur],
+            ["widget", t("skin.widgetBackground"), widgetBackgroundFit, widgetBackgroundOverlay, widgetBackgroundBlur],
+          ] as const).map(([kind, label, fit, overlay, blur]) => (
             <div key={kind} className="space-y-2">
               <p className="text-xs font-medium text-text-secondary">{label}</p>
               <label className="flex items-center justify-between gap-2 text-[11px] text-text-muted">
                 <span>{t("skin.fit")}</span>
                 <select
                   value={fit}
-                  onChange={(event) => updateSkinOptions(kind, event.target.value as "cover" | "contain" | "stretch", overlay)}
+                  onChange={(event) => updateSkinOptions(kind, event.target.value as "cover" | "contain" | "stretch", overlay, blur)}
                   className="ui-select text-xs"
                 >
                   <option value="cover">{t("skin.cover")}</option>
@@ -1126,10 +1137,23 @@ export default function Settings() {
                   max={90}
                   step={1}
                   value={overlay}
-                  onChange={(event) => updateSkinOptions(kind, fit, Number(event.target.value))}
+                  onChange={(event) => updateSkinOptions(kind, fit, Number(event.target.value), blur)}
                   className="ui-range max-w-32"
                 />
                 <span className="w-8 text-right">{overlay}%</span>
+              </label>
+              <label className="flex items-center justify-between gap-2 text-[11px] text-text-muted">
+                <span>{t("skin.blur")}</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  step={1}
+                  value={blur}
+                  onChange={(event) => updateSkinOptions(kind, fit, overlay, Number(event.target.value))}
+                  className="ui-range max-w-32"
+                />
+                <span className="w-8 text-right">{blur}%</span>
               </label>
             </div>
           ))}
@@ -1145,7 +1169,7 @@ export default function Settings() {
                 className="h-24 rounded-xl border border-surface-border overflow-hidden bg-surface-card"
                 style={{
                   backgroundImage: image
-                    ? `linear-gradient(rgba(20, 24, 36, ${overlay / 100}), rgba(20, 24, 36, ${overlay / 100})), url("${convertFileSrc(image)}")`
+                    ? `linear-gradient(rgb(var(--app-overlay-rgb) / ${overlay / 100}), rgb(var(--app-overlay-rgb) / ${overlay / 100})), url("${convertFileSrc(image)}")`
                     : undefined,
                   backgroundSize: image ? (fit === "stretch" ? "100% 100%" : fit) : undefined,
                   backgroundPosition: "center",
@@ -1661,6 +1685,10 @@ export default function Settings() {
                         } catch {
                           // ignore
                         }
+                        void emit("timelens-widget-auto-blur-changed", {
+                          widgetId: w.id,
+                          enabled: next,
+                        });
                         setWidgetAutoBlur((prev) => ({ ...prev, [w.id]: next }));
                       }}
                     />

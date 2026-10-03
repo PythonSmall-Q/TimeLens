@@ -4,12 +4,14 @@ All notable changes to TimeLens are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ---
 
-## [2.3.0] - 2026-08-28
+## [2.3.0] - 2026-10-03
 
 ### Added
 
 - **Skin Studio** — added separate local background images for the TimeLens app and widget windows, with live preview, clear/reset actions, `cover` / `contain` / `stretch` fit modes, configurable overlay strength, and per-widget skin overrides.
 - **Built-in skin palettes** — added Default, Ocean, Forest, Sunset, and Monochrome palettes that update surface, text, border, and accent colors across the app and widgets.
+- **Skin blur level** — app and widget backgrounds now have independent 0–100% blur sliders in Settings, applied live across all windows and included in skin diagnostics.
+- **Pet studio improvements** — the desktop pet gains a pack preview strip (idle/focus/rest states), favorite messages (star to save, tapped first), quiet mode (suppresses greeting rotation), scheduled appearance (active hours with overnight range support), and a compact display mode; all preferences persist per-widget through the Widget Gateway.
 - **Widget layout presets** — save, apply, replace, delete, import, and export named widget layouts; built-in Work, Focus, Break, Coding, and Review presets are created automatically.
 - **Backup-compatible layout settings** — layout presets are included in Backup & Restore packages and restored with the backup payload.
 - **Scheduled layout switching** — switch layouts automatically by local time or focus state without relying on a cloud service.
@@ -17,6 +19,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Official experience widgets** — added Skin Preview, Layout Switcher, Widget Health, and Focus Streak widgets.
 - **Widget diagnostics** — added redacted skin snapshot export, contrast checking, reduced-motion support, compact widget mode, and Widget Dev Harness diagnostics with capability simulation, hash inspection, logs, and auto-reload.
 - **Update flow tests** — added coverage for update checking, download confirmation, download progress, install confirmation, and unavailable updater states.
+- **Validation gate coverage** — added layout recovery tests (invalid bounds clamping, monitor-shrink recovery, corrupt preset merging), layout preset round-trip and profile isolation tests, skin persistence contract tests, and accessibility contract tests for motion, compact mode, and root-class theming.
 - **Scoped Local API credentials** — API credentials now have a nickname and independently configured data-access and operation permissions, with revocation and one-time secret reveal/copy behavior.
 - **Local API permission picker** — Settings now provides localized multi-select controls for the Local API's supported read, subscription, and write scopes.
 - **Animation & Motion Control Center** — Added user-selectable motion preset controls (`Full Animations`, `Reduced Motion`, `Disable All Animations`) in Settings.
@@ -28,7 +31,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   - Chart & Data Animations
   - Pulse & Status Effects
 - **Multi-language Support (i18n)** — Added full translation strings for all animation modes and granular toggle items across English (`en`), Simplified Chinese (`zh-CN`), and Traditional Chinese (`zh-TW`).
-
+- **Widget network consent gating** — widget `network_fetch` and `media_load` requests now require class-level consent (`network.general.http`/`https`, `media.image.remote.read`) before any outbound request, replacing the previous unauthenticated proxy behavior.
+- **Per-domain network consent** — the gateway now evaluates each network target against a built-in high-risk domain blocklist (auth, payment, file-hosting, sensitive-upload categories), per-widget domain allow/deny rules, and per-widget per-domain runtime consent (`network:domain:<host>`) with a structured `consent_required` denial so widgets prompt the user before the first request to a new domain.
+- **Remote video opt-in** — media responses with `video/` content type require a separate `media.video.remote.read` consent before the payload is returned, keeping remote video always explicit opt-in per the widget runtime policy.
+- **High-risk consent warnings** — the widget consent prompt now shows an amber warning block for high-risk scopes (detailed sessions, remote video, local API) and an info note for medium-risk scopes, with the risk level persisted alongside each grant/deny decision.
+- **Gateway query expansion** — widgets can now query `interruptions` (sliding-window interruption fragments), `hourly` (hourly usage distribution), and `health` (per-widget runtime health) through the Widget Gateway.
+- **Gateway focus session writes** — widgets can start and stop focus sessions through the new `focus_session_write` gateway capability (`settings:write` scope), with `focus-session-changed` events broadcast to subscribers after each transition.
 
 ### Changed
 
@@ -50,6 +58,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **High-Contrast Segmented Controls & Tab Buttons** — Replaced low-contrast white-on-light selection states with high-contrast `bg-accent-blue/15 text-accent-blue border border-accent-blue/30` styling across Widget Center, Browser Usage, Dashboard Insights, Quick Capture, and Timer widgets.
 - **Unified Hover Micro-Interactions** — Standardized hover states across sidebars, search buttons, settings items, and tab options to use consistent soft blue tinting (`bg-accent-blue/10 text-accent-blue`).
 - **Collapsible Widget Center Layout** — Compacted top "Layout Presets" and "Widget Health Center" cards into collapsible sections (collapsed by default) to maximize space for the main widget list.
+- **Official widget permission alignment** — official widget capabilities now match their actual gateway usage (todo/quick-capture gain write access, browser-activity gains the new `read_browser` capability, focus-coach gains write access, focus-streak gains metric read); a new permission reconciliation pass runs at widget create, open, and app startup restore to self-heal missing permissions on existing widgets while never re-granting scopes the user explicitly revoked.
+- **Remaining widget gateway migration** — Session Pulse (interruptions/hourly), Focus Coach (focus session start/stop), Widget Health (runtime health), and Focus Streak (focus sessions) now go through the Widget Gateway instead of direct Tauri API calls.
 
 ### Fixed
 
@@ -68,11 +78,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Sidebar Hover CSS Specificity** — Removed CSS `!important` overrides that interfered with hover state specificity on navigation items.
 - **Settings Card Background Noise** — Removed dark container card background wrappers around motion controls, making animation options render seamlessly as standard SettingsRows.
 - **Removed Motion Bounce & Translate Y Shifts** — Eliminated unwanted button/card jump, scale, and translateY bouncing on click and setting toggle events.
+- **Broken official widgets** — fixed todo, quick-capture, and browser-activity widgets being denied by the gateway because their install-time permissions did not cover the scopes they actually use; restored widgets self-heal automatically on next open or app launch.
 
 ### Security
 
 - **Managed local resources** — image imports enforce allowed extensions, file signatures, size limits, managed-directory boundaries, and traversal protection.
 - **Gateway request governance** — network, media, local API, and notification requests continue through permission checks, audit logging, timeouts, response limits, and normalized errors.
+- **Revocation termination** — resetting widget permissions now revokes all runtime consent decisions for that widget and emits a `widget-permission-revoked` event (`all: true`) so widgets immediately enter a degraded state; single-scope revocations are also written to the access audit log.
 - **Dependency audit** — `npm audit --audit-level=high` reports zero vulnerabilities for the v2.3.0 dependency tree.
 
 

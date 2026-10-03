@@ -3,7 +3,7 @@ import { convertFileSrc } from "@tauri-apps/api/core";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useTranslation } from "react-i18next";
 import { open } from "@tauri-apps/plugin-dialog";
-import { X, Upload, Sparkles } from "lucide-react";
+import { X, Upload, Sparkles, Settings2, Star } from "lucide-react";
 import * as api from "@/services/tauriApi";
 import { useWidgetErrorReporter } from "@/hooks/useWidgetErrorReporter";
 import { useWidgetClient } from "@/hooks/useWidgetClient";
@@ -18,6 +18,16 @@ import clsx from "clsx";
 interface Props {
   widgetId: string;
 }
+
+interface PetSchedule {
+  enabled: boolean;
+  start: string;
+  end: string;
+}
+
+const DEFAULT_SCHEDULE: PetSchedule = { enabled: false, start: "09:00", end: "18:00" };
+
+const MESSAGE_ROTATE_MS = 15000;
 
 function getStringArray(value: unknown, fallback: string[]): string[] {
   if (Array.isArray(value)) {
@@ -115,6 +125,49 @@ function pickMessage(messages: string[], index: number): string {
   return messages[index % messages.length] ?? messages[0] ?? "";
 }
 
+function parseStoredStringArray(raw: unknown): string[] {
+  if (!raw || typeof raw !== "string") return [];
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
+  } catch {
+    return [];
+  }
+}
+
+function parseStoredSchedule(raw: unknown): PetSchedule | null {
+  if (!raw || typeof raw !== "string") return null;
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    if (typeof parsed.start !== "string" || typeof parsed.end !== "string") return null;
+    return {
+      enabled: parsed.enabled === true,
+      start: parsed.start,
+      end: parsed.end,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function timeToMinutes(value: string): number {
+  const [hours, minutes] = value.split(":").map((part) => Number.parseInt(part, 10));
+  const h = Number.isFinite(hours) ? hours : 0;
+  const m = Number.isFinite(minutes) ? minutes : 0;
+  return h * 60 + m;
+}
+
+function isWithinScheduleWindow(now: Date, start: string, end: string): boolean {
+  const startMin = timeToMinutes(start);
+  const endMin = timeToMinutes(end);
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  if (startMin === endMin) return true;
+  return startMin < endMin
+    ? nowMin >= startMin && nowMin < endMin
+    : nowMin >= startMin || nowMin < endMin;
+}
+
 export default function PetWidget({ widgetId }: Props) {
   const { t } = useTranslation(["widgets", "common"]);
   useWidgetErrorReporter(widgetId);
@@ -157,8 +210,15 @@ export default function PetWidget({ widgetId }: Props) {
   const [monitorStatus, setMonitorStatus] = useState<MonitorStatus | null>(null);
   const [focusActive, setFocusActive] = useState(false);
   const [tapIndex, setTapIndex] = useState(0);
+  const [rotateIndex, setRotateIndex] = useState(0);
+  const [now, setNow] = useState(() => new Date());
   const [importing, setImporting] = useState(false);
   const [importHint, setImportHint] = useState<string | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [favorites, setFavorites] = useState<string[]>([]);
+  const [quiet, setQuiet] = useState(false);
+  const [compact, setCompact] = useState(false);
+  const [schedule, setSchedule] = useState<PetSchedule>(DEFAULT_SCHEDULE);
 
   // Load manifest and persisted pack directory.
   useEffect(() => {
@@ -220,6 +280,7 @@ export default function PetWidget({ widgetId }: Props) {
         .then((r) => setFocusActive(r.active))
         .catch(() => {});
       api.getMonitorStatus().then(setMonitorStatus).catch(() => {});
+      setNow(new Date());
     }, 5000);
 
     return () => {
@@ -229,28 +290,114 @@ export default function PetWidget({ widgetId }: Props) {
     };
   }, [client, widgetId, fallbackManifest]);
 
-  const stateKey: DesktopPetStateKey = focusActive
-    ? "focus"
-    : monitorStatus?.active === false
-      ? "rest"
-      : "idle";
+  // Load persisted pet preferences (favorites, quiet, compact, schedule).
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const [favRaw, quietRaw, compactRaw, scheduleRaw] = await Promise.all([
+          client.getState("pet_favorites"),
+          client.getState("pet_quiet"),
+          client.getState("pet_compact"),
+          client.getState("pet_schedule"),
+        ]);
+        if (!mounted) return;
+        setFavorites(parseStoredStringArray(favRaw));
+        setQuiet(quietRaw === "1");
+        setCompact(compactRaw === "1");
+        const parsedSchedule = parseStoredSchedule(scheduleRaw);
+        if (parsedSchedule) setSchedule(parsedSchedule);
+      } catch {
+        // Keep defaults when preference state is unavailable.
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [client]);
+
+  // Gently rotate the greeting message unless quiet mode is on.
+  useEffect(() => {
+    if (quiet) return;
+    const timer = window.setInterval(() => {
+      setRotateIndex((index) => index + 1);
+    }, MESSAGE_ROTATE_MS);
+    return () => window.clearInterval(timer);
+  }, [quiet]);
+
+  const scheduleAway =
+    schedule.enabled && !isWithinScheduleWindow(now, schedule.start, schedule.end);
+
+  const stateKey: DesktopPetStateKey = scheduleAway
+    ? "rest"
+    : focusActive
+      ? "focus"
+      : monitorStatus?.active === false
+        ? "rest"
+        : "idle";
+
+  // A new state starts from its greeting, not the previous tap position.
+  useEffect(() => {
+    setRotateIndex(0);
+    setTapIndex(0);
+  }, [stateKey]);
+
   const state = manifest.states[stateKey] ?? fallbackManifest.states.idle;
   const accentColor = state.accent_color || "#f59e0b";
 
-  const avatarSrc = useMemo(() => {
-    if (!state.avatar_image || !packDir) return null;
-    const assetPath = `${packDir.replace(/\\/g, "/")}/${state.avatar_image}`;
+  const getAvatarSrc = (petState: DesktopPetPackState): string | null => {
+    if (!petState.avatar_image || !packDir) return null;
+    const assetPath = `${packDir.replace(/\\/g, "/")}/${petState.avatar_image}`;
     return convertFileSrc(assetPath);
-  }, [state.avatar_image, packDir]);
+  };
 
-  const message = useMemo(() => {
+  const avatarSrc = getAvatarSrc(state);
+
+  const tapPool = useMemo(() => {
     const tapMessages = manifest.interactions?.tap_messages?.length
       ? manifest.interactions.tap_messages
-      : fallbackManifest.interactions?.tap_messages ?? [t("pet.fallbackMessage")];
-    return tapIndex === 0
-      ? pickMessage(state.messages, 0)
-      : pickMessage(tapMessages, tapIndex);
-  }, [state, manifest.interactions, fallbackManifest.interactions, tapIndex, t]);
+      : fallbackManifest.interactions?.tap_messages ?? [];
+    return favorites.length > 0 ? [...favorites, ...tapMessages] : tapMessages;
+  }, [favorites, manifest.interactions, fallbackManifest.interactions]);
+
+  const message = useMemo(() => {
+    if (tapIndex > 0) {
+      return pickMessage(tapPool, tapIndex - 1);
+    }
+    if (quiet) {
+      return state.messages[0] ?? "";
+    }
+    return pickMessage(state.messages, rotateIndex);
+  }, [tapIndex, tapPool, quiet, state.messages, rotateIndex]);
+
+  const isFavorite = message.length > 0 && favorites.includes(message);
+
+  const persistQuiet = (next: boolean) => {
+    setQuiet(next);
+    const op = next ? client.setState("pet_quiet", "1") : client.deleteState("pet_quiet");
+    op.catch(() => {});
+  };
+
+  const persistCompact = (next: boolean) => {
+    setCompact(next);
+    const op = next ? client.setState("pet_compact", "1") : client.deleteState("pet_compact");
+    op.catch(() => {});
+  };
+
+  const updateSchedule = (patch: Partial<PetSchedule>) => {
+    const next = { ...schedule, ...patch };
+    setSchedule(next);
+    client.setState("pet_schedule", JSON.stringify(next)).catch(() => {});
+  };
+
+  const toggleFavorite = () => {
+    if (!message) return;
+    const next = favorites.includes(message)
+      ? favorites.filter((item) => item !== message)
+      : [...favorites, message];
+    setFavorites(next);
+    client.setState("pet_favorites", JSON.stringify(next)).catch(() => {});
+  };
 
   const handleImport = async () => {
     if (importing) return;
@@ -273,11 +420,92 @@ export default function PetWidget({ widgetId }: Props) {
     }
   };
 
+  const previewStates: DesktopPetStateKey[] = ["idle", "focus", "rest"];
+
   return (
-    <div className="w-full h-full glass-card flex flex-col p-4 select-none overflow-hidden">
+    <div
+      className={clsx(
+        "w-full h-full glass-card flex flex-col p-4 select-none overflow-hidden",
+        compact && "pet-compact"
+      )}
+    >
       <div data-tauri-drag-region className="flex items-center justify-between mb-2">
         <span className="text-text-muted text-xs">{manifest.character_name}</span>
         <div className="flex items-center gap-2">
+          <div className="relative">
+            <button
+              onClick={() => setSettingsOpen((open) => !open)}
+              className="text-text-muted hover:text-text-secondary transition-colors"
+              title={t("pet.settings")}
+              aria-label={t("pet.settings")}
+              aria-expanded={settingsOpen}
+            >
+              <Settings2 size={13} />
+            </button>
+            {settingsOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setSettingsOpen(false)}
+                  aria-hidden="true"
+                />
+                <div className="absolute right-0 top-5 z-50 w-64 rounded-xl border border-surface-border bg-surface/95 backdrop-blur p-3 shadow-xl flex flex-col gap-2.5">
+                  <label className="flex items-center gap-2 text-xs text-text-primary cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="ui-checkbox flex-shrink-0"
+                      checked={quiet}
+                      onChange={(event) => persistQuiet(event.target.checked)}
+                      aria-label={t("pet.quietMode")}
+                    />
+                    <span className="flex-1">{t("pet.quietMode")}</span>
+                  </label>
+                  <p className="text-[10px] text-text-muted -mt-1 pl-6">{t("pet.quietModeHint")}</p>
+                  <label className="flex items-center gap-2 text-xs text-text-primary cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="ui-checkbox flex-shrink-0"
+                      checked={compact}
+                      onChange={(event) => persistCompact(event.target.checked)}
+                      aria-label={t("pet.compactMode")}
+                    />
+                    <span className="flex-1">{t("pet.compactMode")}</span>
+                  </label>
+                  <div className="border-t border-surface-border pt-2 flex flex-col gap-2">
+                    <label className="flex items-center gap-2 text-xs text-text-primary cursor-pointer">
+                      <input
+                        type="checkbox"
+                        className="ui-checkbox flex-shrink-0"
+                        checked={schedule.enabled}
+                        onChange={(event) => updateSchedule({ enabled: event.target.checked })}
+                        aria-label={t("pet.schedule")}
+                      />
+                      <span className="flex-1">{t("pet.schedule")}</span>
+                    </label>
+                    <div className="flex items-center gap-1.5 pl-6">
+                      <input
+                        type="time"
+                        value={schedule.start}
+                        onChange={(event) => updateSchedule({ start: event.target.value })}
+                        disabled={!schedule.enabled}
+                        className="ui-field flex-1 text-xs"
+                        aria-label={t("pet.scheduleStart")}
+                      />
+                      <span className="text-text-muted text-xs">–</span>
+                      <input
+                        type="time"
+                        value={schedule.end}
+                        onChange={(event) => updateSchedule({ end: event.target.value })}
+                        disabled={!schedule.enabled}
+                        className="ui-field flex-1 text-xs"
+                        aria-label={t("pet.scheduleEnd")}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
           <button
             onClick={() => void handleImport()}
             disabled={importing}
@@ -309,43 +537,106 @@ export default function PetWidget({ widgetId }: Props) {
         </div>
       )}
 
-      <button
-        onClick={() => setTapIndex((i) => i + 1)}
-        className="flex-1 min-h-0 flex flex-col items-center justify-center gap-3 focus:outline-none"
-      >
-        <div
-          className={clsx(
-            "relative rounded-3xl flex items-center justify-center border-2 border-white/10 shadow-lg animate-float",
-            "w-28 h-28 text-5xl"
-          )}
-          style={{ backgroundColor: `${accentColor}22`, borderColor: `${accentColor}33` }}
-        >
-          {avatarSrc ? (
-            <img
-              src={avatarSrc}
-              alt={manifest.character_name}
-              className="w-full h-full object-contain p-2"
-            />
-          ) : (
-            <span aria-hidden="true">{state.avatar_emoji || manifest.default_avatar_emoji}</span>
-          )}
-          <span
-            className="absolute -top-1 -right-1 px-2 py-0.5 rounded-full text-[10px] text-white/95 shadow"
-            style={{ backgroundColor: accentColor }}
-          >
-            {state.label}
+      {!compact && (
+        <div className="mb-2 flex items-center justify-center gap-1.5 flex-wrap">
+          <span className="text-[10px] uppercase tracking-wide text-text-muted">
+            {t("pet.preview")}
           </span>
+          {previewStates.map((key) => {
+            const previewState = manifest.states[key] ?? fallbackManifest.states[key];
+            const src = getAvatarSrc(previewState);
+            return (
+              <div
+                key={key}
+                title={`${t("pet.preview")}: ${previewState.label}`}
+                className="flex items-center gap-1 rounded-full border border-surface-border bg-surface-hover/40 pl-1 pr-2 py-0.5"
+              >
+                <span className="w-4 h-4 flex items-center justify-center text-xs">
+                  {src ? (
+                    <img src={src} alt="" className="w-4 h-4 object-contain" />
+                  ) : (
+                    <span aria-hidden="true">
+                      {previewState.avatar_emoji || manifest.default_avatar_emoji}
+                    </span>
+                  )}
+                </span>
+                <span className="text-[10px] text-text-secondary">{previewState.label}</span>
+              </div>
+            );
+          })}
         </div>
+      )}
 
-        <div className="w-full rounded-2xl border border-surface-border bg-surface-hover/50 px-4 py-3">
-          <div className="text-sm leading-relaxed text-text-primary text-center">{message}</div>
-        </div>
+      <div className="flex-1 min-h-0 w-full flex flex-col items-center justify-center gap-3">
+        <button
+          onClick={() => setTapIndex((i) => i + 1)}
+          className="flex flex-col items-center gap-3 focus:outline-none"
+        >
+          <div
+            className={clsx(
+              "relative rounded-3xl flex items-center justify-center border-2 border-white/10 shadow-lg animate-float",
+              compact ? "w-12 h-12 text-2xl" : "w-28 h-28 text-5xl"
+            )}
+            style={{ backgroundColor: `${accentColor}22`, borderColor: `${accentColor}33` }}
+          >
+            {avatarSrc ? (
+              <img
+                src={avatarSrc}
+                alt={manifest.character_name}
+                className="w-full h-full object-contain p-2"
+              />
+            ) : (
+              <span aria-hidden="true">{state.avatar_emoji || manifest.default_avatar_emoji}</span>
+            )}
+            <span
+              className="absolute -top-1 -right-1 px-2 py-0.5 rounded-full text-[10px] text-white/95 shadow"
+              style={{ backgroundColor: accentColor }}
+            >
+              {state.label}
+            </span>
+          </div>
+        </button>
 
-        <div className="flex items-center gap-1.5 text-[11px] text-text-muted">
-          <Sparkles size={11} style={{ color: accentColor }} />
-          <span>{t("pet.tapHint")}</span>
-        </div>
-      </button>
+        {!scheduleAway && (
+          <div className="relative w-full">
+            <button
+              onClick={() => setTapIndex((i) => i + 1)}
+              className={clsx(
+                "w-full rounded-2xl border border-surface-border bg-surface-hover/50 text-left",
+                compact ? "px-3 py-1.5" : "px-4 py-3"
+              )}
+            >
+              <div
+                className={clsx(
+                  "text-sm text-text-primary",
+                  compact ? "truncate leading-snug" : "leading-relaxed text-center"
+                )}
+              >
+                {message}
+              </div>
+            </button>
+            <button
+              onClick={toggleFavorite}
+              title={t("pet.favorite")}
+              aria-label={t("pet.favorite")}
+              className="absolute -top-1.5 -right-1.5 p-1 rounded-full bg-surface border border-surface-border shadow-sm transition-colors"
+            >
+              <Star
+                size={11}
+                className={isFavorite ? "text-amber-400" : "text-text-muted"}
+                fill={isFavorite ? "currentColor" : "none"}
+              />
+            </button>
+          </div>
+        )}
+
+        {!scheduleAway && (
+          <div className="flex items-center gap-1.5 text-[11px] text-text-muted">
+            <Sparkles size={11} style={{ color: accentColor }} />
+            <span>{t("pet.tapHint")}</span>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

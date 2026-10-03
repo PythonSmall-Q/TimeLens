@@ -43,11 +43,35 @@ export function saveWidgetPresets(presets: WidgetLayoutPreset[], storage: Pick<S
   storage.setItem(widgetPresetsStorageKey(getCurrentProfileId(storage)), JSON.stringify(presets));
 }
 
-export function applyWidgetPreset(current: WidgetConfig[], preset: WidgetLayoutPreset): WidgetConfig[] {
+export const MIN_WIDGET_WIDTH = 120;
+export const MIN_WIDGET_HEIGHT = 80;
+
+export interface WidgetViewport {
+  width: number;
+  height: number;
+}
+
+export function sanitizeWidgetConfigForViewport(config: WidgetConfig, viewport: WidgetViewport): WidgetConfig {
+  const width = Number.isFinite(config.width) && config.width > 0
+    ? Math.max(MIN_WIDGET_WIDTH, config.width)
+    : MIN_WIDGET_WIDTH;
+  const height = Number.isFinite(config.height) && config.height > 0
+    ? Math.max(MIN_WIDGET_HEIGHT, config.height)
+    : MIN_WIDGET_HEIGHT;
+  const maxX = Math.max(0, viewport.width - width);
+  const maxY = Math.max(0, viewport.height - height);
+  const x = Number.isFinite(config.x) ? Math.min(Math.max(0, config.x), maxX) : 0;
+  const y = Number.isFinite(config.y) ? Math.min(Math.max(0, config.y), maxY) : 0;
+  return { ...config, x, y, width, height };
+}
+
+export function applyWidgetPreset(current: WidgetConfig[], preset: WidgetLayoutPreset, viewport?: WidgetViewport): WidgetConfig[] {
   const byId = new Map(preset.widgets.map((widget) => [widget.id, widget]));
   return current.map((widget) => {
     const saved = byId.get(widget.id);
-    return saved ? { ...widget, ...saved } : widget;
+    if (!saved) return widget;
+    const merged = { ...widget, ...saved };
+    return viewport ? sanitizeWidgetConfigForViewport(merged, viewport) : merged;
   });
 }
 

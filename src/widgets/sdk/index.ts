@@ -111,10 +111,19 @@ export class WidgetClient {
   private consentRetrying = false;
 
   private consentRiskLevel(scope: string): "low" | "medium" | "high" {
-    if (scope === "sessions" || scope === "network_fetch" || scope === "media_load" || scope === "local_api_call") {
+    if (scope === "media.video.remote.read" || scope === "sessions" || scope === "local_api_call") {
       return "high";
     }
-    if (scope === "browser" || scope === "projects" || scope === "rules" || scope === "notification_send") {
+    if (
+      scope.startsWith("network:domain:")
+      || scope === "media.image.remote.read"
+      || scope === "network.general.http"
+      || scope === "network.general.https"
+      || scope === "browser"
+      || scope === "projects"
+      || scope === "rules"
+      || scope === "notification_send"
+    ) {
       return "medium";
     }
     return "low";
@@ -131,9 +140,10 @@ export class WidgetClient {
     ) {
       this.consentRetrying = true;
       try {
+        const consentScope = response.error.scope ?? request.scope;
         const granted = await this.options.onConsentRequired(
-          request.scope,
-          this.consentRiskLevel(request.scope),
+          consentScope,
+          this.consentRiskLevel(consentScope),
           response.error.message,
         );
         if (granted) {
@@ -222,6 +232,25 @@ export class WidgetClient {
     );
     if (response.status !== "success") {
       throw new WidgetGatewayError(response.error ?? { code: "unknown", message: "setFocusModeActive failed" });
+    }
+  }
+
+  async startFocusSession(options?: { trigger_type?: string; reason?: string }): Promise<number> {
+    const response = await this.gatewayRequest(
+      this.makeRequest("focus_session_write", "settings:write", { action: "start", ...options }),
+    );
+    if (response.status === "success") {
+      return response.payload as number;
+    }
+    throw new WidgetGatewayError(response.error ?? { code: "unknown", message: "startFocusSession failed" });
+  }
+
+  async stopFocusSession(id: number): Promise<void> {
+    const response = await this.gatewayRequest(
+      this.makeRequest("focus_session_write", "settings:write", { action: "stop", id }),
+    );
+    if (response.status !== "success") {
+      throw new WidgetGatewayError(response.error ?? { code: "unknown", message: "stopFocusSession failed" });
     }
   }
 

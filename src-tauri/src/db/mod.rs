@@ -524,6 +524,72 @@ pub fn get_hourly_distribution(conn: &Connection, date: &str) -> Result<Vec<(i32
         .collect())
 }
 
+/// Sliding window: 5 min window with ≥ 4 switches → fragment.
+/// Returns per-hour fragment info for the given date.
+pub fn get_interruption_periods(
+    conn: &Connection,
+    date: &str,
+) -> Result<Vec<crate::models::InterruptionPeriod>> {
+    // Fetch all app_usage segments for the date, ordered by start time
+    let mut stmt =
+        conn.prepare("SELECT first_seen_at FROM app_usage WHERE date = ?1 ORDER BY first_seen_at")?;
+
+    let timestamps: Vec<String> = stmt
+        .query_map(params![date], |row| row.get::<_, String>(0))?
+        .collect::<Result<_>>()?;
+
+    // Parse to seconds-since-midnight for easier arithmetic
+    fn parse_secs(ts: &str) -> Option<i64> {
+        // Format: "2024-01-01T14:30:00" or "2024-01-01 14:30:00"
+        let time_part = ts.get(11..19)?;
+        let mut parts = time_part.splitn(3, ':');
+        let h: i64 = parts.next()?.parse().ok()?;
+        let m: i64 = parts.next()?.parse().ok()?;
+        let s: i64 = parts.next()?.parse().ok()?;
+        Some(h * 3600 + m * 60 + s)
+    }
+
+    let secs: Vec<i64> = timestamps.iter().filter_map(|ts| parse_secs(ts)).collect();
+
+    // Per-hour switch counts
+    let mut hour_switches: [u32; 24] = [0; 24];
+    for &s in &secs {
+        let h = (s / 3600).clamp(0, 23) as usize;
+        hour_switches[h] += 1;
+    }
+
+    // Sliding window 5 min = 300 s, count switches where ≥ 4 occur in window
+    let mut hour_fragment_counts: [u32; 24] = [0; 24];
+    for i in 0..secs.len() {
+        let window_end = secs[i] + 300;
+        let window_count = secs[i..].iter().take_while(|&&t| t <= window_end).count();
+        if window_count >= 4 {
+            let h = (secs[i] / 3600).clamp(0, 23) as usize;
+            hour_fragment_counts[h] += 1;
+        }
+    }
+
+    let mut result = Vec::new();
+    for h in 0..24usize {
+        if hour_switches[h] == 0 {
+            continue;
+        }
+        // fragment_score: ratio of fragment windows to total switches in hour
+        let fragment_score = if hour_switches[h] > 0 {
+            (hour_fragment_counts[h] as f32 / hour_switches[h] as f32).min(1.0)
+        } else {
+            0.0
+        };
+        result.push(crate::models::InterruptionPeriod {
+            hour: h as u8,
+            switch_count: hour_switches[h],
+            fragment_score,
+        });
+    }
+
+    Ok(result)
+}
+
 /// Get total seconds for each of the past N days.
 pub fn get_daily_totals(conn: &Connection, since_date: &str) -> Result<Vec<(String, i64)>> {
     let ignore_system = get_bool_setting(conn, "ignore_system_processes", false)? as i32;

@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { X, Activity } from "lucide-react";
-import * as api from "@/services/tauriApi";
 import type { FocusSession, HourlyDistribution, InterruptionPeriod } from "@/types";
 import { todayString } from "@/utils/format";
 import { useWidgetClient } from "@/hooks/useWidgetClient";
@@ -25,8 +24,8 @@ export default function SessionPulseWidget({ widgetId }: Props) {
       try {
         const [s, h, i] = await Promise.all([
           client.query<FocusSession[]>("sessions", { start_at: `${today}T00:00:00`, end_at: `${today}T23:59:59` }),
-          api.getTodayHourly(),
-          api.getInterruptionPeriods(today),
+          client.query<HourlyDistribution[]>("hourly", { date: today }),
+          client.query<InterruptionPeriod[]>("interruptions", { date: today }),
         ]);
         setSessions(s);
         setHourly(h);

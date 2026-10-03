@@ -35,6 +35,9 @@
     "light": "Claro",
     "system": "Sistema"
   },
+  "skin": {
+    "blur": "Blur"
+  },
   "trayIconStyle": {
     "label": "Estilo del icono de bandeja",
     "auto": "Auto",

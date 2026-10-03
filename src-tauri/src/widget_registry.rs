@@ -224,6 +224,7 @@ pub fn expand_capability_to_permissions(capability: &str) -> Vec<&'static str> {
     match capability {
         "read_metrics" => vec!["screen-time:read", "todo:read"],
         "write_data" => vec!["todo:write", "settings:write"],
+        "read_browser" => vec!["browser:read"],
         "automation_trigger" => vec!["active-window:subscribe"],
         "local_api_call" => vec!["local-api:call"],
         _ => vec![],
@@ -356,7 +357,7 @@ fn official_widgets() -> Vec<WidgetRegistryItem> {
             default_height: 420.0,
             permissions: Vec::new(),
             manifest_version: "v2".to_string(),
-            capabilities: vec!["read_metrics".to_string()],
+            capabilities: vec!["read_metrics".to_string(), "write_data".to_string()],
             sdk_version: None,
             csp: None,
             ..Default::default()
@@ -436,7 +437,7 @@ fn official_widgets() -> Vec<WidgetRegistryItem> {
             default_height: 320.0,
             permissions: Vec::new(),
             manifest_version: "v2".to_string(),
-            capabilities: vec!["read_metrics".to_string()],
+            capabilities: vec!["read_metrics".to_string(), "write_data".to_string()],
             sdk_version: None,
             csp: None,
             ..Default::default()
@@ -452,7 +453,7 @@ fn official_widgets() -> Vec<WidgetRegistryItem> {
             default_height: 220.0,
             permissions: Vec::new(),
             manifest_version: "v2".to_string(),
-            capabilities: Vec::new(),
+            capabilities: vec!["write_data".to_string()],
             sdk_version: None,
             csp: None,
             ..Default::default()
@@ -500,7 +501,7 @@ fn official_widgets() -> Vec<WidgetRegistryItem> {
             default_height: 340.0,
             permissions: Vec::new(),
             manifest_version: "v2".to_string(),
-            capabilities: Vec::new(),
+            capabilities: vec!["read_browser".to_string()],
             sdk_version: None,
             csp: None,
             ..Default::default()
@@ -508,7 +509,7 @@ fn official_widgets() -> Vec<WidgetRegistryItem> {
         WidgetRegistryItem { widget_type: "skin-preview".to_string(), display_name: "Skin Preview".to_string(), source: "official".to_string(), description: Some("Built-in skin preview widget".to_string()), icon: Some("skin-preview".to_string()), default_width: 320.0, default_height: 240.0, manifest_version: "v2".to_string(), ..Default::default() },
         WidgetRegistryItem { widget_type: "layout-switcher".to_string(), display_name: "Layout Switcher".to_string(), source: "official".to_string(), description: Some("Built-in layout preset widget".to_string()), icon: Some("layout-switcher".to_string()), default_width: 320.0, default_height: 300.0, manifest_version: "v2".to_string(), ..Default::default() },
         WidgetRegistryItem { widget_type: "widget-health".to_string(), display_name: "Widget Health".to_string(), source: "official".to_string(), description: Some("Built-in widget health widget".to_string()), icon: Some("widget-health".to_string()), default_width: 320.0, default_height: 260.0, manifest_version: "v2".to_string(), ..Default::default() },
-        WidgetRegistryItem { widget_type: "focus-streak".to_string(), display_name: "Focus Streak".to_string(), source: "official".to_string(), description: Some("Built-in focus streak widget".to_string()), icon: Some("focus-streak".to_string()), default_width: 280.0, default_height: 220.0, manifest_version: "v2".to_string(), ..Default::default() },
+        WidgetRegistryItem { widget_type: "focus-streak".to_string(), display_name: "Focus Streak".to_string(), source: "official".to_string(), description: Some("Built-in focus streak widget".to_string()), icon: Some("focus-streak".to_string()), default_width: 280.0, default_height: 220.0, manifest_version: "v2".to_string(), capabilities: vec!["read_metrics".to_string()], ..Default::default() },
     ]
 }
 
@@ -840,6 +841,14 @@ mod tests {
         assert!(v2.permissions.contains(&"screen-time:read".to_string()));
         assert!(!v2.permissions.contains(&"todo:read".to_string()));
         assert!(v2.permissions.contains(&"local-api:call".to_string()));
+    }
+
+    #[test]
+    fn test_expand_read_browser_capability() {
+        assert_eq!(
+            expand_capability_to_permissions("read_browser"),
+            vec!["browser:read"]
+        );
     }
 
     #[test]

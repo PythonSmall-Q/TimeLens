@@ -5,7 +5,9 @@ use tauri::State;
 
 use crate::commands::storage_cmd::DbState;
 use crate::db;
-use crate::models::{CategoryComparison, DistractionHotspot, GoalRiskAlert, ProjectComparison};
+use crate::models::{
+    CategoryComparison, DistractionHotspot, GoalRiskAlert, InterruptionPeriod, ProjectComparison,
+};
 
 // ── Types ─────────────────────────────────────────────────────
 
@@ -16,13 +18,6 @@ pub struct ProductivityScore {
     pub focus_seconds: i64,
     pub switch_count: i64,
     pub score: u8,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct InterruptionPeriod {
-    pub hour: u8,
-    pub switch_count: u32,
-    pub fragment_score: f32,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -191,68 +186,7 @@ pub fn get_interruption_periods(
     db: State<'_, DbState>,
 ) -> Result<Vec<InterruptionPeriod>, String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
-
-    // Fetch all app_usage segments for the date, ordered by start time
-    let mut stmt = conn
-        .prepare("SELECT first_seen_at FROM app_usage WHERE date = ?1 ORDER BY first_seen_at")
-        .map_err(|e| e.to_string())?;
-
-    let timestamps: Vec<String> = stmt
-        .query_map(params![date], |row| row.get::<_, String>(0))
-        .map_err(|e| e.to_string())?
-        .collect::<Result<_, _>>()
-        .map_err(|e: rusqlite::Error| e.to_string())?;
-
-    // Parse to seconds-since-midnight for easier arithmetic
-    fn parse_secs(ts: &str) -> Option<i64> {
-        // Format: "2024-01-01T14:30:00" or "2024-01-01 14:30:00"
-        let time_part = ts.get(11..19)?;
-        let mut parts = time_part.splitn(3, ':');
-        let h: i64 = parts.next()?.parse().ok()?;
-        let m: i64 = parts.next()?.parse().ok()?;
-        let s: i64 = parts.next()?.parse().ok()?;
-        Some(h * 3600 + m * 60 + s)
-    }
-
-    let secs: Vec<i64> = timestamps.iter().filter_map(|ts| parse_secs(ts)).collect();
-
-    // Per-hour switch counts
-    let mut hour_switches: [u32; 24] = [0; 24];
-    for &s in &secs {
-        let h = (s / 3600).clamp(0, 23) as usize;
-        hour_switches[h] += 1;
-    }
-
-    // Sliding window 5 min = 300 s, count switches where ≥ 4 occur in window
-    let mut hour_fragment_counts: [u32; 24] = [0; 24];
-    for i in 0..secs.len() {
-        let window_end = secs[i] + 300;
-        let window_count = secs[i..].iter().take_while(|&&t| t <= window_end).count();
-        if window_count >= 4 {
-            let h = (secs[i] / 3600).clamp(0, 23) as usize;
-            hour_fragment_counts[h] += 1;
-        }
-    }
-
-    let mut result = Vec::new();
-    for h in 0..24usize {
-        if hour_switches[h] == 0 {
-            continue;
-        }
-        // fragment_score: ratio of fragment windows to total switches in hour
-        let fragment_score = if hour_switches[h] > 0 {
-            (hour_fragment_counts[h] as f32 / hour_switches[h] as f32).min(1.0)
-        } else {
-            0.0
-        };
-        result.push(InterruptionPeriod {
-            hour: h as u8,
-            switch_count: hour_switches[h],
-            fragment_score,
-        });
-    }
-
-    Ok(result)
+    db::get_interruption_periods(&conn, &date).map_err(|e| e.to_string())
 }
 
 #[tauri::command]

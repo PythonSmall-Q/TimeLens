@@ -40,6 +40,8 @@ interface SettingsState {
   widgetBackgroundFit: "cover" | "contain" | "stretch";
   appBackgroundOverlay: number;
   widgetBackgroundOverlay: number;
+  appBackgroundBlur: number;
+  widgetBackgroundBlur: number;
   skinPalette: SkinPaletteId;
   updateMode: "off" | "notify" | "auto";
   monitoringActive: boolean;
@@ -67,6 +69,8 @@ interface SettingsState {
   setWidgetBackgroundFit: (fit: "cover" | "contain" | "stretch") => void;
   setAppBackgroundOverlay: (value: number) => void;
   setWidgetBackgroundOverlay: (value: number) => void;
+  setAppBackgroundBlur: (value: number) => void;
+  setWidgetBackgroundBlur: (value: number) => void;
   setSkinPalette: (palette: SkinPaletteId) => void;
   setUpdateMode: (mode: "off" | "notify" | "auto") => void;
   setMonitoringActive: (active: boolean) => Promise<void>;
@@ -99,6 +103,8 @@ export const useSettingsStore = create<SettingsState>()(
       widgetBackgroundFit: "cover",
       appBackgroundOverlay: 62,
       widgetBackgroundOverlay: 62,
+      appBackgroundBlur: 0,
+      widgetBackgroundBlur: 0,
       skinPalette: "default",
       updateMode: "notify",
       monitoringActive: true,
@@ -145,6 +151,10 @@ export const useSettingsStore = create<SettingsState>()(
       setAppBackgroundOverlay: (value) => set({ appBackgroundOverlay: Math.max(0, Math.min(90, value)) }),
 
       setWidgetBackgroundOverlay: (value) => set({ widgetBackgroundOverlay: Math.max(0, Math.min(90, value)) }),
+
+      setAppBackgroundBlur: (value) => set({ appBackgroundBlur: Math.max(0, Math.min(100, value)) }),
+
+      setWidgetBackgroundBlur: (value) => set({ widgetBackgroundBlur: Math.max(0, Math.min(100, value)) }),
 
       setSkinPalette: (skinPalette) => set({ skinPalette }),
 

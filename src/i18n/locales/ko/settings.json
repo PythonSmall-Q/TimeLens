@@ -35,6 +35,9 @@
     "light": "라이트",
     "system": "시스템"
   },
+  "skin": {
+    "blur": "Blur"
+  },
   "trayIconStyle": {
     "label": "트레이 아이콘 스타일",
     "auto": "자동",

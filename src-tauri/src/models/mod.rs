@@ -43,6 +43,13 @@ pub struct HourlyDistribution {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct InterruptionPeriod {
+    pub hour: u8,
+    pub switch_count: u32,
+    pub fragment_score: f32,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct DailyUsage {
     pub date: String,
     pub total_seconds: i64,
@@ -505,6 +512,7 @@ pub enum WidgetGatewayRequestType {
     NotificationSend,
     FocusModeWrite,
     TodoWrite,
+    FocusSessionWrite,
     RuntimeInfo,
 }
 

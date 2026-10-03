@@ -10,8 +10,6 @@ describe("SessionPulseWidget", () => {
 
   it("renders title and empty state", async () => {
     mockTauriApi.widgetGatewayRequest.mockResolvedValue(successResponse([]));
-    mockTauriApi.getTodayHourly.mockResolvedValue([]);
-    mockTauriApi.getInterruptionPeriods.mockResolvedValue([]);
     renderWithProviders(<SessionPulseWidget widgetId="pulse-test" />);
 
     expect(screen.getByText("Session Pulse")).toBeInTheDocument();
@@ -22,8 +20,17 @@ describe("SessionPulseWidget", () => {
 
   it("displays focus time and interruptions", async () => {
     const today = new Date().toISOString().slice(0, 10);
-    mockTauriApi.widgetGatewayRequest.mockResolvedValue(
-      successResponse([
+    mockTauriApi.widgetGatewayRequest.mockImplementation(async (request: { scope?: string }) => {
+      if (request.scope === "hourly") {
+        return successResponse([
+          { hour: 9, seconds: 1800 },
+          { hour: 10, seconds: 0 },
+        ]);
+      }
+      if (request.scope === "interruptions") {
+        return successResponse([{ hour: 9, switch_count: 2, fragment_score: 0.5 }]);
+      }
+      return successResponse([
         {
           id: 1,
           started_at: `${today}T09:00:00`,
@@ -31,13 +38,8 @@ describe("SessionPulseWidget", () => {
           trigger_type: "manual",
           reason: "focus",
         },
-      ])
-    );
-    mockTauriApi.getTodayHourly.mockResolvedValue([
-      { hour: 9, seconds: 1800 },
-      { hour: 10, seconds: 0 },
-    ]);
-    mockTauriApi.getInterruptionPeriods.mockResolvedValue([{ start_hour: 9, switch_count: 2 }]);
+      ]);
+    });
     renderWithProviders(<SessionPulseWidget widgetId="pulse-test" />);
 
     await waitFor(() => {

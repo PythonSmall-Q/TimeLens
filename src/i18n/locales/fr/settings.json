@@ -35,6 +35,9 @@
     "light": "Clair",
     "system": "Système"
   },
+  "skin": {
+    "blur": "Blur"
+  },
   "trayIconStyle": {
     "label": "Style d'icône de barre",
     "auto": "Auto",

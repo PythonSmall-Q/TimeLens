@@ -553,7 +553,7 @@ Deliverables:
 - Migrated first-party widgets.
 - External widget beta path.
 
-### Phase D: Media and Sensitive Access Hardening
+### Phase D: Media and Sensitive Access Hardening ✅ Completed
 
 Deliverables:
 
@@ -673,6 +673,7 @@ After this plan is reviewed, the next artifact should be a narrow RFC that freez
 - **Phase A — 契约与 Schema 冻结**：已完成。
 - **Phase B — Kernel 与 Gateway Core**：已完成。
 - **Phase C — JS/TS Runtime 迁移**：已完成（SDK、ExternalWidgetHost、运行时同意提示、全部适用 Gateway 的官方组件迁移、SDK 测试均已落地）。
+- **Phase D — 媒体与敏感访问加固**：已完成（网络/媒体类级同意、内置高风险域名封锁、按域名运行时同意、远程视频单独 opt-in、高风险同意警告 UI、撤权终止与审计）。
 
 ### 关键交付物
 
@@ -699,14 +700,22 @@ After this plan is reviewed, the next artifact should be a narrow RFC that freez
 | SDK 测试 | `src/widgets/sdk/__tests__/WidgetClient.test.ts` | mock gateway 覆盖 query/state/subscribe/consent retry |
 | 官方组件全量测试 | `src/widgets/__tests__/*.test.tsx` | 覆盖 Clock/Todo/Note/Status/GoalProgress/SessionPulse/FocusCoach/Pet/QuickCapture/Timer/BrowserActivity |
 | 权限治理 UX | `src/pages/WidgetCenter/index.tsx` | 权限矩阵支持单个权限撤销，保留「撤销全部」入口 |
+| Phase D 网络防火墙 | `src-tauri/src/widget_gateway/policy_firewall.rs` | 内置高风险域名分类封锁（auth/payment/file-hosting/sensitive-upload）、域名规则匹配（精确/子域，deny 优先） |
+| Phase D 类级同意 | `src-tauri/src/widget_gateway/capability_resolver.rs` | `network_fetch` → `network.general.http/https`（按 URL scheme），`media_load` → `media.image.remote.read` |
+| Phase D 域名同意网关 | `src-tauri/src/widget_gateway/mod.rs` | `evaluate_network_target` 门控：封锁列表/拒绝规则硬拒绝 → 按域名同意（`network:domain:<host>`，consent_required）→ 放行；`DispatchFailure` 结构化拒绝路径；远程视频需 `media.video.remote.read` 二次 opt-in |
+| Phase D 撤权终止 | `src-tauri/src/commands/widget_runtime_cmd.rs`、`src-tauri/src/widget_kernel/mod.rs` | 重置权限后发 `widget-permission-revoked`（all: true）；撤权写入审计；重置时撤销全部运行时同意决定 |
+| Phase D 同意 UX | `src/widgets/sdk/index.ts`、`src/widgets/ExternalWidgetHost.tsx`、`src/components/WidgetConsentPrompt.tsx` | SDK 透传 `error.scope`；风险分级（high/medium/low）；高风险琥珀警告块 + 中风险提示；riskLevel 随 grant/deny 落库 |
+| Phase D i18n | `src/i18n/locales/*/widgets.json` | `consentPrompt.riskHigh` / `consentPrompt.riskMedium` 8 语言 |
+| Phase D 测试 | `src-tauri/src/widget_gateway/mod.rs`（9 个新 Rust 测试）、`WidgetClient.test.ts`（+2） | 覆盖 scope 映射、封锁分类、域名规则、类级/域名级同意拒绝、视频同意、错误 scope 透传 |
 
 ### 验证结果
 
 - `npm run typecheck` ✅
-- `npm run lint` ✅（0 errors，8 pre-existing warnings）
-- `npm run test` ✅（56/56，含 11 个 WidgetClient 测试 + 34 个官方组件测试）
+- `npm run lint` ✅（0 errors）
+- `npm run test` ✅（74/74，含 21 个 WidgetClient 测试）
 - `cargo check` ✅
-- `cargo test` ✅（38/38）
+- `cargo test` ✅（59/59）
+- 环境备注：本机 Windows 更新后 comctl32 v5 缺失 `TaskDialogIndirect`，test 二进制需嵌入 Common Controls v6 manifest 才能启动（pre-existing 问题，与代码无关）。
 
 ### 当前限制
 
@@ -714,16 +723,18 @@ After this plan is reviewed, the next artifact should be a narrow RFC that freez
 - 旧 widget 的 `widget_permissions` 被 Gateway 视为已授权，保证迁移期兼容。
 - `WidgetClient.fetch` 返回代理后的标准 `Response`，`loadMedia` 返回受限的 `data:` URL 引用。
 - `notification_send` 已通过 Tauri notification provider 支持 Windows、macOS 和 Linux，实际显示仍受操作系统通知权限和桌面环境影响。
-- TimerWidget、QuickCaptureWidget、BrowserActivityWidget 仍使用直接 `tauriApi` 调用，待 Gateway 暴露对应能力后再迁移；但其渲染与交互已纳入官方组件测试覆盖。
+- **官方组件权限对齐与 Gateway 能力补齐（2026-10-03）**：官方组件 capabilities 已按真实 Gateway 用量修正（todo/quick-capture 补 `write_data`、browser-activity 新增 `read_browser` capability → `browser:read`、focus-coach 补 `write_data`、focus-streak 补 `read_metrics`）；新增 `ensure_official_widget_permissions` 权限 reconcile，在 create/open/启动恢复三个时机自动补齐缺失权限，并尊重用户显式撤销（审计最新动作为 revoke 的 scope 不再自动补发）。Gateway 新增 `interruptions`/`hourly`/`health` 查询命名空间与 `focus_session_write` 写能力（scope `settings:write`，start/stop 后广播 `focus-session-changed`）；SessionPulse、FocusCoach、Widget Health、Focus Streak 组件已迁移至 Gateway（`client.query("interruptions"|"hourly"|"health")`、`client.startFocusSession/stopFocusSession`）。TimerWidget 为自包含实现（localStorage），无需 Gateway；PetWidget 的 pack 导入与 active-window 订阅仍为受控直接 API。
 
 ### 建议下一步
 
 后续可选的 Runtime 强化工作：
 
 1. 为非 Windows 平台补充统一的原生通知 provider。
-2. 为高风险详细数据访问增加更细粒度的二次确认和降级 UI。
-3. 处理撤权后的长连接主动终止与显式 revoked 事件。
+2. ~~为高风险详细数据访问增加更细粒度的二次确认和降级 UI。~~（Phase D 已落地：高风险琥珀警告 + 视频/域名二级同意）
+3. ~~处理撤权后的长连接主动终止与显式 revoked 事件。~~（Phase D 已落地：`widget-permission-revoked` 含 reset 全量事件；网络请求为短连接 5s 超时，天然无长连接残留）
 4. 评估是否将 `buildLegacyChannel` 标记为 deprecated，并更新 `WIDGET_SDK_v2_MIGRATION.md`。
+5. 在 Widget Center/设置中暴露用户自定义域名 denylist 管理界面（`widget_network_domain_rules` 表已支持 `policy_source: 'user'`，目前仅缺 UI 与写入命令）。
+6. 评估为 test 二进制嵌入 Common Controls v6 manifest，修复本机 `cargo test` 无法直接启动的问题。
 
 ---
 
@@ -731,12 +742,13 @@ After this plan is reviewed, the next artifact should be a narrow RFC that freez
 
 - [x] Phase C 官方组件全量测试流程已落地。
 - [x] LLM 集成与 AI 洞察对话管理已落地：多模型配置、数据共享设置、分析范围选择、对话持久化（SQLite）、归档/置顶/删除、上下文 Summarize。
+- [x] Phase D 媒体与敏感访问加固已落地（2026-10-03）：类级网络/媒体同意、内置高风险域名封锁、按域名运行时同意、远程视频单独 opt-in、高风险同意警告 UI、撤权终止事件与审计。
 
-基于 Phase C 与 LLM 功能已完成，当前建议继续推进 v2.2.0 剩余需求：
+下一阶段建议（按优先级）：
 
-1. **桌宠重写**：改为纯宠物资源包模式，支持用户导入 JSON pack（参考 Codex 宠物）。
-2. **快速记录后待办/便签页面自动刷新**：保存后触发对应 widget 刷新事件。
-3. **错误日志筛选失效**：当前筛选输入不生效，所有行被隐藏。
-4. **自动更新弹窗与下载安装**：应用内检测更新、每次下载/安装需用户确认、支持关闭/仅提示。
+1. **Phase E — Java Runtime Beta**：JVM host、Java SDK、Java 包校验器、示例 widget（工程量大，需先确认优先级）。
+2. **域名防火墙设置 UI**：在 Widget Center 或设置中允许用户管理按域名拒绝/允许规则（后端表已就绪）。
+3. **PetWidget Gateway 化**：pet pack 导入、active-window 订阅、`getAllWidgets`/`getMonitorStatus` 仍走直接 API，可评估迁入 Gateway（新增 media/本机状态命名空间）。
+4. **v2.3.0 Widget Experience 收尾**：对照 ROADMAP v2.3.0 检查 Skin Studio、布局预设、Widget Health 的完成度。
 
-如果用户继续输入「继续」，则默认从第 1 项开始：桌宠重写为可导入宠物包。
+如果用户继续输入「继续」，默认从第 2 项开始：域名防火墙设置 UI（范围小、用户可感知）。

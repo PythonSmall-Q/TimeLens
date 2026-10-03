@@ -23,6 +23,8 @@
         "local_api_call",
         "notification_send",
         "focus_mode_write",
+        "todo_write",
+        "focus_session_write",
         "runtime_info"
       ]
     },

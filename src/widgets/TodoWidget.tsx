@@ -144,26 +144,7 @@ export default function TodoWidget({ widgetId }: Props) {
       return false;
     }
   });
-  const [isFocused, setIsFocused] = useState(true);
   const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    let unlisten: (() => void) | undefined;
-    const win = getCurrentWebviewWindow();
-    win.isFocused()
-      .then(setIsFocused)
-      .catch(() => {});
-    win.onFocusChanged(({ payload: focused }) => {
-      setIsFocused(focused);
-    })
-      .then((fn) => {
-        unlisten = fn;
-      })
-      .catch(() => {});
-    return () => {
-      unlisten?.();
-    };
-  }, []);
 
   useEffect(() => {
     const onChanged = () => {
@@ -276,10 +257,7 @@ export default function TodoWidget({ widgetId }: Props) {
   const remaining = todos.filter((t) => !t.done).length;
 
   return (
-    <div className={clsx(
-      "w-full h-full glass-card flex flex-col p-4 select-none overflow-hidden transition-all duration-200",
-      autoBlur && !isFocused && "blur-[2px] opacity-90"
-    )}>
+    <div className="w-full h-full glass-card flex flex-col p-4 select-none overflow-hidden transition-all duration-200">
       {/* Header / drag region */}
       <div data-tauri-drag-region className="flex items-center justify-between mb-3">
         <span className="text-text-muted text-xs">{t("todo.title")}</span>

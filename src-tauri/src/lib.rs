@@ -691,6 +691,12 @@ pub fn run() {
                             if !cfg.start_on_launch {
                                 continue;
                             }
+                            let _ = commands::widget_cmd::ensure_official_widget_permissions(
+                                &app_handle,
+                                &db_state,
+                                &cfg.id,
+                                &cfg.widget_type,
+                            );
                             let _ = commands::widget_cmd::build_widget_window_sync(&app_handle, &cfg);
                         }
                     }

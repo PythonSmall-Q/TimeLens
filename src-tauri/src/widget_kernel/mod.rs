@@ -140,6 +140,15 @@ impl WidgetKernel {
     ) -> Result<(), String> {
         let conn = self.db.lock().map_err(|e| e.to_string())?;
         db::revoke_all_widget_permissions(&conn, widget_id, actor).map_err(|e| e.to_string())?;
+        let consent_scopes: Vec<String> = db::get_widget_consent_decisions(&conn, widget_id)
+            .map_err(|e| e.to_string())?
+            .into_iter()
+            .map(|decision| decision.scope)
+            .collect();
+        for scope in consent_scopes {
+            db::revoke_widget_consent_decision(&conn, widget_id, &scope)
+                .map_err(|e| e.to_string())?;
+        }
         db::clear_widget_runtime_data(&conn, widget_id).map_err(|e| e.to_string())?;
         Ok(())
     }

@@ -32,9 +32,10 @@ export default function WidgetWindow({ widgetId }: Props) {
   const positionSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const topModeRef = useRef<"always" | "focus" | "never">("focus");
   const [isBlurred, setIsBlurred] = useState(false);
+  const [isWindowFocused, setIsWindowFocused] = useState(true);
+  const [autoBlurEnabled, setAutoBlurEnabled] = useState(false);
   const [idle, setIdle] = useState(false);
   const idleTimer = useRef<ReturnType<typeof setTimeout>>();
-  const autoBlurEnabled = useRef(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const [widgetType, setWidgetType] = useState<string>(
     widgetId.includes("-") ? widgetId.substring(0, widgetId.lastIndexOf("-")) : ""
@@ -65,18 +66,32 @@ export default function WidgetWindow({ widgetId }: Props) {
 
   useEffect(() => {
     const autoBlurKey = `${widgetId}-auto-blur`;
-    autoBlurEnabled.current = localStorage.getItem(autoBlurKey) === "1";
-    const onAutoBlurChanged = (event: Event) => {
-      const { widgetId: changedWidgetId, enabled } = (event as CustomEvent<{
-        widgetId?: string;
-        enabled?: boolean;
-      }>).detail ?? {};
+    try {
+      setAutoBlurEnabled(localStorage.getItem(autoBlurKey) === "1");
+    } catch {
+      setAutoBlurEnabled(false);
+    }
+    const onAutoBlurChanged = ({ widgetId: changedWidgetId, enabled }: {
+      widgetId?: string;
+      enabled?: boolean;
+    }) => {
       if (changedWidgetId !== widgetId) return;
-      autoBlurEnabled.current = enabled === true;
+      setAutoBlurEnabled(enabled === true);
       clearTimeout(idleTimer.current);
-      if (!autoBlurEnabled.current) setIdle(false);
+      if (enabled !== true) setIdle(false);
     };
-    window.addEventListener("timelens-widget-auto-blur-changed", onAutoBlurChanged);
+    const onLocalAutoBlurChanged = (event: Event) => {
+      onAutoBlurChanged((event as CustomEvent).detail ?? {});
+    };
+    window.addEventListener("timelens-widget-auto-blur-changed", onLocalAutoBlurChanged);
+    let disposed = false;
+    let unlistenAutoBlur: (() => void) | undefined;
+    void listen<{ widgetId?: string; enabled?: boolean }>("timelens-widget-auto-blur-changed", (event) => {
+      onAutoBlurChanged(event.payload);
+    }).then((unlisten) => {
+      if (disposed) unlisten();
+      else unlistenAutoBlur = unlisten;
+    }).catch(() => {});
 
     const heartbeatKey = `timelens-widget-heartbeat:${widgetId}`;
     const recordHeartbeat = (event: string) => {
@@ -105,7 +120,17 @@ export default function WidgetWindow({ widgetId }: Props) {
       .catch(() => {});
 
     // Focus/blur behavior: optionally fade on blur while keeping it visible.
+    void win.isFocused().then((focused) => {
+      setIsWindowFocused(focused);
+      const fadeOnBlur = localStorage.getItem("timelens-widget-fade-on-blur") !== "0";
+      setIsBlurred(fadeOnBlur && !focused);
+    }).catch(() => {});
     const unlistenFocus = win.onFocusChanged(({ payload: focused }) => {
+      setIsWindowFocused(focused);
+      if (focused) {
+        clearTimeout(idleTimer.current);
+        setIdle(false);
+      }
       const fadeOnBlur = localStorage.getItem("timelens-widget-fade-on-blur") !== "0";
 
       if (topModeRef.current === "always") {
@@ -128,6 +153,8 @@ export default function WidgetWindow({ widgetId }: Props) {
 
     const restoreOnMouseDown = () => {
       setIsBlurred(false);
+      clearTimeout(idleTimer.current);
+      setIdle(false);
       if (topModeRef.current !== "never") {
         win.setAlwaysOnTop(true).catch(() => {});
       }
@@ -161,7 +188,9 @@ export default function WidgetWindow({ widgetId }: Props) {
     return () => {
       unlistenFocus.then((u) => u());
       unlistenMove.then((u) => u());
-      window.removeEventListener("timelens-widget-auto-blur-changed", onAutoBlurChanged);
+      disposed = true;
+      unlistenAutoBlur?.();
+      window.removeEventListener("timelens-widget-auto-blur-changed", onLocalAutoBlurChanged);
       window.removeEventListener("mousedown", restoreOnMouseDown);
       if (positionSaveTimer.current) clearTimeout(positionSaveTimer.current);
     };
@@ -233,7 +262,7 @@ export default function WidgetWindow({ widgetId }: Props) {
   };
 
   const handleMouseLeave = () => {
-    if (!autoBlurEnabled.current) return;
+    if (!autoBlurEnabled) return;
     idleTimer.current = setTimeout(() => {
       const activeElement = document.activeElement;
       const isEditing = activeElement instanceof HTMLTextAreaElement
@@ -264,12 +293,12 @@ export default function WidgetWindow({ widgetId }: Props) {
   return (
     <div
       ref={rootRef}
-      className={`widget-root ${isBlurred && widgetType !== "clock" ? "widget-root--faded" : ""} ${idle ? "widget-idle" : ""}`}
+      className={`widget-root ${isBlurred && widgetType !== "clock" ? "widget-root--faded" : ""} ${autoBlurEnabled && (!isWindowFocused || idle) && widgetType !== "clock" ? "widget-root--auto-blurred" : ""}`}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       onFocusCapture={handleFocusCapture}
     >
-      {widgetType === "clock" && <ClockWidget key={refreshKey} widgetId={widgetId} isBlurred={isBlurred} />}
+      {widgetType === "clock" && <ClockWidget key={refreshKey} widgetId={widgetId} isBlurred={isBlurred || (autoBlurEnabled && (!isWindowFocused || idle))} />}
       {widgetType === "todo" && <TodoWidget key={refreshKey} widgetId={widgetId} />}
       {widgetType === "timer" && <TimerWidget key={refreshKey} widgetId={widgetId} />}
       {widgetType === "note" && <NoteWidget key={refreshKey} widgetId={widgetId} />}
@@ -283,7 +312,7 @@ export default function WidgetWindow({ widgetId }: Props) {
       {widgetType === "skin-preview" && <SkinPreviewWidget key={refreshKey} />}
       {widgetType === "layout-switcher" && <LayoutSwitcherWidget key={refreshKey} />}
       {widgetType === "widget-health" && <WidgetHealthWidget key={refreshKey} widgetId={widgetId} />}
-      {widgetType === "focus-streak" && <FocusStreakWidget key={refreshKey} />}
+      {widgetType === "focus-streak" && <FocusStreakWidget key={refreshKey} widgetId={widgetId} />}
       {widgetType !== "clock"
         && widgetType !== "todo"
         && widgetType !== "timer"

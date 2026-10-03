@@ -50,6 +50,7 @@
     "contain": "Contain",
     "stretch": "Stretch",
     "overlay": "Overlay",
+    "blur": "Blur",
     "appPreview": "TimeLens preview",
     "widgetPreview": "Widget preview",
     "checkContrast": "Check contrast",

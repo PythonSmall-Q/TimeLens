@@ -1,15 +1,24 @@
 use chrono::Local;
-use rusqlite::Connection;
+use rusqlite::{Connection, OptionalExtension};
 use serde_json::Value;
 
 use crate::db;
 use crate::models::{
     AppUsageSummary, BrowserDomainStats, CategoryUsageSummary, FocusSession, GoalProgress,
-    UsageGoal,
+    HourlyDistribution, UsageGoal, WidgetRuntimeHealth,
 };
 
 fn today() -> String {
     Local::now().format("%Y-%m-%d").to_string()
+}
+
+fn payload_date(payload: &Option<Value>) -> String {
+    payload
+        .as_ref()
+        .and_then(|p| p.get("date"))
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
+        .unwrap_or_else(today)
 }
 
 fn query_metrics(conn: &Connection, payload: &Option<Value>) -> Result<Value, String> {
@@ -158,6 +167,44 @@ fn query_todos(conn: &Connection, _payload: &Option<Value>) -> Result<Value, Str
     Ok(serde_json::to_value(todos).unwrap_or(Value::Array(vec![])))
 }
 
+fn query_interruptions(conn: &Connection, payload: &Option<Value>) -> Result<Value, String> {
+    let date = payload_date(payload);
+    let periods = db::get_interruption_periods(conn, &date).map_err(|e| e.to_string())?;
+    Ok(serde_json::to_value(periods).unwrap_or(Value::Array(vec![])))
+}
+
+fn query_hourly(conn: &Connection, payload: &Option<Value>) -> Result<Value, String> {
+    let date = payload_date(payload);
+    let rows = db::get_hourly_distribution(conn, &date).map_err(|e| e.to_string())?;
+    let distribution: Vec<HourlyDistribution> = rows
+        .into_iter()
+        .map(|(hour, seconds)| HourlyDistribution { hour, seconds })
+        .collect();
+    Ok(serde_json::to_value(distribution).unwrap_or(Value::Array(vec![])))
+}
+
+fn query_health(conn: &Connection, widget_id: &str) -> Result<Value, String> {
+    let health = conn
+        .query_row(
+            "SELECT widget_id, host_id, memory_used_mb, cpu_used_ms, last_heartbeat_at, status
+             FROM widget_runtime_health WHERE widget_id = ?1",
+            rusqlite::params![widget_id],
+            |row| {
+                Ok(WidgetRuntimeHealth {
+                    widget_id: row.get(0)?,
+                    host_id: row.get(1)?,
+                    memory_used_mb: row.get(2)?,
+                    cpu_used_ms: row.get(3)?,
+                    last_heartbeat_at: row.get(4)?,
+                    status: row.get(5)?,
+                })
+            },
+        )
+        .optional()
+        .map_err(|e| e.to_string())?;
+    Ok(serde_json::to_value(health).unwrap_or(Value::Null))
+}
+
 #[derive(serde::Serialize)]
 struct BrowserQueryResult {
     domains: Vec<BrowserDomainStats>,
@@ -207,6 +254,7 @@ fn query_browser(conn: &Connection, payload: &Option<Value>) -> Result<Value, St
 
 pub fn handle_query(
     conn: &Connection,
+    widget_id: &str,
     namespace: &str,
     payload: &Option<Value>,
 ) -> Result<Value, String> {
@@ -221,6 +269,9 @@ pub fn handle_query(
         "focus" => query_focus(conn, payload),
         "todos" => query_todos(conn, payload),
         "browser" => query_browser(conn, payload),
+        "interruptions" => query_interruptions(conn, payload),
+        "hourly" => query_hourly(conn, payload),
+        "health" => query_health(conn, widget_id),
         _ => Err(format!("unknown widget query namespace: {}", namespace)),
     }
 }

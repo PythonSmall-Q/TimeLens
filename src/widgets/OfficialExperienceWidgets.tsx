@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import * as api from "@/services/tauriApi";
 import { getCurrentProfileId, readWidgetPresets, type WidgetLayoutPreset } from "@/pages/WidgetCenter/widgetExperience";
 import type { FocusSession, WidgetRuntimeHealth } from "@/types";
+import { useWidgetClient } from "@/hooks/useWidgetClient";
 
 export function SkinPreviewWidget() {
   const { t } = useTranslation("widgets");
@@ -25,14 +25,17 @@ export function LayoutSwitcherWidget() {
 
 export function WidgetHealthWidget({ widgetId }: { widgetId: string }) {
   const { t } = useTranslation("widgets");
+  const client = useWidgetClient({ widgetId, widgetType: "widget-health" });
   const [health, setHealth] = useState<WidgetRuntimeHealth | null>(null);
-  useEffect(() => { void api.getWidgetRuntimeHealth(widgetId).then(setHealth).catch(() => setHealth(null)); }, [widgetId]);
+  useEffect(() => { void client.query<WidgetRuntimeHealth | null>("health").then(setHealth).catch(() => setHealth(null)); }, [client, widgetId]);
   return <div className="h-full p-4 space-y-3"><h2 className="text-sm font-semibold">{t("widgetHealth.title")}</h2><p className="text-xs text-text-muted">{t("widgetHealth.status")}: {health?.status ?? t("widgetHealth.unavailable")}</p><p className="text-xs text-text-muted">{t("widgetHealth.memory")}: {health ? `${health.memory_used_mb} MB` : "-"}</p><p className="text-xs text-text-muted">{t("widgetHealth.cpu")}: {health ? `${health.cpu_used_ms} ms` : "-"}</p></div>;
 }
 
-export function FocusStreakWidget() {
+export function FocusStreakWidget({ widgetId }: { widgetId: string }) {
   const { t } = useTranslation("widgets");
+  const client = useWidgetClient({ widgetId, widgetType: "focus-streak" });
   const [sessions, setSessions] = useState<FocusSession[]>([]);
-  useEffect(() => { void api.listFocusSessions().then(setSessions).catch(() => setSessions([])); }, []);
+  // The previous unbounded listFocusSessions() returned every session; use a full-range window to keep that behavior.
+  useEffect(() => { void client.query<FocusSession[]>("sessions", { start_at: "1970-01-01T00:00:00", end_at: "9999-12-31T23:59:59" }).then(setSessions).catch(() => setSessions([])); }, [client, widgetId]);
   return <div className="h-full p-4 space-y-3"><h2 className="text-sm font-semibold">{t("focusStreak.title")}</h2><p className="text-3xl font-bold text-accent-blue">{sessions.length}</p><p className="text-xs text-text-muted">{t("focusStreak.sessions")}</p></div>;
 }

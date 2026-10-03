@@ -199,7 +199,10 @@ export type WidgetQueryNamespace =
   | "rules"
   | "focus"
   | "todos"
-  | "browser";
+  | "browser"
+  | "interruptions"
+  | "hourly"
+  | "health";
 
 export interface WidgetQueryRequest {
   widget_id: string;
@@ -242,6 +245,7 @@ export type WidgetGatewayRequestType =
   | "notification_send"
   | "focus_mode_write"
   | "todo_write"
+  | "focus_session_write"
   | "runtime_info";
 
 export interface WidgetGatewayRequest {
