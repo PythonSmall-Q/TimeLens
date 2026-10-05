@@ -4,6 +4,7 @@
 
 :root,
 html.theme-dark {
+  color-scheme: dark;
   --app-bg: #141824;
   --surface: #1e2433;
   --surface-light: #262d3d;
@@ -24,6 +25,7 @@ html.theme-dark {
 }
 
 html.theme-light {
+  color-scheme: light;
   --app-bg: #eef3fb;
   --surface: #f6f9ff;
   --surface-light: #edf3ff;
@@ -370,6 +372,11 @@ html.compact-widgets .widget-root {
   background: var(--surface-card);
   color: var(--text-primary);
   padding: 6px 10px;
+}
+
+.ui-select option:checked {
+  background: var(--surface-hover);
+  color: var(--text-primary);
 }
 
 .ui-range {
